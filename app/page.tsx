@@ -4,6 +4,8 @@ import Input from "@/app/components/ui/Input";
 import Button from "@/app/components/ui/Button";
 import { prisma } from "@/app/lib/prisma";
 
+export const dynamic = "force-dynamic";
+
 function Icon({ name, className }: { name: "car" | "shield" | "bolt" | "sparkles" | "key" | "gear" | "star" | "users"; className?: string }) {
   const common = "h-5 w-5";
   const cls = className ? `${common} ${className}` : common;
@@ -209,28 +211,45 @@ function TopListingsRow({ title, listings }: { title: string; listings: TopListi
 }
 
 export default async function Home() {
-  const topListingsRaw = await prisma.listing.findMany({
-    where: { status: "ACTIVE", isApproved: true },
-    orderBy: { createdAt: "desc" },
-    take: 5,
-    select: {
-      id: true,
-      title: true,
-      city: true,
-      country: true,
-      dailyRateCents: true,
-      currency: true,
-      imageUrl: true,
-      host: {
-        select: {
-          reviewsReceived: {
-            select: { rating: true },
-            take: 50,
+  let topListingsRaw: Array<{
+    id: string;
+    title: string;
+    city: string;
+    country: string;
+    dailyRateCents: number;
+    currency: string;
+    imageUrl: string | null;
+    host: { reviewsReceived: Array<{ rating: number }> };
+  }> = [];
+
+  try {
+    topListingsRaw = await prisma.listing.findMany({
+      where: { status: "ACTIVE", isApproved: true },
+      orderBy: { createdAt: "desc" },
+      take: 5,
+      select: {
+        id: true,
+        title: true,
+        city: true,
+        country: true,
+        dailyRateCents: true,
+        currency: true,
+        imageUrl: true,
+        host: {
+          select: {
+            reviewsReceived: {
+              select: { rating: true },
+              take: 50,
+            },
           },
         },
       },
-    },
-  });
+    });
+  } catch {
+    // If the DB isn't reachable (e.g. during build/prerender or temporary outage),
+    // render the page without featured listings instead of failing the build.
+    topListingsRaw = [];
+  }
 
   const topListings: TopListing[] = topListingsRaw.map((l) => {
     const ratings = l.host.reviewsReceived.map((r) => r.rating).filter((n) => Number.isFinite(n));
