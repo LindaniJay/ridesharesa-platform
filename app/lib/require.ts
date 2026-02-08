@@ -22,14 +22,14 @@ export type AuthedUser = {
 async function getOrCreateDbUser(params: {
   email: string;
   name?: string | null;
-  role?: "HOST" | "RENTER" | null;
+  role?: Role | null;
 }) {
   return prisma.user.upsert({
     where: { email: params.email },
     create: {
       email: params.email,
       name: params.name ?? null,
-      role: params.role === "HOST" ? "HOST" : "RENTER",
+      role: params.role ?? "RENTER",
       status: "ACTIVE",
       idVerificationStatus: "UNVERIFIED",
       driversLicenseStatus: "UNVERIFIED",
@@ -37,6 +37,9 @@ async function getOrCreateDbUser(params: {
     update: {
       // Only fill name if missing.
       ...(params.name ? { name: params.name } : {}),
+
+      // Allow promoting to ADMIN only from server-controlled sources.
+      ...(params.role === "ADMIN" ? { role: "ADMIN" } : {}),
     },
     select: {
       id: true,
@@ -69,12 +72,21 @@ export async function requireUser(): Promise<AuthedUser> {
     (typeof data.user.user_metadata?.name === "string" && data.user.user_metadata.name.trim()) ||
     null;
 
+  // ADMIN is only allowed from server-controlled app_metadata.
+  // (Supabase Auth app_metadata can only be written via service role.)
+  const appRoleRaw = data.user.app_metadata?.role;
+  const appRole = appRoleRaw === "ADMIN" ? "ADMIN" : null;
+
   // Only allow HOST/RENTER to be sourced from user metadata.
   // Never grant ADMIN via client-controlled metadata.
   const metadataRoleRaw = data.user.user_metadata?.role;
   const metadataRole = metadataRoleRaw === "HOST" || metadataRoleRaw === "RENTER" ? metadataRoleRaw : null;
 
-  const dbUser = await getOrCreateDbUser({ email, name, role: metadataRole });
+  const dbUser = await getOrCreateDbUser({
+    email,
+    name,
+    role: appRole ?? metadataRole,
+  });
 
   if (dbUser.status === "SUSPENDED") redirect("/");
   return { supabaseUser: data.user, dbUser };

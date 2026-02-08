@@ -18,6 +18,10 @@ export async function GET() {
 
   const email = data.user.email.toLowerCase().trim();
 
+  // ADMIN is only allowed from server-controlled app_metadata.
+  const appRoleRaw = data.user.app_metadata?.role;
+  const appRole = appRoleRaw === "ADMIN" ? "ADMIN" : null;
+
   // Only allow HOST/RENTER from metadata. Never grant ADMIN via metadata.
   const metadataRoleRaw = data.user.user_metadata?.role;
   const metadataRole = metadataRoleRaw === "HOST" || metadataRoleRaw === "RENTER" ? metadataRoleRaw : null;
@@ -26,12 +30,12 @@ export async function GET() {
     where: { email },
     create: {
       email,
-      role: metadataRole === "HOST" ? "HOST" : "RENTER",
+      role: appRole ?? (metadataRole === "HOST" ? "HOST" : "RENTER"),
       status: "ACTIVE",
       idVerificationStatus: "UNVERIFIED",
       driversLicenseStatus: "UNVERIFIED",
     },
-    update: {},
+    update: appRole === "ADMIN" ? { role: "ADMIN" } : {},
     select: { email: true, role: true, status: true },
   });
 

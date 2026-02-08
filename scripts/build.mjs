@@ -1,5 +1,6 @@
 import { spawn } from "node:child_process";
 import path from "node:path";
+import fs from "node:fs";
 
 const workspaceRoot = process.cwd();
 const env = { ...process.env };
@@ -57,6 +58,20 @@ function sleep(ms) {
   return new Promise((r) => setTimeout(r, ms));
 }
 
+function fileExists(p) {
+  try {
+    return fs.existsSync(p);
+  } catch {
+    return false;
+  }
+}
+
+function getNodeMajor() {
+  const raw = process.versions?.node ?? "";
+  const major = Number.parseInt(String(raw).split(".")[0] ?? "", 10);
+  return Number.isFinite(major) ? major : null;
+}
+
 function isPrismaWindowsEngineLocked(text) {
   if (!text) return false;
   return (
@@ -90,6 +105,11 @@ const args = process.argv.slice(2);
 const prismaCli = path.resolve(workspaceRoot, "node_modules", "prisma", "build", "index.js");
 console.log("[build] prisma generate");
 {
+  const nodeMajor = getNodeMajor();
+  const generatedClientDts = path.resolve(workspaceRoot, "node_modules", ".prisma", "client", "index.d.ts");
+  const generatedClientJs = path.resolve(workspaceRoot, "node_modules", ".prisma", "client", "index.js");
+  const hasGeneratedClient = fileExists(generatedClientDts) || fileExists(generatedClientJs);
+
   // Prisma requires DATABASE_URL to be present to parse the datasource in schema/config.
   // Vercel builds can fail if DATABASE_URL is not configured for the Build step.
   // This fallback only exists to allow `prisma generate` (types/client) to run.
@@ -100,10 +120,25 @@ console.log("[build] prisma generate");
     console.log("[build] Set DATABASE_URL in your Vercel Project Settings for Preview/Production.");
   }
 
-  const maxAttempts = 3;
-  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-    const result = await runWithCapture(process.execPath, [prismaCli, "generate"]);
-    if (!result.signal && result.code === 0) break;
+  // Prisma CLI has been seen to crash on non-LTS Node versions (e.g. v23).
+  // If we already have a generated client, don't block builds on regeneration.
+  if (nodeMajor != null && nodeMajor >= 23) {
+    if (hasGeneratedClient) {
+      console.log(
+        `[build] WARNING: Detected Node.js v${process.versions.node}. Skipping prisma generate because Prisma may not support this Node version.`
+      );
+    } else {
+      console.error(
+        `[build] ERROR: Detected Node.js v${process.versions.node} and no generated Prisma client was found.\n` +
+          "[build] Please use an LTS Node version (20 or 22), then run: npm run db:generate"
+      );
+      process.exit(1);
+    }
+  } else {
+    const maxAttempts = 3;
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      const result = await runWithCapture(process.execPath, [prismaCli, "generate"]);
+      if (!result.signal && result.code === 0) break;
 
     const combined = `${result.stdout ?? ""}\n${result.stderr ?? ""}`;
     const looksLocked = process.platform === "win32" && isPrismaWindowsEngineLocked(combined);
@@ -111,15 +146,24 @@ console.log("[build] prisma generate");
       printPrismaWindowsEpermHelp();
     }
 
-    if (attempt === maxAttempts) {
-      if (result.signal) process.exit(1);
-      process.exit(result.code);
-    }
+      if (attempt === maxAttempts) {
+        // If Prisma generation fails but a previous client exists, allow build to proceed.
+        if (hasGeneratedClient) {
+          console.log(
+            `[build] WARNING: prisma generate failed, but an existing generated client was found. Continuing without regenerating.`
+          );
+          break;
+        }
+
+        if (result.signal) process.exit(1);
+        process.exit(result.code);
+      }
 
     // On Windows, prisma generate can fail with EPERM when the query engine DLL is temporarily locked.
     // A short retry usually fixes it (AV / file handles).
-    console.log(`[build] prisma generate failed (attempt ${attempt}/${maxAttempts}). Retrying...`);
-    await sleep(looksLocked ? 2000 : 600);
+      console.log(`[build] prisma generate failed (attempt ${attempt}/${maxAttempts}). Retrying...`);
+      await sleep(looksLocked ? 2000 : 600);
+    }
   }
 }
 
