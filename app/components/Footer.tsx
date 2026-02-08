@@ -35,6 +35,9 @@ export default function Footer() {
               <Link className="text-foreground/70 hover:text-foreground hover:underline underline-offset-4" href="/guides">
                 Help center
               </Link>
+              <Link className="text-foreground/70 hover:text-foreground hover:underline underline-offset-4" href="/assist">
+                Roadside assist
+              </Link>
               <Link className="text-foreground/70 hover:text-foreground hover:underline underline-offset-4" href="/guides/renters/documents">
                 Safety
               </Link>

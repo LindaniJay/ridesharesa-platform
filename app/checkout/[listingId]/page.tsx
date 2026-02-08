@@ -11,6 +11,14 @@ function first(param: string | string[] | undefined) {
   return Array.isArray(param) ? String(param[0] ?? "") : String(param);
 }
 
+function firstInt(param: string | string[] | undefined) {
+  const raw = first(param).trim();
+  if (!raw) return null;
+  const n = Number(raw);
+  if (!Number.isFinite(n)) return null;
+  return Math.max(0, Math.floor(n));
+}
+
 export default async function CheckoutPage({
   params,
   searchParams,
@@ -24,6 +32,9 @@ export default async function CheckoutPage({
 
   const initialStartDate = first(resolvedSearchParams?.start).trim();
   const initialEndDate = first(resolvedSearchParams?.end).trim();
+
+  const initialChauffeurKm = firstInt(resolvedSearchParams?.chauffeurKm) ?? 0;
+  const initialChauffeurEnabled = first(resolvedSearchParams?.chauffeur).trim() === "1" || initialChauffeurKm > 0;
 
   const listing = await prisma.listing.findFirst({
     where: { id: params.listingId, status: "ACTIVE", isApproved: true },
@@ -86,6 +97,8 @@ export default async function CheckoutPage({
             currency={currency}
             initialStartDate={initialStartDate}
             initialEndDate={initialEndDate}
+            initialChauffeurEnabled={initialChauffeurEnabled}
+            initialChauffeurKm={initialChauffeurKm}
           />
         </CardContent>
       </Card>

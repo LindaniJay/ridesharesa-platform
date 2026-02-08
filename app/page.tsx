@@ -354,7 +354,7 @@ export default async function Home() {
                     <Icon name="car" className="text-foreground/70" />
                     Renter
                   </div>
-                  <div className="mt-1 text-sm text-foreground/60">Discover, book, and manage trips.</div>
+                  <div className="mt-1 text-sm text-foreground/60">Discover, book, and manage bookings.</div>
                 </div>
                 <div className="rounded-2xl border border-border bg-background/40 p-4">
                   <div className="inline-flex items-center gap-2 text-sm font-medium">

@@ -56,10 +56,14 @@ const I18N: Record<ChatLang, Record<string, string>> = {
     menu_bookings: "My bookings",
     menu_docs: "Document status",
     menu_ticket: "Create support ticket",
+    menu_assist: "Roadside assist",
     menu_listings: "Browse listings",
     menu_how: "How it works",
     menu_payments: "Payments (Card/EFT)",
     menu_signin: "Sign in",
+    assist_title: "Roadside assist",
+    assist_line1: "Flat tyre, out of fuel, or you’re stuck?",
+    assist_line2: "Open Assist and send your location to request help.",
     recent_bookings: "Here are your most recent bookings (tap one to open):",
     no_bookings: "You don’t have any bookings yet.",
     sign_in_required:
@@ -84,10 +88,14 @@ const I18N: Record<ChatLang, Record<string, string>> = {
     menu_bookings: "Okubhukile kwami",
     menu_docs: "Isimo samadokhumenti",
     menu_ticket: "Dala ithikithi lokusekelwa",
+    menu_assist: "Usizo lomgwaqo",
     menu_listings: "Bheka izimoto",
     menu_how: "Kusebenza kanjani",
     menu_payments: "Izinkokhelo (Ikhadi/EFT)",
     menu_signin: "Ngena",
+    assist_title: "Usizo lomgwaqo",
+    assist_line1: "Ithayi ephumile umoya, uphelelwe uphethiloli, noma ubambekile?",
+    assist_line2: "Vula i-Assist bese uthumela indawo yakho ukuze uthole usizo.",
     recent_bookings: "Nazi okubhukile zakamuva (cindezela ukuvula):",
     no_bookings: "Awunakho okubhukile okwamanje.",
     sign_in_required:
@@ -112,10 +120,14 @@ const I18N: Record<ChatLang, Record<string, string>> = {
     menu_bookings: "My besprekings",
     menu_docs: "Dokumentstatus",
     menu_ticket: "Skep ondersteuningstiket",
+    menu_assist: "Padbystand",
     menu_listings: "Blaai motors",
     menu_how: "Hoe dit werk",
     menu_payments: "Betalings (Kaart/EFT)",
     menu_signin: "Meld aan",
+    assist_title: "Padbystand",
+    assist_line1: "Pap band, sonder brandstof, of jy sit vas?",
+    assist_line2: "Open Assist en stuur jou ligging om hulp te vra.",
     recent_bookings: "Hier is jou mees onlangse besprekings (tik om oop te maak):",
     no_bookings: "Jy het nog geen besprekings nie.",
     sign_in_required:
@@ -211,12 +223,14 @@ function helpResponse(lang: ChatLang, params?: { signedIn?: boolean }): ChatbotR
           { id: uid(), label: t(lang, "menu_bookings"), action: { kind: "listBookings" } },
           { id: uid(), label: t(lang, "menu_docs"), action: { kind: "getVerification" } },
           { id: uid(), label: t(lang, "menu_ticket"), action: { kind: "startTicket" } },
+          { id: uid(), label: t(lang, "menu_assist"), action: { kind: "send", text: "Roadside assist" } },
           { id: uid(), label: t(lang, "menu_listings"), action: { kind: "send", text: "Show me listings" } },
           { id: uid(), label: t(lang, "menu_how"), action: { kind: "send", text: "How it works" } },
         ]
       : [
           { id: uid(), label: t(lang, "menu_listings"), action: { kind: "send", text: "Show me listings" } },
           { id: uid(), label: t(lang, "menu_how"), action: { kind: "send", text: "How it works" } },
+          { id: uid(), label: t(lang, "menu_assist"), action: { kind: "send", text: "Roadside assist" } },
           { id: uid(), label: t(lang, "menu_payments"), action: { kind: "send", text: "How do payments work?" } },
           { id: uid(), label: t(lang, "menu_signin"), action: { kind: "send", text: "Sign in" } },
         ],
@@ -224,9 +238,10 @@ function helpResponse(lang: ChatLang, params?: { signedIn?: boolean }): ChatbotR
       {
         id: uid(),
         title: "Quick links",
-        lines: ["Browse listings", "Learn how it works", "Terms & privacy"],
+        lines: ["Browse listings", "Roadside assist", "Learn how it works"],
         actions: [
           { label: "Listings", action: { kind: "send", text: "Show me listings" } },
+          { label: "Assist", action: { kind: "send", text: "Roadside assist" } },
           { label: "How it works", action: { kind: "send", text: "How it works" } },
           { label: "Terms", action: { kind: "send", text: "Terms" } },
           { label: "Privacy", action: { kind: "send", text: "Privacy" } },
@@ -414,7 +429,11 @@ function normalizeText(message: string) {
   return message.toLowerCase().trim().replace(/\s+/g, " ");
 }
 
-async function answerMessage(message: string, dbUser: Awaited<ReturnType<typeof getAuthedDbUserOrNull>>): Promise<ChatbotResponse> {
+async function answerMessage(
+  message: string,
+  dbUser: Awaited<ReturnType<typeof getAuthedDbUserOrNull>>,
+  lang: ChatLang,
+): Promise<ChatbotResponse> {
   const text = normalizeText(message);
 
   // Greetings
@@ -455,6 +474,38 @@ async function answerMessage(message: string, dbUser: Awaited<ReturnType<typeof 
     if (cancelMatch) {
       return await cancelBooking(dbUser.id, cancelMatch[2]);
     }
+  }
+
+  if (
+    text.includes("assist") ||
+    text.includes("roadside") ||
+    text.includes("flat") ||
+    text.includes("tyre") ||
+    text.includes("tire") ||
+    text.includes("puncture") ||
+    text.includes("petrol") ||
+    text.includes("fuel") ||
+    text.includes("out of fuel") ||
+    text.includes("out of petrol")
+  ) {
+    return {
+      messages: [
+        {
+          text: `${t(lang, "assist_line1")} ${t(lang, "assist_line2")}`,
+        },
+      ],
+      cards: [
+        {
+          id: uid(),
+          title: t(lang, "assist_title"),
+          lines: [t(lang, "assist_line1"), t(lang, "assist_line2")],
+          href: "/assist",
+        },
+      ],
+      quickReplies: [
+        { id: uid(), label: "Show help", action: { kind: "help" } },
+      ],
+    };
   }
 
   // Support ticket intent (guided flow handled by the client widget)
@@ -679,7 +730,7 @@ export async function POST(req: Request) {
 
   if ("message" in body) {
     try {
-      const resp = await answerMessage(body.message, dbUser);
+      const resp = await answerMessage(body.message, dbUser, lang);
 
       // Special-case: greeting/help placeholder emitted above
       if (resp.messages.length === 1 && resp.messages[0]?.text === "help") {

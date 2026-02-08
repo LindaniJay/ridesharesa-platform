@@ -80,13 +80,21 @@ export default function HowItWorksPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Next: enterprise features</CardTitle>
-          <CardDescription>Payments, identity verification, audit logs, and operational tooling.</CardDescription>
+          <CardTitle>Roadside assist</CardTitle>
+          <CardDescription>Flat tyre or out of petrol.</CardDescription>
         </CardHeader>
         <CardContent>
-          <p className="text-sm text-black/70 dark:text-white/70">
-            To implement the full enterprise set (real payments, emails, uploads, audit logs, monitoring, tests, Postgres), we’ll pick providers and configure environments.
-          </p>
+          <ol className="list-decimal space-y-2 pl-5 text-sm">
+            <li>Open the Assist page and allow location access (or click the map to set your position).</li>
+            <li>Select the issue: Flat tyre or Out of petrol.</li>
+            <li>Add optional notes and a contact number.</li>
+            <li>Submit to create a support incident with your location attached.</li>
+          </ol>
+          <div className="mt-4">
+            <Link className="text-sm font-medium underline" href="/assist">
+              Open roadside assist
+            </Link>
+          </div>
         </CardContent>
       </Card>
     </main>

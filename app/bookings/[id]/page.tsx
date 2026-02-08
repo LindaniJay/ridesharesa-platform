@@ -9,10 +9,33 @@ import { prisma } from "@/app/lib/prisma";
 import { requireUser } from "@/app/lib/require";
 import BookingStatusClient from "@/app/bookings/[id]/BookingStatusClient";
 
-export default async function BookingPage({ params }: { params: { id: string } }) {
+function parseIntParam(v: unknown) {
+  if (typeof v !== "string") return null;
+  const n = Number(v);
+  if (!Number.isFinite(n)) return null;
+  const i = Math.floor(n);
+  if (String(i) !== v.trim()) return i;
+  return i;
+}
+
+export default async function BookingPage({
+  params,
+  searchParams,
+}: {
+  params: { id: string };
+  searchParams?: Record<string, string | string[] | undefined>;
+}) {
   const { dbUser } = await requireUser();
   const viewerRole = dbUser.role;
   const viewerId = dbUser.id;
+
+  const chauffeurKmRaw = Array.isArray(searchParams?.chauffeurKm)
+    ? searchParams?.chauffeurKm[0]
+    : searchParams?.chauffeurKm;
+  const chauffeurKmParsed = parseIntParam(chauffeurKmRaw);
+  const chauffeurKm = chauffeurKmParsed && chauffeurKmParsed > 0 ? Math.min(chauffeurKmParsed, 5000) : 0;
+  const chauffeurRateCentsPerKm = 10 * 100;
+  const chauffeurCents = chauffeurKm > 0 ? chauffeurKm * chauffeurRateCentsPerKm : 0;
 
   const booking = await prisma.booking.findUnique({
     where: { id: params.id },
@@ -31,6 +54,7 @@ export default async function BookingPage({ params }: { params: { id: string } }
           id: true,
           title: true,
           city: true,
+          dailyRateCents: true,
         },
       },
     },
@@ -41,6 +65,8 @@ export default async function BookingPage({ params }: { params: { id: string } }
 
   const isPending = booking.status === "PENDING_PAYMENT";
   const isManualPayment = isPending && !booking.stripeCheckoutSessionId;
+
+  const rentalCents = Math.max(0, booking.totalCents - chauffeurCents);
 
   const eft = {
     bankName: process.env.EFT_BANK_NAME ?? "",
@@ -163,6 +189,30 @@ export default async function BookingPage({ params }: { params: { id: string } }
               <div>{booking.days}</div>
             </div>
             <div>
+              <div className="text-black/60 dark:text-white/60">Daily rate</div>
+              <div>
+                {(booking.listing.dailyRateCents / 100).toFixed(0)} {booking.currency}
+              </div>
+            </div>
+
+            {chauffeurKm > 0 ? (
+              <>
+                <div>
+                  <div className="text-black/60 dark:text-white/60">Rental total</div>
+                  <div>
+                    {(rentalCents / 100).toFixed(0)} {booking.currency}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-black/60 dark:text-white/60">Chauffeur</div>
+                  <div>
+                    {chauffeurKm} km × 10 = {(chauffeurCents / 100).toFixed(0)} {booking.currency}
+                  </div>
+                </div>
+              </>
+            ) : null}
+
+            <div>
               <div className="text-black/60 dark:text-white/60">Total</div>
               <div>
                 {(booking.totalCents / 100).toFixed(0)} {booking.currency}
@@ -175,13 +225,13 @@ export default async function BookingPage({ params }: { params: { id: string } }
       <Card>
         <CardHeader>
           <CardTitle>Next steps</CardTitle>
-          <CardDescription>What to do before pickup and during your trip.</CardDescription>
+          <CardDescription>What to do before pickup and during your booking.</CardDescription>
         </CardHeader>
         <CardContent>
           <ul className="list-disc space-y-2 pl-5 text-sm text-black/70 dark:text-white/70">
-            <li>Double-check your dates and trip details.</li>
+            <li>Double-check your dates and booking details.</li>
             <li>Bring a valid driver’s license and ID.</li>
-            <li>Need help during the trip? Create a support ticket.</li>
+            <li>Need help during the booking? Create a support ticket.</li>
           </ul>
           <div className="mt-3 flex flex-wrap gap-2">
             <Link href="/renter#support">
@@ -202,7 +252,7 @@ export default async function BookingPage({ params }: { params: { id: string } }
           <Button>Browse more</Button>
         </Link>
         {isPending ? (
-          <Link href={`/checkout/${booking.listing.id}?start=${encodeURIComponent(booking.startDate.toISOString().slice(0, 10))}&end=${encodeURIComponent(booking.endDate.toISOString().slice(0, 10))}`}>
+          <Link href={`/checkout/${booking.listing.id}?start=${encodeURIComponent(booking.startDate.toISOString().slice(0, 10))}&end=${encodeURIComponent(booking.endDate.toISOString().slice(0, 10))}${chauffeurKm > 0 ? `&chauffeurKm=${encodeURIComponent(String(chauffeurKm))}&chauffeur=1` : ""}`}>
             <Button variant="secondary">Try payment again</Button>
           </Link>
         ) : null}

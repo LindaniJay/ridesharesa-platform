@@ -107,9 +107,12 @@ export default function NavbarClient() {
           <NavLink href="/listings" active={isActivePath(pathname, "/listings")}>
             Listings
           </NavLink>
+          <NavLink href="/assist" active={isActivePath(pathname, "/assist")}>
+            Assist
+          </NavLink>
           {role === "RENTER" && (
             <NavLink href="/renter" active={isActivePath(pathname, "/renter")}>
-              Trips
+              Bookings
             </NavLink>
           )}
           {role === "HOST" && (
@@ -175,9 +178,12 @@ export default function NavbarClient() {
         <NavLink href="/listings" active={isActivePath(pathname, "/listings")}>
           Listings
         </NavLink>
+        <NavLink href="/assist" active={isActivePath(pathname, "/assist")}>
+          Assist
+        </NavLink>
         {role === "RENTER" && (
           <NavLink href="/renter" active={isActivePath(pathname, "/renter")}>
-            Trips
+            Bookings
           </NavLink>
         )}
         {role === "HOST" && (

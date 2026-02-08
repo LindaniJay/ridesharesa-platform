@@ -216,7 +216,7 @@ export default async function HostDashboardPage() {
           </Card>
           <Card>
             <CardHeader>
-              <CardTitle>Trips in progress</CardTitle>
+              <CardTitle>Bookings in progress</CardTitle>
               <CardDescription>Active rentals right now.</CardDescription>
             </CardHeader>
             <CardContent>
@@ -226,7 +226,7 @@ export default async function HostDashboardPage() {
           <Card>
             <CardHeader>
               <CardTitle>Booking history</CardTitle>
-              <CardDescription>Confirmed trips completed.</CardDescription>
+              <CardDescription>Confirmed bookings completed.</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-semibold">{confirmedTrips}</div>
@@ -360,12 +360,12 @@ export default async function HostDashboardPage() {
           </Card>
           <Card>
             <CardHeader>
-              <CardTitle>Trips in progress</CardTitle>
+              <CardTitle>Bookings in progress</CardTitle>
               <CardDescription>Currently active rentals.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-2">
               {activeBookings.length === 0 ? (
-                <div className="text-sm text-foreground/60">No active trips.</div>
+                <div className="text-sm text-foreground/60">No active bookings.</div>
               ) : (
                 activeBookings.map((b) => (
                   <div key={b.id} className="rounded-lg border border-border bg-card p-3 text-sm">
@@ -388,12 +388,12 @@ export default async function HostDashboardPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Past trips</CardTitle>
+            <CardTitle>Past bookings</CardTitle>
             <CardDescription>Recent completed/cancelled bookings.</CardDescription>
           </CardHeader>
           <CardContent>
             {pastBookings.length === 0 ? (
-              <div className="text-sm text-foreground/60">No past trips.</div>
+              <div className="text-sm text-foreground/60">No past bookings.</div>
             ) : (
               <div className="overflow-hidden rounded-xl border border-border">
                 <table className="w-full text-left text-sm">

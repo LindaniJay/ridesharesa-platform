@@ -109,21 +109,21 @@ export default async function RenterDashboardPage() {
     <main className="space-y-8">
       <div className="space-y-1">
         <h1 className="text-2xl font-semibold tracking-tight">Renter dashboard</h1>
-        <p className="text-sm text-foreground/60">Manage your trips, payments, and support.</p>
+        <p className="text-sm text-foreground/60">Manage your bookings, payments, and support.</p>
       </div>
 
       <section className="space-y-3">
-        <h2 className="text-lg font-semibold">Trips overview</h2>
+        <h2 className="text-lg font-semibold">Bookings overview</h2>
 
         <div className="grid gap-4 lg:grid-cols-3">
           <Card>
             <CardHeader>
               <CardTitle>Upcoming</CardTitle>
-              <CardDescription>Trips that haven’t started yet.</CardDescription>
+              <CardDescription>Bookings that haven’t started yet.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
               {upcoming.length === 0 ? (
-                <div className="text-sm text-foreground/60">No upcoming trips.</div>
+                <div className="text-sm text-foreground/60">No upcoming bookings.</div>
               ) : (
                 <div className="space-y-2">
                   {upcoming.map((b) => (
@@ -152,11 +152,11 @@ export default async function RenterDashboardPage() {
           <Card>
             <CardHeader>
               <CardTitle>Ongoing</CardTitle>
-              <CardDescription>Trips currently in progress.</CardDescription>
+              <CardDescription>Bookings currently in progress.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
               {ongoing.length === 0 ? (
-                <div className="text-sm text-foreground/60">No active trip right now.</div>
+                <div className="text-sm text-foreground/60">No active booking right now.</div>
               ) : (
                 <div className="space-y-2">
                   {ongoing.map((b) => (
@@ -185,11 +185,11 @@ export default async function RenterDashboardPage() {
           <Card>
             <CardHeader>
               <CardTitle>Past</CardTitle>
-              <CardDescription>Completed or cancelled trips.</CardDescription>
+              <CardDescription>Completed or cancelled bookings.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
               {past.length === 0 ? (
-                <div className="text-sm text-foreground/60">No past trips.</div>
+                <div className="text-sm text-foreground/60">No past bookings.</div>
               ) : (
                 <div className="space-y-2">
                   {past.map((b) => (
@@ -228,7 +228,7 @@ export default async function RenterDashboardPage() {
         <Card>
           <CardHeader>
             <CardTitle>Payment history</CardTitle>
-            <CardDescription>Invoices per trip (from booking totals).</CardDescription>
+            <CardDescription>Invoices per booking (from booking totals).</CardDescription>
           </CardHeader>
           <CardContent>
             {past.length === 0 ? (
@@ -238,7 +238,7 @@ export default async function RenterDashboardPage() {
                 <table className="w-full text-left text-sm">
                   <thead className="bg-muted">
                     <tr>
-                      <th className="px-3 py-2">Trip</th>
+                      <th className="px-3 py-2">Booking</th>
                       <th className="px-3 py-2">Dates</th>
                       <th className="px-3 py-2">Status</th>
                       <th className="px-3 py-2">Total</th>
@@ -302,7 +302,7 @@ export default async function RenterDashboardPage() {
           <Card>
             <CardHeader>
               <CardTitle>Contact support</CardTitle>
-              <CardDescription>Create a ticket for issues during a trip.</CardDescription>
+              <CardDescription>Create a ticket for issues during a booking.</CardDescription>
             </CardHeader>
             <CardContent>
               <form action={createSupportTicket} className="space-y-3">
@@ -350,7 +350,7 @@ export default async function RenterDashboardPage() {
         <Card>
           <CardHeader>
             <CardTitle>Reviews</CardTitle>
-            <CardDescription>Review flows can be enabled per completed trip.</CardDescription>
+            <CardDescription>Review flows can be enabled per completed booking.</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="text-sm text-foreground/60">

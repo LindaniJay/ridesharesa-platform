@@ -9,6 +9,12 @@ const BodySchema = z.object({
   listingId: z.string().min(1),
   startDate: z.string().min(1),
   endDate: z.string().min(1),
+  chauffeur: z
+    .object({
+      enabled: z.boolean(),
+      kilometers: z.number().int().min(0).max(5000),
+    })
+    .optional(),
 });
 
 function daysBetween(start: Date, end: Date) {
@@ -16,6 +22,8 @@ function daysBetween(start: Date, end: Date) {
   const days = Math.ceil(ms / (1000 * 60 * 60 * 24));
   return Number.isFinite(days) ? days : 0;
 }
+
+const CHAUFFEUR_RATE_CENTS_PER_KM = 10 * 100;
 
 export async function POST(req: Request) {
   const { dbUser } = await requireRole("RENTER");
@@ -49,7 +57,15 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Invalid date range" }, { status: 400 });
   }
 
-  const totalCents = days * listing.dailyRateCents;
+  const chauffeurEnabled = parsed.data.chauffeur?.enabled === true;
+  const chauffeurKm = chauffeurEnabled ? parsed.data.chauffeur?.kilometers ?? 0 : 0;
+  if (chauffeurEnabled && chauffeurKm <= 0) {
+    return NextResponse.json({ error: "Invalid chauffeur kilometers" }, { status: 400 });
+  }
+
+  const baseCents = days * listing.dailyRateCents;
+  const chauffeurCents = chauffeurEnabled && chauffeurKm > 0 ? chauffeurKm * CHAUFFEUR_RATE_CENTS_PER_KM : 0;
+  const totalCents = baseCents + chauffeurCents;
 
   const booking = await prisma.booking.create({
     data: {
@@ -66,6 +82,14 @@ export async function POST(req: Request) {
   });
 
   const baseUrl = process.env.APP_URL || "http://localhost:3000";
+
+  const breakdownParams = new URLSearchParams();
+  if (chauffeurEnabled && chauffeurKm > 0) {
+    breakdownParams.set("chauffeurKm", String(chauffeurKm));
+    breakdownParams.set("chauffeurRate", "10");
+  }
+  const breakdownQuery = breakdownParams.toString();
+  const breakdownSuffix = breakdownQuery ? `&${breakdownQuery}` : "";
 
   const stripeSession = await stripe().checkout.sessions.create({
     mode: "payment",
@@ -86,8 +110,23 @@ export async function POST(req: Request) {
           },
         },
       },
+      ...(chauffeurEnabled && chauffeurKm > 0
+        ? [
+            {
+              quantity: chauffeurKm,
+              price_data: {
+                currency: listing.currency.toLowerCase(),
+                unit_amount: CHAUFFEUR_RATE_CENTS_PER_KM,
+                product_data: {
+                  name: "Chauffeur service",
+                  description: `${chauffeurKm} km @ 10 ${listing.currency}/km`,
+                },
+              },
+            },
+          ]
+        : []),
     ],
-    success_url: `${baseUrl}/bookings/${booking.id}?checkout=success&session_id={CHECKOUT_SESSION_ID}`,
+    success_url: `${baseUrl}/bookings/${booking.id}?checkout=success&session_id={CHECKOUT_SESSION_ID}${breakdownSuffix}`,
     cancel_url: `${baseUrl}/checkout/${listing.id}?checkout=cancelled`,
   });
 

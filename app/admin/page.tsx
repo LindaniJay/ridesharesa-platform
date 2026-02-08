@@ -757,7 +757,7 @@ export default async function AdminDashboardPage({
         <div className="grid gap-4 lg:grid-cols-3">
           <Card>
             <CardHeader>
-              <CardTitle>Ongoing trips</CardTitle>
+              <CardTitle>Ongoing bookings</CardTitle>
               <CardDescription>Confirmed and currently active.</CardDescription>
             </CardHeader>
             <div className="px-6 pb-6 text-2xl font-semibold">{activeRentalsNow}</div>
