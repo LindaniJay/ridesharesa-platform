@@ -90,6 +90,16 @@ const args = process.argv.slice(2);
 const prismaCli = path.resolve(workspaceRoot, "node_modules", "prisma", "build", "index.js");
 console.log("[build] prisma generate");
 {
+  // Prisma requires DATABASE_URL to be present to parse the datasource in schema/config.
+  // Vercel builds can fail if DATABASE_URL is not configured for the Build step.
+  // This fallback only exists to allow `prisma generate` (types/client) to run.
+  // The deployed app still needs a real DATABASE_URL at runtime.
+  if (!env.DATABASE_URL) {
+    env.DATABASE_URL = "postgresql://prisma:prisma@localhost:5432/prisma?schema=public";
+    console.log("[build] WARNING: DATABASE_URL was not set. Using a placeholder for prisma generate.");
+    console.log("[build] Set DATABASE_URL in your Vercel Project Settings for Preview/Production.");
+  }
+
   const maxAttempts = 3;
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     const result = await runWithCapture(process.execPath, [prismaCli, "generate"]);
