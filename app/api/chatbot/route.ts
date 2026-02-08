@@ -623,7 +623,7 @@ export async function POST(req: Request) {
     return NextResponse.json(helpResponse("en", { signedIn: false }));
   }
 
-  const lang = pickLang((body as any).lang);
+  const lang = pickLang(body.lang);
 
   const dbUser = await getAuthedDbUserOrNull();
 
