@@ -1,0 +1,305 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum Role {
+  ADMIN
+  HOST
+  RENTER
+}
+
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+}
+
+enum VerificationStatus {
+  UNVERIFIED
+  PENDING
+  VERIFIED
+  REJECTED
+}
+
+enum ListingStatus {
+  DRAFT
+  ACTIVE
+  PAUSED
+}
+
+enum BookingStatus {
+  PENDING_PAYMENT
+  CONFIRMED
+  CANCELLED
+}
+
+enum SupportTicketStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+  CLOSED
+}
+
+enum IncidentType {
+  DAMAGE
+  ACCIDENT
+  FRAUD
+  SUPPORT
+  OTHER
+}
+
+enum IncidentStatus {
+  OPEN
+  IN_REVIEW
+  RESOLVED
+  CLOSED
+}
+
+enum PayoutStatus {
+  PENDING
+  PAID
+  FAILED
+}
+
+model User {
+  id           String    @id @default(cuid())
+  email        String    @unique
+  name         String?
+  passwordHash String?
+  role         Role      @default(RENTER)
+
+  status                 UserStatus          @default(ACTIVE)
+  idVerificationStatus    VerificationStatus @default(UNVERIFIED)
+  driversLicenseStatus    VerificationStatus @default(UNVERIFIED)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Host
+  listings Listing[]
+
+  payouts HostPayout[]
+
+  // Renter
+  bookings Booking[]
+
+  favorites Favorite[]
+
+  // NextAuth
+  accounts Account[]
+  sessions Session[]
+
+  // Support / safety
+  supportTickets SupportTicket[]
+  incidentReports IncidentReport[]
+
+  // Reviews
+  reviewsAuthored Review[] @relation("reviews_authored")
+  reviewsReceived Review[] @relation("reviews_received")
+}
+
+model Listing {
+  id          String        @id @default(cuid())
+  hostId      String
+  host        User          @relation(fields: [hostId], references: [id], onDelete: Cascade)
+
+  title       String
+  description String
+
+  imageUrl    String?
+
+  city        String
+  country     String        @default("South Africa")
+  latitude    Float
+  longitude   Float
+
+  dailyRateCents Int
+  currency      String      @default("ZAR")
+
+  status     ListingStatus @default(DRAFT)
+  isApproved Boolean       @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  bookings Booking[]
+
+  incidentReports IncidentReport[]
+
+  favorites Favorite[]
+
+  @@index([hostId])
+  @@index([status, isApproved])
+}
+
+model Booking {
+  id        String        @id @default(cuid())
+  listingId String
+  listing   Listing       @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  renterId  String
+  renter    User          @relation(fields: [renterId], references: [id], onDelete: Cascade)
+
+  startDate DateTime
+  endDate   DateTime
+
+  days          Int
+  totalCents    Int
+  currency      String   @default("ZAR")
+  status        BookingStatus @default(PENDING_PAYMENT)
+
+  stripeCheckoutSessionId String? @unique
+  stripePaymentIntentId   String?
+  paidAt                  DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  incidentReports IncidentReport[]
+  reviews         Review[]
+
+  @@index([listingId])
+  @@index([renterId])
+  @@index([status])
+}
+
+model SupportTicket {
+  id        String @id @default(cuid())
+  userId    String
+  user      User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  subject   String
+  message   String
+  status    SupportTicketStatus @default(OPEN)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([status])
+}
+
+model IncidentReport {
+  id        String @id @default(cuid())
+  userId    String
+  user      User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  type      IncidentType
+  status    IncidentStatus @default(OPEN)
+
+  bookingId String?
+  booking   Booking? @relation(fields: [bookingId], references: [id], onDelete: SetNull)
+
+  listingId String?
+  listing   Listing? @relation(fields: [listingId], references: [id], onDelete: SetNull)
+
+  title     String
+  details   String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([status])
+  @@index([type])
+  @@index([bookingId])
+  @@index([listingId])
+}
+
+model HostPayout {
+  id        String @id @default(cuid())
+  hostId    String
+  host      User   @relation(fields: [hostId], references: [id], onDelete: Cascade)
+
+  amountCents Int
+  currency    String @default("ZAR")
+  status      PayoutStatus @default(PENDING)
+
+  periodStart DateTime?
+  periodEnd   DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([hostId])
+  @@index([status])
+}
+
+model Favorite {
+  id       String @id @default(cuid())
+  renterId String
+  renter   User   @relation(fields: [renterId], references: [id], onDelete: Cascade)
+  listingId String
+  listing   Listing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([renterId, listingId])
+  @@index([renterId])
+  @@index([listingId])
+}
+
+model Review {
+  id        String @id @default(cuid())
+  bookingId String?
+  booking   Booking? @relation(fields: [bookingId], references: [id], onDelete: SetNull)
+
+  authorId  String
+  author    User @relation("reviews_authored", fields: [authorId], references: [id], onDelete: Cascade)
+  targetUserId String
+  targetUser   User @relation("reviews_received", fields: [targetUserId], references: [id], onDelete: Cascade)
+
+  rating    Int
+  comment   String?
+
+  createdAt DateTime @default(now())
+
+  @@index([authorId])
+  @@index([targetUserId])
+  @@index([rating])
+}
+
+// NextAuth / Auth.js Prisma Adapter models
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}

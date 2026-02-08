@@ -1,0 +1,11 @@
+HTTP/1.1 200 OK
+set-cookie: __supabase_dev_disable=1; Path=/; Expires=Sat, 07 Feb 2026 21:36:01 GMT; Max-Age=300; HttpOnly; SameSite=lax
+Vary: rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch, Accept-Encoding
+Cache-Control: no-store, must-revalidate
+X-Powered-By: Next.js
+Content-Type: text/html; charset=utf-8
+Date: Sat, 07 Feb 2026 21:31:01 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+Transfer-Encoding: chunked
+

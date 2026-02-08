@@ -1,26 +1,72 @@
 @import "tailwindcss";
+@import "leaflet/dist/leaflet.css";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  color-scheme: light dark;
+  --background: #fbfcff;
+  --foreground: #0b1220;
+  --card: #ffffff;
+  --muted: #f3f6ff;
+  --border: #e6eaf2;
+  --accent: #00a651;
+  --accent-foreground: #07101f;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-card: var(--card);
+  --color-muted: var(--muted);
+  --color-border: var(--border);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Arial, "Noto Sans", "Liberation Sans", sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --background: #070b14;
+    --foreground: #e8ecf6;
+    --card: #0b1220;
+    --muted: #0e172b;
+    --border: #1b2740;
+    --accent: #00a651;
+    --accent-foreground: #07101f;
   }
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans);
+}
+
+@layer base {
+  :focus-visible {
+    outline: none;
+  }
+
+  ::selection {
+    background: color-mix(in srgb, var(--accent) 25%, transparent);
+  }
+
+  select {
+    font: inherit;
+    color: var(--foreground);
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 0.75rem;
+    padding: 0.5rem 0.75rem;
+    line-height: 1.25rem;
+  }
+
+  select:focus-visible {
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 30%, transparent);
+  }
+
+  option {
+    color: var(--foreground);
+    background: var(--background);
+  }
 }
