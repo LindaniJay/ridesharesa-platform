@@ -2,6 +2,23 @@ import { spawn } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 
+function sleep(ms) {
+  return new Promise((r) => setTimeout(r, ms));
+}
+
+function run(command, args, options = {}) {
+  return new Promise((resolve) => {
+    const child = spawn(command, args, {
+      stdio: "inherit",
+      ...options,
+    });
+
+    child.on("exit", (code, signal) => {
+      resolve({ code: code ?? 1, signal });
+    });
+  });
+}
+
 function fileExists(p) {
   try {
     return fs.existsSync(p);
@@ -47,6 +64,27 @@ if (bestPem && (!current || currentMissing || currentLooksLegacy)) {
 
 const nextBin = path.resolve(workspaceRoot, "node_modules", "next", "dist", "bin", "next");
 const args = process.argv.slice(2);
+
+// Keep Prisma Client types in sync for dev (e.g. enums like BookingStatus).
+// On Windows, prisma generate can fail with EPERM if the query engine DLL is temporarily locked;
+// a short retry usually fixes it.
+const prismaCli = path.resolve(workspaceRoot, "node_modules", "prisma", "build", "index.js");
+console.log("[dev] prisma generate");
+{
+  const maxAttempts = process.platform === "win32" ? 3 : 1;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    const result = await run(process.execPath, [prismaCli, "generate"], { env });
+    if (!result.signal && result.code === 0) break;
+
+    if (attempt === maxAttempts) {
+      if (result.signal) process.exit(1);
+      process.exit(result.code);
+    }
+
+    console.log(`[dev] prisma generate failed (attempt ${attempt}/${maxAttempts}). Retrying...`);
+    await sleep(600);
+  }
+}
 
 const wantsTurbopack = args.includes("--turbo") || args.includes("--turbopack");
 const wantsWebpack = args.includes("--webpack");

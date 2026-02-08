@@ -2,6 +2,17 @@ import https from "node:https";
 import type { TLSSocket } from "node:tls";
 import { NextResponse } from "next/server";
 
+type PeerCert = {
+  subject?: unknown;
+  issuer?: unknown;
+  valid_from?: unknown;
+  valid_to?: unknown;
+  fingerprint256?: unknown;
+  serialNumber?: unknown;
+  fingerprint?: unknown;
+  issuerCertificate?: PeerCert;
+};
+
 function getSupabaseHost() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;
   if (!url) return null;
@@ -12,7 +23,7 @@ function getSupabaseHost() {
   }
 }
 
-function certSummary(cert: any) {
+function certSummary(cert: PeerCert | undefined) {
   if (!cert || typeof cert !== "object") return null;
   return {
     subject: cert.subject ?? null,
@@ -24,8 +35,8 @@ function certSummary(cert: any) {
   };
 }
 
-function flattenChain(peer: any) {
-  const out: any[] = [];
+function flattenChain(peer: PeerCert | undefined) {
+  const out: Array<ReturnType<typeof certSummary>> = [];
   const seen = new Set<string>();
   let cur = peer;
   while (cur && typeof cur === "object") {
@@ -65,7 +76,7 @@ export async function GET() {
       },
       (res) => {
         const tlsSocket = res.socket as TLSSocket;
-        const peer = (tlsSocket as any).getPeerCertificate?.(true);
+        const peer = tlsSocket.getPeerCertificate?.(true) as PeerCert | undefined;
         const chain = flattenChain(peer);
         res.resume();
         resolve({
@@ -89,7 +100,7 @@ export async function GET() {
     req.on("error", (error: unknown) => {
       resolve({
         ok: false,
-        error: String((error as any)?.message ?? error),
+        error: error instanceof Error ? error.message : String(error),
       });
     });
 

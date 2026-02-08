@@ -264,11 +264,11 @@ export default async function Home() {
             Clean, secure car rentals
           </div>
 
-          <h1 className="max-w-2xl text-4xl font-semibold tracking-tight sm:text-6xl sm:leading-[1.02]">
-            Rent and share cars with total confidence.
-          </h1>
+            <h1 className="max-w-2xl text-4xl font-semibold tracking-tight text-foreground sm:text-6xl sm:leading-[1.02]">
+              Rent cars from trusted local owners. Fast, affordable, secure.
+            </h1>
           <p className="max-w-xl text-base leading-relaxed text-foreground/70">
-            A premium marketplace for renters, hosts, and admins.
+            Book in minutes. Host with confidence.
           </p>
 
           <div className="flex flex-wrap items-center gap-2">

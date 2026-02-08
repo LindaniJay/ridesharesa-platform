@@ -3,6 +3,7 @@ import "./globals.css";
 import Navbar from "@/app/components/Navbar";
 import Providers from "@/app/providers";
 import Footer from "@/app/components/Footer";
+import ChatWidget from "@/app/components/ChatWidget.client";
 
 export const metadata: Metadata = {
   title: "RideShare Platform",
@@ -29,6 +30,7 @@ export default function RootLayout({
               <Navbar />
               <div className="mx-auto w-full max-w-6xl px-4 py-8">{children}</div>
               <Footer />
+              <ChatWidget />
             </div>
           </div>
         </Providers>
