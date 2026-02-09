@@ -16,16 +16,9 @@ const BodySchema = z.object({
 });
 
 export async function POST(req: Request) {
-  const supabase = await supabaseServer();
-
-  let userData: Awaited<ReturnType<(typeof supabase.auth)["getUser"]>>["data"];
-  try {
-    ({ data: userData } = await supabase.auth.getUser());
-  } catch {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  const emailRaw = userData.user?.email;
+  // Only allow renters to use Tire Assist
+  const { dbUser } = await requireRole("RENTER");
+  const emailRaw = dbUser.email;
   if (!emailRaw) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }

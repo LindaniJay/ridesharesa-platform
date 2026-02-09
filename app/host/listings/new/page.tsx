@@ -44,7 +44,11 @@ export default async function NewListingPage({
     const dailyRate = Number(formData.get("dailyRate") ?? 0);
     const latitude = Number(formData.get("latitude") ?? NaN);
     const longitude = Number(formData.get("longitude") ?? NaN);
-    const photo = formData.get("photo");
+    const leftPhoto = formData.get("leftPhoto");
+    const rightPhoto = formData.get("rightPhoto");
+    const interiorPhoto = formData.get("interiorPhoto");
+    const exteriorPhoto = formData.get("exteriorPhoto");
+    const damagePhoto = formData.get("damagePhoto");
 
     if (!title || !description || !city) {
       redirect("/host/listings/new?error=missing");
@@ -56,28 +60,40 @@ export default async function NewListingPage({
       redirect("/host/listings/new?error=location");
     }
 
-    let imageUrl: string | undefined;
-    if (photo instanceof File && photo.size > 0) {
-      try {
-        const uploaded = await uploadListingImage({ hostId, file: photo });
-        imageUrl = uploaded.publicUrl;
-      } catch {
-        redirect("/host/listings/new?error=upload");
+    // Upload each photo and store URLs
+    const photoUploads = async (file: File | null) => {
+      if (file instanceof File && file.size > 0) {
+        try {
+          const uploaded = await uploadListingImage({ hostId, file });
+          return uploaded.publicUrl;
+        } catch {
+          return undefined;
+        }
       }
-    }
+      return undefined;
+    };
+    const leftPhotoUrl = await photoUploads(leftPhoto as File);
+    const rightPhotoUrl = await photoUploads(rightPhoto as File);
+    const interiorPhotoUrl = await photoUploads(interiorPhoto as File);
+    const exteriorPhotoUrl = await photoUploads(exteriorPhoto as File);
+    const damagePhotoUrl = await photoUploads(damagePhoto as File);
 
     await prisma.listing.create({
       data: {
         hostId,
         title,
         description,
-        imageUrl,
         city,
         latitude,
         longitude,
         dailyRateCents: Math.round(dailyRate * 100),
         currency: "ZAR",
         status: "ACTIVE",
+        leftPhotoUrl,
+        rightPhotoUrl,
+        interiorPhotoUrl,
+        exteriorPhotoUrl,
+        damagePhotoUrl,
         // isApproved stays false until admin approval
       },
     });
@@ -129,12 +145,27 @@ export default async function NewListingPage({
           />
         </label>
 
+        <div className="text-sm font-medium text-black/70 dark:text-white/70">Photos</div>
         <label className="block">
-          <div className="mb-1 text-sm">Photo (optional)</div>
-          <Input name="photo" type="file" accept="image/*" />
-          <div className="mt-1 text-xs text-black/50 dark:text-white/50">
-            JPG/PNG/WebP, up to 5MB.
-          </div>
+          <div className="mb-1 text-sm">Left side</div>
+          <Input name="leftPhoto" type="file" accept="image/*" required />
+        </label>
+        <label className="block">
+          <div className="mb-1 text-sm">Right side</div>
+          <Input name="rightPhoto" type="file" accept="image/*" required />
+        </label>
+        <label className="block">
+          <div className="mb-1 text-sm">Interior</div>
+          <Input name="interiorPhoto" type="file" accept="image/*" required />
+        </label>
+        <label className="block">
+          <div className="mb-1 text-sm">Exterior</div>
+          <Input name="exteriorPhoto" type="file" accept="image/*" required />
+        </label>
+        <label className="block">
+          <div className="mb-1 text-sm">Damage (optional)</div>
+          <Input name="damagePhoto" type="file" accept="image/*" />
+          <div className="mt-1 text-xs text-black/50 dark:text-white/50">Upload only if there is visible damage.</div>
         </label>
 
         <div className="text-sm font-medium text-black/70 dark:text-white/70">Location</div>

@@ -9,17 +9,17 @@ export default function Badge({
 }: React.HTMLAttributes<HTMLSpanElement> & {
   variant?: BadgeVariant;
 }) {
-  const base = "inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-medium";
+  const base = "inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium";
   const styles =
     variant === "success"
-      ? "border-border bg-muted text-foreground"
+      ? "border-foreground/20 bg-foreground/5 text-foreground"
       : variant === "warning"
-        ? "border-dashed border-border bg-card text-foreground"
+        ? "border-dashed border-foreground/30 bg-transparent text-foreground"
         : variant === "danger"
-          ? "border-border bg-muted text-foreground"
+          ? "border-foreground/30 bg-foreground/10 text-foreground"
           : variant === "info"
-            ? "border-border bg-muted text-foreground"
-            : "border-border bg-card text-foreground/70";
+            ? "border-foreground/10 bg-foreground/5 text-foreground"
+            : "border-foreground/10 bg-transparent text-foreground/70";
 
   return <span className={cn(base, styles, className)} {...props} />;
 }

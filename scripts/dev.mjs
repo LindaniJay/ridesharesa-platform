@@ -27,12 +27,6 @@ function fileExists(p) {
   }
 }
 
-function getNodeMajor() {
-  const raw = process.versions?.node ?? "";
-  const major = Number.parseInt(String(raw).split(".")[0] ?? "", 10);
-  return Number.isFinite(major) ? major : null;
-}
-
 const workspaceRoot = process.cwd();
 const windowsStorePem = path.resolve(workspaceRoot, ".certs", "corp-windows-store.pem");
 const bundledChainPem = path.resolve(workspaceRoot, ".certs", "corp-chain.pem");
@@ -77,26 +71,17 @@ const args = process.argv.slice(2);
 const prismaCli = path.resolve(workspaceRoot, "node_modules", "prisma", "build", "index.js");
 console.log("[dev] prisma generate");
 {
-  const nodeMajor = getNodeMajor();
-  const generatedClientDts = path.resolve(workspaceRoot, "node_modules", ".prisma", "client", "index.d.ts");
-  const generatedClientJs = path.resolve(workspaceRoot, "node_modules", ".prisma", "client", "index.js");
-  const hasGeneratedClient = fileExists(generatedClientDts) || fileExists(generatedClientJs);
+  const generatedClientDts = path.resolve(workspaceRoot, "node_modules", "@prisma", "client", "index.d.ts");
+  const generatedClientJs = path.resolve(workspaceRoot, "node_modules", "@prisma", "client", "index.js");
+  const legacyGeneratedClientDts = path.resolve(workspaceRoot, "node_modules", ".prisma", "client", "index.d.ts");
+  const legacyGeneratedClientJs = path.resolve(workspaceRoot, "node_modules", ".prisma", "client", "index.js");
 
-  // Prisma CLI has been seen to crash on non-LTS Node versions (e.g. v23).
-  // If we already have a generated client, don't block `next dev` on this step.
-  if (nodeMajor != null && nodeMajor >= 23) {
-    if (hasGeneratedClient) {
-      console.log(
-        `[dev] WARNING: Detected Node.js v${process.versions.node}. Skipping prisma generate because Prisma may not support this Node version.`
-      );
-    } else {
-      console.error(
-        `[dev] ERROR: Detected Node.js v${process.versions.node} and no generated Prisma client was found.\n` +
-          "[dev] Please use an LTS Node version (20 or 22), then run: npm run db:generate"
-      );
-      process.exit(1);
-    }
-  } else {
+  const hasGeneratedClient =
+    fileExists(generatedClientDts) ||
+    fileExists(generatedClientJs) ||
+    fileExists(legacyGeneratedClientDts) ||
+    fileExists(legacyGeneratedClientJs);
+
   const maxAttempts = process.platform === "win32" ? 3 : 1;
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     const result = await run(process.execPath, [prismaCli, "generate"], { env });
@@ -118,7 +103,6 @@ console.log("[dev] prisma generate");
 
     console.log(`[dev] prisma generate failed (attempt ${attempt}/${maxAttempts}). Retrying...`);
     await sleep(600);
-  }
   }
 }
 

@@ -273,7 +273,56 @@ export default async function RenterDashboardPage() {
 
       <section className="space-y-3">
         <h2 className="text-lg font-semibold">Profile & verification</h2>
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid gap-4 sm:grid-cols-3">
+          <Card>
+            <CardHeader>
+              <CardTitle>Profile creation</CardTitle>
+              <CardDescription>Enter your details and upload verification images.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <form action="/api/account/documents" method="post" encType="multipart/form-data" className="space-y-3">
+                <label className="block">
+                  <div className="mb-1 text-sm">Full name</div>
+                  <Input name="name" defaultValue={dbUser.name || ""} required />
+                </label>
+                <label className="block">
+                  <div className="mb-1 text-sm">Phone number</div>
+                  <Input name="phone" type="tel" required placeholder="+27 123 456 7890" />
+                </label>
+                <label className="block">
+                  <div className="mb-1 text-sm">Date of birth</div>
+                  <Input name="dob" type="date" required />
+                </label>
+                <label className="block">
+                  <div className="mb-1 text-sm">Address</div>
+                  <Input name="address" required placeholder="Street, City, Country" />
+                </label>
+                <label className="block">
+                  <div className="mb-1 text-sm">ID number</div>
+                  <Input name="idNumber" required placeholder="ID or passport number" />
+                </label>
+                <label className="block">
+                  <div className="mb-1 text-sm">Profile photo</div>
+                  <Input name="profilePhoto" type="file" accept="image/*" required />
+                </label>
+                <label className="block">
+                  <div className="mb-1 text-sm">ID document</div>
+                  <Input name="idDocument" type="file" accept="image/*" required />
+                </label>
+                <label className="block">
+                  <div className="mb-1 text-sm">Driver’s license</div>
+                  <Input name="driversLicense" type="file" accept="image/*" required />
+                </label>
+                <Button type="submit" className="w-full">Save profile</Button>
+              </form>
+              {/* Display profile image if available */}
+              {dbUser.profileImagePath ? (
+                <img src={dbUser.profileImagePath} alt="Profile" className="w-24 h-24 rounded-full mt-4 object-cover border" />
+              ) : (
+                <div className="w-24 h-24 rounded-full bg-muted flex items-center justify-center mt-4">No photo</div>
+              )}
+            </CardContent>
+          </Card>
           <Card>
             <CardHeader>
               <CardTitle>Driver’s license</CardTitle>

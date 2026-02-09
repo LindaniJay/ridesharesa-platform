@@ -16,7 +16,6 @@ export default function AssistPage() {
           Flat tyre or out of petrol? Share your location and we’ll open a support incident.
         </p>
       </div>
-
       <Card>
         <CardHeader>
           <CardTitle>Request help</CardTitle>

@@ -24,9 +24,11 @@ function first(param: string | string[] | undefined) {
 export default async function ListingsPage({
   searchParams,
 }: {
-  searchParams?: Promise<Record<string, string | string[] | undefined>>;
+  searchParams?:
+    | Record<string, string | string[] | undefined>
+    | Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const resolvedSearchParams = (await searchParams) ?? {};
+  const resolvedSearchParams = await searchParams;
 
   const q = first(resolvedSearchParams?.q).trim();
   const start = first(resolvedSearchParams?.start).trim();
@@ -78,7 +80,7 @@ export default async function ListingsPage({
     <main className="space-y-6">
       <div className="space-y-1">
         <h1 className="text-2xl font-semibold tracking-tight">Listings</h1>
-        <p className="text-sm text-foreground/60">Browse approved cars near you.</p>
+        <p className="text-sm text-black/60 dark:text-white/60">Browse approved cars near you.</p>
       </div>
 
       <Card>
@@ -105,7 +107,7 @@ export default async function ListingsPage({
               <select
                 name="sort"
                 defaultValue={sort}
-                className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm text-foreground outline-none transition-shadow focus-visible:ring-2 focus-visible:ring-accent/30"
+                className="w-full rounded-md border border-black/10 bg-transparent px-3 py-2 text-sm outline-none transition-shadow focus-visible:ring-2 focus-visible:ring-black/20 dark:border-white/10 dark:focus-visible:ring-white/20"
               >
                 <option value="recent">Most recent</option>
                 <option value="price_asc">Price: low to high</option>
@@ -119,7 +121,7 @@ export default async function ListingsPage({
                   Clear
                 </Link>
               )}
-              <div className="text-sm text-foreground/60">{listings.length} result(s)</div>
+              <div className="text-sm text-black/60 dark:text-white/60">{listings.length} result(s)</div>
             </div>
           </form>
         </CardContent>
@@ -159,9 +161,9 @@ export default async function ListingsPage({
               href={carryQS ? `/listings/${l.id}?${carryQS}` : `/listings/${l.id}`}
               className="group"
             >
-              <div className="rounded-xl border border-border bg-card p-4 shadow-sm transition-colors group-hover:bg-muted">
+              <div className="rounded-xl border border-black/10 bg-background p-4 shadow-sm shadow-black/5 transition-colors group-hover:bg-black/5 dark:border-white/10 dark:shadow-black/20 dark:group-hover:bg-white/10">
                 {l.imageUrl ? (
-                  <div className="relative mb-3 aspect-[16/9] w-full overflow-hidden rounded-lg border border-border">
+                  <div className="relative mb-3 aspect-[16/9] w-full overflow-hidden rounded-lg border border-black/10 dark:border-white/10">
                     <Image
                       src={l.imageUrl}
                       alt={l.title}
@@ -173,13 +175,13 @@ export default async function ListingsPage({
                   </div>
                 ) : null}
                 <div className="text-base font-semibold tracking-tight">{l.title}</div>
-                <div className="mt-1 text-sm text-foreground/60">
+                <div className="mt-1 text-sm text-black/60 dark:text-white/60">
                   {l.city}, {l.country}
                 </div>
                 <div className="mt-3 flex items-center justify-between">
                   <div className="text-sm">
                     {(l.dailyRateCents / 100).toFixed(0)} {l.currency}
-                    <span className="text-foreground/50"> / day</span>
+                    <span className="text-black/50 dark:text-white/50"> / day</span>
                   </div>
                   <div className="text-sm font-medium underline">View</div>
                 </div>

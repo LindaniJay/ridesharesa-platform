@@ -90,49 +90,16 @@ export default function SignInClient() {
       body: JSON.stringify({}),
     })
       .then(async (r) => {
-        const json = (await r.json().catch(() => null)) as null | {
-          ok?: boolean;
-          reason?: string;
-          name?: unknown;
-          message?: unknown;
-        };
-        if (json?.ok) return true;
-
-        if (json?.reason === "DEV_DISABLED") {
-          setError(
-            "Auth was temporarily disabled due to previous Supabase TLS failures (__supabase_dev_disable). Use the button below to clear it, then retry sign-in.",
-          );
-          return false;
-        }
-
-        if (json?.reason === "SUPABASE_UNREACHABLE") {
-          setError(
-            "Signed in, but the server still can’t reach Supabase (likely TLS/cert). Ensure NODE_EXTRA_CA_CERTS is set in the running dev server process, then retry.",
-          );
-          return false;
-        }
-
-        if (json?.reason === "SUPABASE_ERROR") {
-          const details = [json?.name, json?.message].filter(Boolean).map(String).join(": ");
-          setError(
-            `Signed in, but Supabase returned an error while validating your session${details ? ` (${details})` : ""}. This is often TLS/cert on corporate networks.`,
-          );
-          return false;
-        }
-
-        if (json?.reason === "NOT_AUTHENTICATED") {
-          setError(
-            "Signed in, but the server didn’t receive your session cookies. This usually means Supabase SSR cookie refresh is blocked or misconfigured.",
-          );
-          return false;
-        }
-
-        return false;
+        const json = (await r.json().catch(() => null)) as null | { ok?: boolean };
+        return Boolean(json?.ok);
       })
       .catch(() => false);
 
     if (!bootstrapOk) {
       setLoading(false);
+      setError(
+        "Signed in, but the server couldn’t finish setup (Supabase may be disabled due to TLS/cert issues). Clear site data for this app to remove the __supabase_dev_disable cookie, then try again.",
+      );
       return;
     }
 
@@ -174,45 +141,45 @@ export default function SignInClient() {
               Check your email to confirm your account, then come back and sign in.
             </div>
           ) : null}
-          <form onSubmit={onSubmit} className="space-y-3">
-            <label className="block">
-              <div className="mb-1 text-sm">Email</div>
-              <Input
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                type="email"
-                autoComplete="email"
-                required
-              />
-            </label>
+      <form onSubmit={onSubmit} className="space-y-3">
+        <label className="block">
+          <div className="mb-1 text-sm">Email</div>
+          <Input
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            type="email"
+            autoComplete="email"
+            required
+          />
+        </label>
 
-            <label className="block">
-              <div className="mb-1 text-sm">Password</div>
-              <Input
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                type="password"
-                autoComplete="current-password"
-                required
-              />
-            </label>
+        <label className="block">
+          <div className="mb-1 text-sm">Password</div>
+          <Input
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            type="password"
+            autoComplete="current-password"
+            required
+          />
+        </label>
 
-            {error && <div className="text-sm text-red-600">{error}</div>}
+        {error && <div className="text-sm text-red-600">{error}</div>}
 
-            {error?.includes("__supabase_dev_disable") ? (
-              <Button type="button" variant="secondary" className="w-full" onClick={clearSupabaseDevDisable}>
-                Clear dev auth disable and retry
-              </Button>
-            ) : null}
+        {error?.includes("__supabase_dev_disable") ? (
+          <Button type="button" variant="secondary" className="w-full" onClick={clearSupabaseDevDisable}>
+            Clear dev auth disable and retry
+          </Button>
+        ) : null}
 
-            <Button type="submit" disabled={loading} className="w-full">
-              {loading ? "Signing in…" : "Sign in"}
-            </Button>
+        <Button type="submit" disabled={loading} className="w-full">
+          {loading ? "Signing in…" : "Sign in"}
+        </Button>
 
-            <div className="text-sm text-foreground/60">
-              No account? <Link className="underline" href="/sign-up">Sign up</Link>
-            </div>
-          </form>
+        <div className="text-sm text-foreground/60">
+          No account? <Link className="underline" href="/sign-up">Sign up</Link>
+        </div>
+      </form>
         </CardContent>
       </Card>
     </main>
