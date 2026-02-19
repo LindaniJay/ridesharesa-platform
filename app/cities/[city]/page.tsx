@@ -8,6 +8,10 @@ import { prisma } from "@/app/lib/prisma";
 
 export const dynamic = "force-dynamic";
 
+type CityPageProps = {
+  params: Promise<{ city: string }>;
+};
+
 function normalize(s: string) {
   return s.trim().toLowerCase().replace(/['’]/g, "");
 }
@@ -21,8 +25,9 @@ function slugifyCity(city: string) {
     .replace(/(^-|-$)/g, "");
 }
 
-export default async function CityPage({ params }: { params: { city: string } }) {
-  const citySlug = normalize(decodeURIComponent(params.city));
+export default async function CityPage({ params }: CityPageProps) {
+  const resolvedParams = await params;
+  const citySlug = normalize(decodeURIComponent(resolvedParams.city));
 
   const listings = await prisma.listing.findMany({
     where: { status: "ACTIVE", isApproved: true },

@@ -53,6 +53,51 @@ Copy the printed `whsec_...` into `STRIPE_WEBHOOK_SECRET`.
 npm run dev
 ```
 
+## Mobile app (quickest): PWA + Web Push
+
+This repo can be shipped as an **installable PWA** (Add to Home Screen) that works on both Android and iOS.
+
+### Install / “app” behavior
+
+- Android: open the site in Chrome → **Install app**
+- iOS: open the site in Safari → **Share** → **Add to Home Screen**
+
+### Push notifications (Web Push)
+
+This project includes endpoints:
+
+- `POST /api/push/subscribe` (store the current user's push subscription)
+- `POST /api/push/send` (send a test notification to the current user)
+
+1) Install dependency (already done if you pulled latest):
+
+```bash
+npm install
+```
+
+2) Generate VAPID keys:
+
+```bash
+npx web-push generate-vapid-keys --json
+```
+
+3) Add these to `.env`:
+
+- `NEXT_PUBLIC_WEB_PUSH_PUBLIC_KEY` (from generated `publicKey`)
+- `WEB_PUSH_PRIVATE_KEY` (from generated `privateKey`)
+- `WEB_PUSH_SUBJECT` (e.g. `mailto:admin@yourdomain.com`)
+
+4) Apply the DB change:
+
+```bash
+npm run db:migrate
+```
+
+### iOS caveats
+
+- iOS only supports Web Push for **installed** PWAs (Add to Home Screen) on modern iOS versions.
+- Permission prompts generally must be triggered by a **user gesture** (button click), not automatically on page load.
+
 ## Fixing `SELF_SIGNED_CERT_IN_CHAIN` (Windows / corporate proxy)
 
 If you see Supabase errors like `fetch failed` / `SELF_SIGNED_CERT_IN_CHAIN`, your network is likely doing SSL inspection (MITM) and Node.js doesn't trust your corporate root CA by default.

@@ -6,6 +6,11 @@ import { prisma } from "@/app/lib/prisma";
 import { requireRole } from "@/app/lib/require";
 import CheckoutClient from "@/app/checkout/[listingId]/CheckoutClient";
 
+type CheckoutPageProps = {
+  params: Promise<{ listingId: string }>;
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
+};
+
 function first(param: string | string[] | undefined) {
   if (!param) return "";
   return Array.isArray(param) ? String(param[0] ?? "") : String(param);
@@ -22,12 +27,10 @@ function firstInt(param: string | string[] | undefined) {
 export default async function CheckoutPage({
   params,
   searchParams,
-}: {
-  params: { listingId: string };
-  searchParams?: Promise<Record<string, string | string[] | undefined>>;
-}) {
+}: CheckoutPageProps) {
   await requireRole("RENTER");
 
+  const resolvedParams = await params;
   const resolvedSearchParams = (await searchParams) ?? {};
 
   const initialStartDate = first(resolvedSearchParams?.start).trim();
@@ -37,7 +40,7 @@ export default async function CheckoutPage({
   const initialChauffeurEnabled = first(resolvedSearchParams?.chauffeur).trim() === "1" || initialChauffeurKm > 0;
 
   const listing = await prisma.listing.findFirst({
-    where: { id: params.listingId, status: "ACTIVE", isApproved: true },
+    where: { id: resolvedParams.listingId, status: "ACTIVE", isApproved: true },
     select: {
       id: true,
       title: true,

@@ -49,6 +49,9 @@ export default async function NewListingPage({
     const interiorPhoto = formData.get("interiorPhoto");
     const exteriorPhoto = formData.get("exteriorPhoto");
     const damagePhoto = formData.get("damagePhoto");
+    const licenseDiskPhoto = formData.get("licenseDiskPhoto");
+    const registrationDoc = formData.get("registrationDoc");
+    const licenseCardPhoto = formData.get("licenseCardPhoto");
 
     if (!title || !description || !city) {
       redirect("/host/listings/new?error=missing");
@@ -77,6 +80,12 @@ export default async function NewListingPage({
     const interiorPhotoUrl = await photoUploads(interiorPhoto as File);
     const exteriorPhotoUrl = await photoUploads(exteriorPhoto as File);
     const damagePhotoUrl = await photoUploads(damagePhoto as File);
+    const licenseDiskImageUrl = await photoUploads(licenseDiskPhoto as File);
+    const registrationImageUrl = await photoUploads(registrationDoc as File);
+    const licenseCardImageUrl = await photoUploads(licenseCardPhoto as File);
+
+    const primaryImageUrl =
+      leftPhotoUrl || rightPhotoUrl || interiorPhotoUrl || exteriorPhotoUrl || damagePhotoUrl || null;
 
     await prisma.listing.create({
       data: {
@@ -89,11 +98,10 @@ export default async function NewListingPage({
         dailyRateCents: Math.round(dailyRate * 100),
         currency: "ZAR",
         status: "ACTIVE",
-        leftPhotoUrl,
-        rightPhotoUrl,
-        interiorPhotoUrl,
-        exteriorPhotoUrl,
-        damagePhotoUrl,
+        imageUrl: primaryImageUrl,
+        licenseDiskImageUrl,
+        registrationImageUrl,
+        licenseCardImageUrl,
         // isApproved stays false until admin approval
       },
     });
@@ -114,7 +122,7 @@ export default async function NewListingPage({
               {err}
             </div>
           ) : null}
-      <form action={createListing} className="space-y-4">
+      <form action={createListing} className="space-y-4" encType="multipart/form-data">
         <div className="text-sm font-medium text-black/70 dark:text-white/70">Basics</div>
 
         <label className="block">
@@ -124,6 +132,20 @@ export default async function NewListingPage({
             required
             placeholder="e.g. Toyota Corolla (Automatic)"
           />
+        </label>
+
+        <div className="text-sm font-medium text-black/70 dark:text-white/70">Vehicle documents</div>
+        <label className="block">
+          <div className="mb-1 text-sm">License disk photo</div>
+          <Input name="licenseDiskPhoto" type="file" accept="image/*" required />
+        </label>
+        <label className="block">
+          <div className="mb-1 text-sm">Registration document</div>
+          <Input name="registrationDoc" type="file" accept="image/*" required />
+        </label>
+        <label className="block">
+          <div className="mb-1 text-sm">License card</div>
+          <Input name="licenseCardPhoto" type="file" accept="image/*" required />
         </label>
 
         <label className="block">

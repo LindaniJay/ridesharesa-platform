@@ -9,6 +9,10 @@ import { prisma } from "@/app/lib/prisma";
 
 export const dynamic = "force-dynamic";
 
+type ListingsPageProps = {
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
+};
+
 type ListingsSearchParams = {
   q?: string;
   start?: string;
@@ -23,12 +27,8 @@ function first(param: string | string[] | undefined) {
 
 export default async function ListingsPage({
   searchParams,
-}: {
-  searchParams?:
-    | Record<string, string | string[] | undefined>
-    | Promise<Record<string, string | string[] | undefined>>;
-}) {
-  const resolvedSearchParams = await searchParams;
+}: ListingsPageProps) {
+  const resolvedSearchParams = (await searchParams) ?? {};
 
   const q = first(resolvedSearchParams?.q).trim();
   const start = first(resolvedSearchParams?.start).trim();

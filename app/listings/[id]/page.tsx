@@ -8,6 +8,11 @@ import Button from "@/app/components/ui/Button";
 import Input from "@/app/components/ui/Input";
 import { prisma } from "@/app/lib/prisma";
 
+type ListingPageProps = {
+  params: Promise<{ id: string }>;
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
+};
+
 function first(param: string | string[] | undefined) {
   if (!param) return "";
   return Array.isArray(param) ? String(param[0] ?? "") : String(param);
@@ -16,15 +21,10 @@ function first(param: string | string[] | undefined) {
 export default async function ListingDetailsPage({
   params,
   searchParams,
-}: {
-  params: { id: string };
-  searchParams?:
-    | Record<string, string | string[] | undefined>
-    | Promise<Record<string, string | string[] | undefined>>;
-}) {
-  const { id } = params;
+}: ListingPageProps) {
+  const { id } = await params;
 
-  const resolvedSearchParams = await searchParams;
+  const resolvedSearchParams = (await searchParams) ?? {};
   const start = first(resolvedSearchParams?.start).trim();
   const end = first(resolvedSearchParams?.end).trim();
 

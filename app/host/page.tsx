@@ -10,6 +10,7 @@ import {
   badgeVariantForListingStatus,
   badgeVariantForPayoutStatus,
   badgeVariantForSupportTicketStatus,
+  badgeVariantForVerificationStatus,
 } from "@/app/lib/badgeVariants";
 import { prisma } from "@/app/lib/prisma";
 import { requireRole } from "@/app/lib/require";
@@ -19,7 +20,7 @@ function iso(d: Date) {
 }
 
 export default async function HostDashboardPage() {
-  const { dbUser } = await requireRole("HOST");
+  const { dbUser, supabaseUser } = await requireRole("HOST");
   const hostId = dbUser.id;
 
   const now = new Date();
@@ -230,6 +231,82 @@ export default async function HostDashboardPage() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-semibold">{confirmedTrips}</div>
+            </CardContent>
+          </Card>
+        </div>
+      </section>
+
+      <section className="space-y-3">
+        <h2 className="text-lg font-semibold">Profile & verification</h2>
+        <div className="grid gap-4 sm:grid-cols-3">
+          <Card>
+            <CardHeader>
+              <CardTitle>Host profile</CardTitle>
+              <CardDescription>Business details and verification images.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <form action="/api/account/documents" method="post" encType="multipart/form-data" className="space-y-3">
+                <label className="block">
+                  <div className="mb-1 text-sm">Full name</div>
+                  <Input name="name" defaultValue={dbUser.name || ""} required />
+                </label>
+                <label className="block">
+                  <div className="mb-1 text-sm">Phone number</div>
+                  <Input name="phone" type="tel" required placeholder="+27 123 456 7890" />
+                </label>
+                <label className="block">
+                  <div className="mb-1 text-sm">Date of birth</div>
+                  <Input name="dob" type="date" required />
+                </label>
+                <label className="block">
+                  <div className="mb-1 text-sm">Address</div>
+                  <Input name="address" required placeholder="Street, City, Country" />
+                </label>
+                <label className="block">
+                  <div className="mb-1 text-sm">ID number</div>
+                  <Input name="idNumber" required placeholder="ID or passport number" />
+                </label>
+                <label className="block">
+                  <div className="mb-1 text-sm">Profile photo</div>
+                  <Input name="profilePhoto" type="file" accept="image/*" required />
+                </label>
+                <label className="block">
+                  <div className="mb-1 text-sm">ID document</div>
+                  <Input name="idDocument" type="file" accept="image/*" required />
+                </label>
+                <label className="block">
+                  <div className="mb-1 text-sm">Drivers license</div>
+                  <Input name="driversLicense" type="file" accept="image/*" required />
+                </label>
+                <Button type="submit" className="w-full">Save profile</Button>
+              </form>
+              {typeof supabaseUser.user_metadata?.profileImagePath === "string" ? (
+                <img
+                  src={supabaseUser.user_metadata.profileImagePath}
+                  alt="Profile"
+                  className="w-24 h-24 rounded-full mt-4 object-cover border"
+                />
+              ) : (
+                <div className="w-24 h-24 rounded-full bg-muted flex items-center justify-center mt-4">No photo</div>
+              )}
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle>Drivers license</CardTitle>
+              <CardDescription>Verification status stored in your profile.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Badge variant={badgeVariantForVerificationStatus(dbUser.driversLicenseStatus)}>{dbUser.driversLicenseStatus}</Badge>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle>ID verification</CardTitle>
+              <CardDescription>Verification status stored in your profile.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Badge variant={badgeVariantForVerificationStatus(dbUser.idVerificationStatus)}>{dbUser.idVerificationStatus}</Badge>
             </CardContent>
           </Card>
         </div>

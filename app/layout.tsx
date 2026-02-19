@@ -4,10 +4,12 @@ import Navbar from "@/app/components/Navbar";
 import Providers from "@/app/providers";
 import Footer from "@/app/components/Footer";
 import ChatWidget from "@/app/components/ChatWidget.client";
+import PwaInit from "@/app/components/PwaInit.client";
 
 export const metadata: Metadata = {
   title: "RideShare Platform",
   description: "Peer-to-peer car rental marketplace (Host / Renter / Admin)",
+  manifest: "/manifest.webmanifest",
   icons: {
     icon: [
       { url: "/favicon-16.png", sizes: "16x16", type: "image/png" },
@@ -27,6 +29,7 @@ export default function RootLayout({
     <html lang="en">
       <body className="antialiased">
         <Providers>
+          <PwaInit />
           <div className="relative min-h-dvh bg-background text-foreground">
             <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden">
               <div className="absolute -top-40 left-1/2 h-[520px] w-[520px] -translate-x-1/2 rounded-full bg-accent/15 blur-3xl" />

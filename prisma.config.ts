@@ -11,7 +11,6 @@ export default defineConfig({
   migrations: {
     path: "prisma/migrations",
   },
-  engine: "classic",
   datasource: {
     // Avoid throwing during config module load when DATABASE_URL isn't set.
     // (Vercel build env can be missing/misconfigured; build script will provide a fallback for `prisma generate`.)

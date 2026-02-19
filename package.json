@@ -17,19 +17,21 @@
     "db:seed": "tsx prisma/seed.ts"
   },
   "dependencies": {
-    "@prisma/client": "^6.19.2",
+    "@prisma/adapter-pg": "7.3.0",
+    "@prisma/client": "7.3.0",
     "@sentry/nextjs": "^10.38.0",
     "@supabase/ssr": "^0.7.0",
     "@supabase/supabase-js": "^2.95.3",
     "leaflet": "^1.9.4",
     "next": "16.1.6",
-    "prisma": "^6.19.2",
+    "pg": "^8.18.0",
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "react-hook-form": "^7.71.1",
     "react-leaflet": "^5.0.0",
     "resend": "^6.9.1",
     "stripe": "^20.3.1",
+    "web-push": "^3.6.7",
     "zod": "^4.3.6"
   },
   "devDependencies": {
@@ -40,10 +42,11 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@types/web-push": "^3.6.4",
     "dotenv": "^16.6.1",
     "eslint": "^9",
     "eslint-config-next": "16.1.6",
-    "pg": "^8.18.0",
+    "prisma": "7.3.0",
     "tailwindcss": "^4",
     "tsx": "^4.21.0",
     "typescript": "^5"

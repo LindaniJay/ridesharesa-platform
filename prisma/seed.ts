@@ -1,7 +1,15 @@
+import "dotenv/config";
+
 import { PrismaClient } from "@prisma/client";
+import { PrismaPg } from "@prisma/adapter-pg";
+import { Pool } from "pg";
 import { createClient } from "@supabase/supabase-js";
 
-const prisma = new PrismaClient();
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+});
+
+const prisma = new PrismaClient({ adapter: new PrismaPg(pool) });
 
 async function main() {
   const email = (process.env.ADMIN_EMAIL ?? "admin@rideshare.local").toLowerCase().trim();
@@ -42,8 +50,47 @@ async function main() {
       user_metadata: { name },
     });
 
-    if (error && !/already\s*registered|exists/i.test(error.message)) {
-      throw new Error(`Supabase admin.createUser failed: ${error.message}`);
+    if (error) {
+      const alreadyExists = /already/i.test(error.message) && /(registered|exists)/i.test(error.message);
+
+      if (alreadyExists) {
+        let existingId: string | null = null;
+        let page = 1;
+        const perPage = 200;
+
+        while (page < 50 && !existingId) {
+          const { data, error: listError } = await supabase.auth.admin.listUsers({ page, perPage });
+          if (listError) {
+            throw new Error(`Supabase admin.listUsers failed: ${listError.message}`);
+          }
+
+          const users = data?.users ?? [];
+          if (users.length === 0) break;
+
+          const match = users.find((u) => (u.email ?? "").toLowerCase().trim() === email);
+          if (match?.id) existingId = match.id;
+          page += 1;
+        }
+
+        if (!existingId) {
+          throw new Error("Supabase Auth admin user exists but could not be found via listUsers");
+        }
+
+        const { error: updateError } = await supabase.auth.admin.updateUserById(existingId, {
+          password,
+          user_metadata: { name },
+        });
+
+        if (updateError) {
+          throw new Error(`Supabase admin.updateUserById failed: ${updateError.message}`);
+        }
+      } else if (/invalid\s*api\s*key/i.test(error.message)) {
+        console.log(
+          "Supabase service role key appears invalid; skipped creating Supabase Auth admin user. (You can sign up via /sign-up instead.)",
+        );
+      } else {
+        throw new Error(`Supabase admin.createUser failed: ${error.message}`);
+      }
     }
   } else {
     console.log(

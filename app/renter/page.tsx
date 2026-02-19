@@ -18,7 +18,7 @@ function iso(d: Date) {
 }
 
 export default async function RenterDashboardPage() {
-  const { dbUser } = await requireRole("RENTER");
+  const { dbUser, supabaseUser } = await requireRole("RENTER");
   const renterId = dbUser.id;
 
   const now = new Date();
@@ -316,8 +316,12 @@ export default async function RenterDashboardPage() {
                 <Button type="submit" className="w-full">Save profile</Button>
               </form>
               {/* Display profile image if available */}
-              {dbUser.profileImagePath ? (
-                <img src={dbUser.profileImagePath} alt="Profile" className="w-24 h-24 rounded-full mt-4 object-cover border" />
+              {typeof supabaseUser.user_metadata?.profileImagePath === "string" ? (
+                <img
+                  src={supabaseUser.user_metadata.profileImagePath}
+                  alt="Profile"
+                  className="w-24 h-24 rounded-full mt-4 object-cover border"
+                />
               ) : (
                 <div className="w-24 h-24 rounded-full bg-muted flex items-center justify-center mt-4">No photo</div>
               )}

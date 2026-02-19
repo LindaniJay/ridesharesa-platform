@@ -9,6 +9,11 @@ import { prisma } from "@/app/lib/prisma";
 import { requireUser } from "@/app/lib/require";
 import BookingStatusClient from "@/app/bookings/[id]/BookingStatusClient";
 
+type BookingPageProps = {
+  params: Promise<{ id: string }>;
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
+};
+
 function parseIntParam(v: unknown) {
   if (typeof v !== "string") return null;
   const n = Number(v);
@@ -21,24 +26,24 @@ function parseIntParam(v: unknown) {
 export default async function BookingPage({
   params,
   searchParams,
-}: {
-  params: { id: string };
-  searchParams?: Record<string, string | string[] | undefined>;
-}) {
+}: BookingPageProps) {
   const { dbUser } = await requireUser();
   const viewerRole = dbUser.role;
   const viewerId = dbUser.id;
 
-  const chauffeurKmRaw = Array.isArray(searchParams?.chauffeurKm)
-    ? searchParams?.chauffeurKm[0]
-    : searchParams?.chauffeurKm;
+  const resolvedParams = await params;
+  const resolvedSearchParams = searchParams ? await searchParams : undefined;
+
+  const chauffeurKmRaw = Array.isArray(resolvedSearchParams?.chauffeurKm)
+    ? resolvedSearchParams?.chauffeurKm[0]
+    : resolvedSearchParams?.chauffeurKm;
   const chauffeurKmParsed = parseIntParam(chauffeurKmRaw);
   const chauffeurKm = chauffeurKmParsed && chauffeurKmParsed > 0 ? Math.min(chauffeurKmParsed, 5000) : 0;
   const chauffeurRateCentsPerKm = 10 * 100;
   const chauffeurCents = chauffeurKm > 0 ? chauffeurKm * chauffeurRateCentsPerKm : 0;
 
   const booking = await prisma.booking.findUnique({
-    where: { id: params.id },
+    where: { id: resolvedParams.id },
     select: {
       id: true,
       status: true,

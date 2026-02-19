@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
 import Logo from "@/app/components/Logo";
+import PushEnableButton from "@/app/components/PushEnableButton.client";
 import Button from "@/app/components/ui/Button";
 import { supabaseBrowser } from "@/app/lib/supabase/browser";
 
@@ -130,6 +131,7 @@ export default function NavbarClient() {
         <div className="flex items-center gap-2">
           {email ? (
             <>
+              <PushEnableButton />
               <span className="hidden text-sm text-foreground/60 sm:inline">
                 {email}
               </span>
