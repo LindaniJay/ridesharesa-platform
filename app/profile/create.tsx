@@ -21,10 +21,36 @@ export default function ProfileCreatePage() {
       setLoading(false);
       return;
     }
-    // TODO: Implement upload logic to /api/account/documents
-    setLoading(false);
-    // Redirect to dashboard after upload
-    window.location.href = "/renter";
+
+    try {
+      const form = new FormData();
+      form.set("profilePhoto", profilePhoto);
+      form.set("idDocument", idDocument);
+      form.set("driversLicense", driversLicense);
+
+      const res = await fetch("/api/account/documents", {
+        method: "POST",
+        body: form,
+      });
+
+      const json = (await res.json().catch(() => null)) as null | { ok?: boolean; error?: string };
+
+      if (res.status === 401) {
+        window.location.href = "/sign-in?next=/profile/create";
+        return;
+      }
+
+      if (!res.ok || !json?.ok) {
+        setError(json?.error || "Upload failed. Please try again.");
+        return;
+      }
+
+      window.location.href = "/renter";
+    } catch {
+      setError("Upload failed. Please try again.");
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (

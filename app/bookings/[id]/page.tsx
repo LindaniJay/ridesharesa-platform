@@ -7,7 +7,45 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/app
 import { badgeVariantForBookingStatus } from "@/app/lib/badgeVariants";
 import { prisma } from "@/app/lib/prisma";
 import { requireUser } from "@/app/lib/require";
+import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
 import BookingStatusClient from "@/app/bookings/[id]/BookingStatusClient";
+
+type BookingPhotoKind = "host_handover" | "renter_pickup" | "renter_return" | "host_return";
+
+const PHOTO_KINDS: Array<{ kind: BookingPhotoKind; label: string; helper: string }> = [
+  { kind: "host_handover", label: "Host handover", helper: "Host uploads proof before pickup." },
+  { kind: "renter_pickup", label: "Renter pickup", helper: "Renter uploads proof at pickup." },
+  { kind: "renter_return", label: "Renter return", helper: "Renter uploads proof at return." },
+  { kind: "host_return", label: "Host return inspection", helper: "Host uploads inspection after return." },
+];
+
+async function listSignedBookingPhotos(params: { bookingId: string; kind: BookingPhotoKind }) {
+  const bucket = process.env.SUPABASE_BOOKING_PHOTOS_BUCKET || "booking-photos";
+  const admin = supabaseAdmin();
+
+  const { data, error } = await admin.storage.from(bucket).list(`${params.bookingId}/${params.kind}`, {
+    limit: 50,
+    offset: 0,
+    sortBy: { column: "name", order: "desc" },
+  });
+
+  if (error) {
+    return { ok: false as const, bucket, error: error.message, photos: [] as Array<{ name: string; signedUrl: string }> };
+  }
+
+  const objects = data ?? [];
+  const photos: Array<{ name: string; signedUrl: string }> = [];
+  for (const o of objects) {
+    if (!o.name) continue;
+    const path = `${params.bookingId}/${params.kind}/${o.name}`;
+    const signed = await admin.storage.from(bucket).createSignedUrl(path, 60 * 10);
+    if (signed.data?.signedUrl) {
+      photos.push({ name: o.name, signedUrl: signed.data.signedUrl });
+    }
+  }
+
+  return { ok: true as const, bucket, error: null as string | null, photos };
+}
 
 type BookingPageProps = {
   params: Promise<{ id: string }>;
@@ -59,14 +97,31 @@ export default async function BookingPage({
           id: true,
           title: true,
           city: true,
+          imageUrl: true,
           dailyRateCents: true,
+          hostId: true,
         },
       },
     },
   });
 
   if (!booking) notFound();
-  if (viewerRole !== "ADMIN" && booking.renterId !== viewerId) redirect("/listings");
+  const canView =
+    viewerRole === "ADMIN" ||
+    booking.renterId === viewerId ||
+    (viewerRole === "HOST" && booking.listing.hostId === viewerId);
+  if (!canView) redirect("/listings");
+
+  const isAdmin = viewerRole === "ADMIN";
+  const isHost = viewerRole === "HOST" && booking.listing.hostId === viewerId;
+  const isRenter = viewerRole === "RENTER" && booking.renterId === viewerId;
+
+  const photosByKind = await Promise.all(
+    PHOTO_KINDS.map(async ({ kind }) => ({
+      kind,
+      result: await listSignedBookingPhotos({ bookingId: booking.id, kind }),
+    })),
+  );
 
   const isPending = booking.status === "PENDING_PAYMENT";
   const isManualPayment = isPending && !booking.stripeCheckoutSessionId;
@@ -176,6 +231,17 @@ export default async function BookingPage({
           <CardDescription>{booking.listing.city}</CardDescription>
         </CardHeader>
         <CardContent>
+          {booking.listing.imageUrl ? (
+            <>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={booking.listing.imageUrl}
+                alt={booking.listing.title}
+                className="mb-3 h-40 w-full rounded-xl border border-border object-cover"
+                loading="lazy"
+              />
+            </>
+          ) : null}
           <div className="mb-3">
             <Badge variant={badgeVariantForBookingStatus(booking.status)}>{booking.status}</Badge>
           </div>
@@ -224,6 +290,86 @@ export default async function BookingPage({
               </div>
             </div>
           </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Photo log</CardTitle>
+          <CardDescription>
+            Handover and return photos help prevent disputes. Photos are private and shared only with the renter, host, and admin.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-5">
+          {PHOTO_KINDS.map(({ kind, label, helper }) => {
+            const entry = photosByKind.find((p) => p.kind === kind);
+            const res = entry?.result;
+
+            const canUpload =
+              isAdmin ||
+              ((kind === "host_handover" || kind === "host_return") ? isHost : false) ||
+              ((kind === "renter_pickup" || kind === "renter_return") ? isRenter : false);
+
+            return (
+              <div key={kind} className="space-y-2">
+                <div className="flex flex-wrap items-end justify-between gap-2">
+                  <div>
+                    <div className="text-sm font-medium">{label}</div>
+                    <div className="text-xs text-foreground/60">{helper}</div>
+                  </div>
+                  {canUpload ? (
+                    <form
+                      action={`/api/bookings/${encodeURIComponent(booking.id)}/photos`}
+                      method="post"
+                      encType="multipart/form-data"
+                      className="flex items-center gap-2"
+                    >
+                      <input type="hidden" name="kind" value={kind} />
+                      <input
+                        name="photo"
+                        type="file"
+                        accept="image/*"
+                        required
+                        className="max-w-[220px] text-sm"
+                      />
+                      <Button type="submit" variant="secondary">
+                        Upload
+                      </Button>
+                    </form>
+                  ) : null}
+                </div>
+
+                {!res ? null : !res.ok ? (
+                  <div className="text-sm text-foreground/60">Could not load photos: {res.error}</div>
+                ) : res.photos.length === 0 ? (
+                  <div className="text-sm text-foreground/60">No photos uploaded yet.</div>
+                ) : (
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    {res.photos.map((p) => (
+                      <a
+                        key={p.name}
+                        href={p.signedUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="group overflow-hidden rounded-xl border border-border bg-card"
+                      >
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={p.signedUrl}
+                          alt={`${label} photo`}
+                          className="h-44 w-full object-cover transition-transform group-hover:scale-[1.01]"
+                          loading="lazy"
+                        />
+                        <div className="border-t border-border p-2 text-xs text-foreground/60">
+                          Open (signed URL)
+                        </div>
+                      </a>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </CardContent>
       </Card>
 

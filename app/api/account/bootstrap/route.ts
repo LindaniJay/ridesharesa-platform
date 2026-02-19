@@ -36,7 +36,8 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
   }
 
-  const email = data.user?.email?.toLowerCase().trim();
+  const user = data.user;
+  const email = user?.email?.toLowerCase().trim();
   if (!email) {
     if (process.env.NODE_ENV !== "production") {
       return NextResponse.json({ ok: false, reason: "NOT_AUTHENTICATED" });
@@ -53,6 +54,9 @@ export async function POST(req: Request) {
   const requestedName = parsed.data.name ?? null;
   const requestedRole = parsed.data.role;
 
+  const metadataRoleRaw = (user?.user_metadata as { role?: unknown } | null | undefined)?.role;
+  const metadataRole = metadataRoleRaw === "HOST" || metadataRoleRaw === "RENTER" ? metadataRoleRaw : null;
+
   const existing = await prisma.user.findUnique({
     where: { email },
     select: { id: true, role: true, name: true },
@@ -64,6 +68,13 @@ export async function POST(req: Request) {
     if (!existing.name && requestedName) {
       await prisma.user.update({ where: { email }, data: { name: requestedName } });
     }
+
+    // If a user chose HOST at signup but the DB row already exists as RENTER
+    // (e.g. created earlier by a background sync), allow a one-way promotion.
+    if (existing.role === "RENTER" && requestedRole === "HOST" && metadataRole === "HOST") {
+      await prisma.user.update({ where: { email }, data: { role: "HOST" } });
+    }
+
     return NextResponse.json({ ok: true });
   }
 

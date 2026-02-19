@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/app
 import Button from "@/app/components/ui/Button";
 import Input from "@/app/components/ui/Input";
 import { prisma } from "@/app/lib/prisma";
+import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
 
 type ListingPageProps = {
   params: Promise<{ id: string }>;
@@ -16,6 +17,28 @@ type ListingPageProps = {
 function first(param: string | string[] | undefined) {
   if (!param) return "";
   return Array.isArray(param) ? String(param[0] ?? "") : String(param);
+}
+
+async function listListingGalleryUrls(listingId: string) {
+  const bucket = process.env.SUPABASE_STORAGE_BUCKET || "listing-images";
+  const admin = supabaseAdmin();
+
+  const { data, error } = await admin.storage.from(bucket).list(listingId, {
+    limit: 50,
+    offset: 0,
+    sortBy: { column: "name", order: "asc" },
+  });
+
+  if (error) return [] as string[];
+
+  const urls: string[] = [];
+  for (const o of data ?? []) {
+    if (!o.name) continue;
+    const path = `${listingId}/${o.name}`;
+    const { data: publicData } = admin.storage.from(bucket).getPublicUrl(path);
+    if (publicData?.publicUrl) urls.push(publicData.publicUrl);
+  }
+  return urls;
 }
 
 export default async function ListingDetailsPage({
@@ -65,6 +88,12 @@ export default async function ListingDetailsPage({
 
   if (!listing) notFound();
 
+  const galleryFromStorage = await listListingGalleryUrls(listing.id);
+  const gallery = Array.from(
+    new Set([listing.imageUrl || null, ...galleryFromStorage].filter((u): u is string => Boolean(u))),
+  );
+  const heroUrl = gallery[0] || null;
+
   return (
     <main className="space-y-6">
       <div className="space-y-1">
@@ -76,16 +105,16 @@ export default async function ListingDetailsPage({
 
       <div className="grid gap-6 lg:grid-cols-2">
         <div className="space-y-3">
-          {listing.imageUrl ? (
+          {heroUrl ? (
             <Card>
               <CardHeader>
-                <CardTitle>Photo</CardTitle>
-                <CardDescription>Listing image</CardDescription>
+                <CardTitle>Photos</CardTitle>
+                <CardDescription>Vehicle gallery</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="relative aspect-[16/9] w-full overflow-hidden rounded-lg border border-black/10 dark:border-white/10">
                   <Image
-                    src={listing.imageUrl}
+                    src={heroUrl}
                     alt={listing.title}
                     fill
                     sizes="(max-width: 1024px) 100vw, 50vw"
@@ -93,6 +122,29 @@ export default async function ListingDetailsPage({
                     priority={false}
                   />
                 </div>
+
+                {gallery.length > 1 ? (
+                  <div className="mt-3 grid grid-cols-3 gap-2 sm:grid-cols-4">
+                    {gallery.slice(0, 8).map((url) => (
+                      <a
+                        key={url}
+                        href={url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="relative aspect-[4/3] overflow-hidden rounded-md border border-black/10 dark:border-white/10"
+                      >
+                        <Image
+                          src={url}
+                          alt="Gallery photo"
+                          fill
+                          sizes="(max-width: 640px) 33vw, 12vw"
+                          className="object-cover"
+                          priority={false}
+                        />
+                      </a>
+                    ))}
+                  </div>
+                ) : null}
               </CardContent>
             </Card>
           ) : null}

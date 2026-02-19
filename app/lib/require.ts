@@ -24,33 +24,50 @@ async function getOrCreateDbUser(params: {
   name?: string | null;
   role?: Role | null;
 }) {
-  return prisma.user.upsert({
-    where: { email: params.email },
-    create: {
-      email: params.email,
-      name: params.name ?? null,
-      role: params.role ?? "RENTER",
-      status: "ACTIVE",
-      idVerificationStatus: "UNVERIFIED",
-      driversLicenseStatus: "UNVERIFIED",
-    },
-    update: {
-      // Only fill name if missing.
-      ...(params.name ? { name: params.name } : {}),
+  const select = {
+    id: true,
+    email: true,
+    name: true,
+    role: true,
+    status: true,
+    idVerificationStatus: true,
+    driversLicenseStatus: true,
+  } as const;
 
-      // Allow promoting to ADMIN only from server-controlled sources.
-      ...(params.role === "ADMIN" ? { role: "ADMIN" } : {}),
-    },
-    select: {
-      id: true,
-      email: true,
-      name: true,
-      role: true,
-      status: true,
-      idVerificationStatus: true,
-      driversLicenseStatus: true,
-    },
-  });
+  const existing = await prisma.user.findUnique({ where: { email: params.email }, select });
+
+  if (!existing) {
+    return prisma.user.create({
+      data: {
+        email: params.email,
+        name: params.name ?? null,
+        role: params.role ?? "RENTER",
+        status: "ACTIVE",
+        idVerificationStatus: "UNVERIFIED",
+        driversLicenseStatus: "UNVERIFIED",
+      },
+      select,
+    });
+  }
+
+  const update: Partial<{ name: string | null; role: Role }> = {};
+
+  // Only fill name if missing.
+  if (!existing.name && params.name) update.name = params.name;
+
+  // Role rules:
+  // - Never grant ADMIN from client-controlled metadata.
+  // - Allow syncing HOST/RENTER from Supabase metadata to avoid users getting
+  //   stuck as RENTER if the DB row was created earlier.
+  if (params.role === "ADMIN") {
+    update.role = "ADMIN";
+  } else if ((params.role === "HOST" || params.role === "RENTER") && existing.role !== "ADMIN") {
+    if (existing.role !== params.role) update.role = params.role;
+  }
+
+  if (Object.keys(update).length === 0) return existing;
+
+  return prisma.user.update({ where: { email: params.email }, data: update, select });
 }
 
 export async function requireUser(): Promise<AuthedUser> {

@@ -10,6 +10,10 @@
   --border: #e6eaf2;
   --accent: #00a651;
   --accent-foreground: #07101f;
+
+  /* Derived from existing tokens (no new hard-coded palette in components). */
+  --accent-soft: color-mix(in srgb, var(--accent) 12%, var(--background));
+  --accent-subtle: color-mix(in srgb, var(--accent) 8%, var(--card));
 }
 
 @theme inline {
@@ -20,6 +24,8 @@
   --color-border: var(--border);
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
+  --color-accent-soft: var(--accent-soft);
+  --color-accent-subtle: var(--accent-subtle);
   --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Arial, "Noto Sans", "Liberation Sans", sans-serif;
   --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
 }

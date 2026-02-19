@@ -15,8 +15,10 @@ import {
   badgeVariantForUserStatus,
   badgeVariantForVerificationStatus,
 } from "@/app/lib/badgeVariants";
+import { cn } from "@/app/lib/cn";
 import { prisma } from "@/app/lib/prisma";
 import { requireRole } from "@/app/lib/require";
+import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
 import type {
   BookingStatus,
   IncidentStatus,
@@ -29,6 +31,61 @@ import type {
   VerificationStatus,
 } from "@prisma/client";
 
+function formatInt(n: number) {
+  return new Intl.NumberFormat("en-ZA", { maximumFractionDigits: 0 }).format(n);
+}
+
+function formatMoneyZar(amountCents: number) {
+  const rands = amountCents / 100;
+  return new Intl.NumberFormat("en-ZA", { style: "currency", currency: "ZAR", maximumFractionDigits: 0 }).format(
+    rands,
+  );
+}
+
+function pctChange(current: number, previous: number) {
+  if (previous <= 0) return null;
+  return ((current - previous) / previous) * 100;
+}
+
+function dayKey(d: Date) {
+  return d.toISOString().slice(0, 10);
+}
+
+function buildDailySeries(
+  startDay: Date,
+  days: number,
+  rows: { day: Date; value: number }[],
+) {
+  const byDay = new Map(rows.map((r) => [dayKey(r.day), r.value] as const));
+  const values: number[] = [];
+  for (let i = 0; i < days; i += 1) {
+    const d = new Date(startDay);
+    d.setDate(startDay.getDate() + i);
+    values.push(byDay.get(dayKey(d)) ?? 0);
+  }
+  return values;
+}
+
+function MiniBars({ values, className }: { values: number[]; className?: string }) {
+  const max = Math.max(1, ...values);
+  const width = 300;
+  const height = 64;
+  const gap = 2;
+  const barCount = values.length;
+  const barWidth = Math.max(1, Math.floor((width - gap * (barCount - 1)) / barCount));
+
+  return (
+    <svg viewBox={`0 0 ${width} ${height}`} className={cn("h-16 w-full text-foreground/20", className)}>
+      {values.map((v, i) => {
+        const h = Math.max(1, Math.round((v / max) * (height - 6)));
+        const x = i * (barWidth + gap);
+        const y = height - h;
+        return <rect key={i} x={x} y={y} width={barWidth} height={h} fill="currentColor" rx={1} />;
+      })}
+    </svg>
+  );
+}
+
 function iso(d: Date) {
   return d.toISOString().slice(0, 10);
 }
@@ -38,15 +95,112 @@ function parseStatus<T extends string>(value: unknown, allowed: readonly T[]) {
   return allowed.includes(v as T) ? (v as T) : null;
 }
 
+type AdminSection =
+  | "overview"
+  | "analytics"
+  | "vehicles"
+  | "users"
+  | "bookings"
+  | "payments"
+  | "risk"
+  | "support";
+
+type UserDocKind = "profile" | "id" | "license";
+
+function parseUserDocKind(value: unknown): UserDocKind | null {
+  const v = String(value ?? "").trim();
+  return v === "profile" || v === "id" || v === "license" ? v : null;
+}
+
+async function getUserDocSignedUrl(params: { userId: string; kind: UserDocKind }) {
+  const bucket = process.env.SUPABASE_USER_DOCS_BUCKET || "user-documents";
+
+  const admin = supabaseAdmin();
+  const { data, error } = await admin.storage.from(bucket).list(params.userId, { limit: 100, offset: 0 });
+  if (error) {
+    return {
+      ok: false as const,
+      error: error.message,
+      bucket,
+    };
+  }
+
+  const objects = data ?? [];
+  const match = objects.find((o) => typeof o.name === "string" && o.name.startsWith(`${params.kind}.`));
+  if (!match) {
+    return {
+      ok: false as const,
+      error: "Document not found (user has not uploaded it yet)",
+      bucket,
+    };
+  }
+
+  const path = `${params.userId}/${match.name}`;
+  const { data: signedData, error: signedError } = await admin.storage.from(bucket).createSignedUrl(path, 60 * 5);
+  if (signedError || !signedData?.signedUrl) {
+    return {
+      ok: false as const,
+      error:
+        signedError?.message ||
+        `Could not create signed URL (ensure bucket "${bucket}" exists and SUPABASE_SERVICE_ROLE_KEY is set).`,
+      bucket,
+      path,
+    };
+  }
+
+  return {
+    ok: true as const,
+    bucket,
+    path,
+    signedUrl: signedData.signedUrl,
+  };
+}
+
+function parseSection(value: unknown): AdminSection | null {
+  const v = String(value ?? "").trim();
+  const allowed: readonly AdminSection[] = [
+    "overview",
+    "analytics",
+    "vehicles",
+    "users",
+    "bookings",
+    "payments",
+    "risk",
+    "support",
+  ];
+  return allowed.includes(v as AdminSection) ? (v as AdminSection) : null;
+}
+
+function adminHref(params: Record<string, string | null | undefined>) {
+  const sp = new URLSearchParams();
+  for (const [k, v] of Object.entries(params)) {
+    if (!v) continue;
+    sp.set(k, v);
+  }
+  const qs = sp.toString();
+  return qs ? `/admin?${qs}` : "/admin";
+}
+
 export default async function AdminDashboardPage({
   searchParams,
 }: {
-  searchParams?: Promise<{ q?: string; bookingStatus?: string; ticketStatus?: string; incidentStatus?: string }>;
+  searchParams?: Promise<{
+    section?: string;
+    q?: string;
+    bookingStatus?: string;
+    ticketStatus?: string;
+    incidentStatus?: string;
+    userId?: string;
+    doc?: string;
+  }>;
 }) {
   await requireRole("ADMIN");
 
   const resolved = searchParams ? await searchParams : undefined;
   const q = (resolved?.q ?? "").trim();
+  const section = parseSection(resolved?.section) ?? "overview";
+  const selectedUserId = (resolved?.userId ?? "").trim() || null;
+  const selectedDocKind = parseUserDocKind(resolved?.doc);
   const bookingStatus = parseStatus<BookingStatus>(resolved?.bookingStatus, [
     "PENDING_PAYMENT",
     "CONFIRMED",
@@ -69,6 +223,10 @@ export default async function AdminDashboardPage({
   const dayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
   const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
   const monthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+  const twoMonthsAgo = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000);
+
+  const trendStart = new Date(monthAgo);
+  trendStart.setHours(0, 0, 0, 0);
 
   const [
     pendingListings,
@@ -93,6 +251,14 @@ export default async function AdminDashboardPage({
     recentPayouts,
     pendingPayoutAgg,
     paidPayoutAgg,
+    bookingsTrendRows,
+    revenueTrendRows,
+    signupsTrendRows,
+    topCitiesRows,
+    bookingsPrev30,
+    revenuePrev30Agg,
+    signupsPrev30,
+    revenue30Agg,
   ] = await Promise.all([
     prisma.listing.findMany({
       where: { isApproved: false },
@@ -209,6 +375,7 @@ export default async function AdminDashboardPage({
         type: true,
         status: true,
         title: true,
+        details: true,
         createdAt: true,
         user: { select: { email: true, role: true } },
         bookingId: true,
@@ -245,7 +412,127 @@ export default async function AdminDashboardPage({
       _sum: { amountCents: true },
       _count: { _all: true },
     }),
+
+    prisma.$queryRaw<{ day: Date; bookings: number }[]>`
+      select
+        date_trunc('day', "createdAt") as day,
+        count(*)::int as bookings
+      from "Booking"
+      where "createdAt" >= ${trendStart}
+      group by 1
+      order by 1
+    `,
+    prisma.$queryRaw<{ day: Date; revenueCents: number }[]>`
+      select
+        date_trunc('day', "createdAt") as day,
+        coalesce(sum("totalCents"), 0)::int as "revenueCents"
+      from "Booking"
+      where "createdAt" >= ${trendStart}
+        and status = 'CONFIRMED'
+      group by 1
+      order by 1
+    `,
+    prisma.$queryRaw<{ day: Date; signups: number }[]>`
+      select
+        date_trunc('day', "createdAt") as day,
+        count(*)::int as signups
+      from "User"
+      where "createdAt" >= ${trendStart}
+      group by 1
+      order by 1
+    `,
+    prisma.$queryRaw<{ city: string; bookings: number; revenueCents: number }[]>`
+      select
+        l.city as city,
+        count(*)::int as bookings,
+        coalesce(sum(b."totalCents"), 0)::int as "revenueCents"
+      from "Booking" b
+      join "Listing" l on l.id = b."listingId"
+      where b."createdAt" >= ${trendStart}
+        and b.status = 'CONFIRMED'
+      group by 1
+      order by bookings desc, "revenueCents" desc
+      limit 8
+    `,
+
+    prisma.booking.count({ where: { createdAt: { gte: twoMonthsAgo, lt: monthAgo } } }),
+    prisma.booking.aggregate({
+      where: { status: "CONFIRMED", createdAt: { gte: twoMonthsAgo, lt: monthAgo } },
+      _sum: { totalCents: true },
+    }),
+    prisma.user.count({ where: { createdAt: { gte: twoMonthsAgo, lt: monthAgo } } }),
+    prisma.booking.aggregate({
+      where: { status: "CONFIRMED", createdAt: { gte: monthAgo } },
+      _sum: { totalCents: true },
+    }),
   ]);
+
+  const selectedUser = selectedUserId
+    ? await prisma.user.findUnique({
+        where: { id: selectedUserId },
+        select: {
+          id: true,
+          email: true,
+          role: true,
+          status: true,
+          idVerificationStatus: true,
+          driversLicenseStatus: true,
+          createdAt: true,
+        },
+      })
+    : null;
+
+  let selectedDocPreview:
+    | {
+        ok: true;
+        signedUrl: string;
+        bucket: string;
+        path: string;
+      }
+    | {
+        ok: false;
+        error: string;
+        bucket?: string;
+        path?: string;
+      }
+    | null = null;
+
+  if (selectedUserId && selectedDocKind) {
+    try {
+      selectedDocPreview = await getUserDocSignedUrl({ userId: selectedUserId, kind: selectedDocKind });
+    } catch (e) {
+      selectedDocPreview = {
+        ok: false,
+        error: e instanceof Error ? e.message : "Failed to load document",
+      };
+    }
+  }
+
+  const bookingsSeries = buildDailySeries(
+    trendStart,
+    30,
+    bookingsTrendRows.map((r) => ({ day: r.day, value: r.bookings })),
+  );
+  const revenueSeries = buildDailySeries(
+    trendStart,
+    30,
+    revenueTrendRows.map((r) => ({ day: r.day, value: r.revenueCents })),
+  );
+  const signupsSeries = buildDailySeries(
+    trendStart,
+    30,
+    signupsTrendRows.map((r) => ({ day: r.day, value: r.signups })),
+  );
+
+  const revenue30 = revenue30Agg._sum.totalCents ?? 0;
+  const revenuePrev30 = revenuePrev30Agg._sum.totalCents ?? 0;
+  const bookingsDelta = pctChange(bookingsMonthly, bookingsPrev30);
+  const revenueDelta = pctChange(revenue30, revenuePrev30);
+  const users30 = signupsSeries.reduce((a, b) => a + b, 0);
+
+  const signupsCurrent30 = users30;
+  const signupsPrev = signupsPrev30;
+  const signupsPct = pctChange(signupsCurrent30, signupsPrev);
 
   async function approveListing(formData: FormData) {
     "use server";
@@ -393,13 +680,63 @@ export default async function AdminDashboardPage({
     revalidatePath("/admin");
   }
 
-  return (
-    <main className="space-y-8">
-      <div className="space-y-1">
-        <h1 className="text-2xl font-semibold tracking-tight">Admin dashboard</h1>
-        <p className="text-sm text-foreground/60">Operations, finance, trust & safety, and support.</p>
-      </div>
+  const sidebarSections: { key: AdminSection; label: string }[] = [
+    { key: "overview", label: "Overview" },
+    { key: "analytics", label: "Analytics" },
+    { key: "vehicles", label: "Vehicles" },
+    { key: "users", label: "Users" },
+    { key: "bookings", label: "Bookings" },
+    { key: "payments", label: "Payments" },
+    { key: "risk", label: "Risk & safety" },
+    { key: "support", label: "Support" },
+  ];
 
+  const currentQuery = {
+    q: q || undefined,
+    bookingStatus: bookingStatus ?? undefined,
+    ticketStatus: ticketStatus ?? undefined,
+    incidentStatus: incidentStatus ?? undefined,
+  };
+
+  return (
+    <main className="grid gap-6 lg:grid-cols-[260px_1fr]">
+      <aside className="space-y-4 lg:sticky lg:top-6 lg:self-start">
+        <div className="space-y-1">
+          <h1 className="text-2xl font-semibold tracking-tight">Admin dashboard</h1>
+          <p className="text-sm text-foreground/60">Operations, finance, trust & safety, and support.</p>
+        </div>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Sections</CardTitle>
+            <CardDescription>Select a dashboard section.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <nav className="flex flex-col gap-1">
+              {sidebarSections.map((s) => {
+                const active = s.key === section;
+                return (
+                  <Link
+                    key={s.key}
+                    href={adminHref({ section: s.key, ...currentQuery })}
+                    className={cn(
+                      "rounded-lg border px-3 py-2 text-sm font-medium transition-colors",
+                      active
+                        ? "border-accent/25 bg-accent-soft text-foreground"
+                        : "border-transparent text-foreground/80 hover:bg-muted hover:text-foreground",
+                    )}
+                  >
+                    {s.label}
+                  </Link>
+                );
+              })}
+            </nav>
+          </CardContent>
+        </Card>
+      </aside>
+
+      <div className="space-y-8">
+      {section === "overview" ? (
       <section className="space-y-3">
         <h2 className="text-lg font-semibold">Platform overview</h2>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -408,28 +745,36 @@ export default async function AdminDashboardPage({
               <CardTitle>Total users</CardTitle>
               <CardDescription>Hosts + renters + admins.</CardDescription>
             </CardHeader>
-            <div className="px-6 pb-6 text-2xl font-semibold">{totalUsers}</div>
+            <CardContent>
+              <div className="text-3xl font-semibold tabular-nums">{formatInt(totalUsers)}</div>
+            </CardContent>
           </Card>
           <Card>
             <CardHeader>
               <CardTitle>Total cars listed</CardTitle>
               <CardDescription>All vehicle listings.</CardDescription>
             </CardHeader>
-            <div className="px-6 pb-6 text-2xl font-semibold">{totalCars}</div>
+            <CardContent>
+              <div className="text-3xl font-semibold tabular-nums">{formatInt(totalCars)}</div>
+            </CardContent>
           </Card>
           <Card>
             <CardHeader>
               <CardTitle>Total bookings</CardTitle>
               <CardDescription>All-time.</CardDescription>
             </CardHeader>
-            <div className="px-6 pb-6 text-2xl font-semibold">{totalBookingsAll}</div>
+            <CardContent>
+              <div className="text-3xl font-semibold tabular-nums">{formatInt(totalBookingsAll)}</div>
+            </CardContent>
           </Card>
           <Card>
             <CardHeader>
               <CardTitle>Active rentals now</CardTitle>
               <CardDescription>Confirmed, currently in-range.</CardDescription>
             </CardHeader>
-            <div className="px-6 pb-6 text-2xl font-semibold">{activeRentalsNow}</div>
+            <CardContent>
+              <div className="text-3xl font-semibold tabular-nums">{formatInt(activeRentalsNow)}</div>
+            </CardContent>
           </Card>
         </div>
 
@@ -439,31 +784,41 @@ export default async function AdminDashboardPage({
               <CardTitle>Bookings (daily)</CardTitle>
               <CardDescription>Last 24 hours.</CardDescription>
             </CardHeader>
-            <div className="px-6 pb-6 text-2xl font-semibold">{bookingsDaily}</div>
+            <CardContent>
+              <div className="text-3xl font-semibold tabular-nums">{formatInt(bookingsDaily)}</div>
+            </CardContent>
           </Card>
           <Card>
             <CardHeader>
               <CardTitle>Bookings (weekly)</CardTitle>
               <CardDescription>Last 7 days.</CardDescription>
             </CardHeader>
-            <div className="px-6 pb-6 text-2xl font-semibold">{bookingsWeekly}</div>
+            <CardContent>
+              <div className="text-3xl font-semibold tabular-nums">{formatInt(bookingsWeekly)}</div>
+            </CardContent>
           </Card>
           <Card>
             <CardHeader>
               <CardTitle>Bookings (monthly)</CardTitle>
               <CardDescription>Last 30 days.</CardDescription>
             </CardHeader>
-            <div className="px-6 pb-6 text-2xl font-semibold">{bookingsMonthly}</div>
+            <CardContent>
+              <div className="text-3xl font-semibold tabular-nums">{formatInt(bookingsMonthly)}</div>
+            </CardContent>
           </Card>
           <Card>
             <CardHeader>
               <CardTitle>Revenue overview</CardTitle>
               <CardDescription>Gross confirmed bookings.</CardDescription>
             </CardHeader>
-            <div className="px-6 pb-6">
-              <div className="text-2xl font-semibold">{((grossRevenue._sum.totalCents ?? 0) / 100).toFixed(0)}</div>
-              <div className="mt-1 text-sm text-foreground/60">Total across all currencies; commission tracking not configured</div>
-            </div>
+            <CardContent>
+              <div className="text-3xl font-semibold tabular-nums">
+                {formatMoneyZar(grossRevenue._sum.totalCents ?? 0)}
+              </div>
+              <div className="mt-1 text-sm text-foreground/60">
+                Total across all currencies; commission tracking not configured
+              </div>
+            </CardContent>
           </Card>
         </div>
 
@@ -473,32 +828,189 @@ export default async function AdminDashboardPage({
               <CardTitle>Cancellations</CardTitle>
               <CardDescription>All-time cancelled bookings.</CardDescription>
             </CardHeader>
-            <div className="px-6 pb-6 text-2xl font-semibold">{cancellations}</div>
+            <CardContent>
+              <div className="text-3xl font-semibold tabular-nums">{formatInt(cancellations)}</div>
+            </CardContent>
           </Card>
           <Card>
             <CardHeader>
               <CardTitle>Disputes & incidents</CardTitle>
               <CardDescription>Open/in-review incidents.</CardDescription>
             </CardHeader>
-            <div className="px-6 pb-6 text-2xl font-semibold">{openIncidentsCount}</div>
+            <CardContent>
+              <div className="text-3xl font-semibold tabular-nums">{formatInt(openIncidentsCount)}</div>
+            </CardContent>
           </Card>
           <Card>
             <CardHeader>
               <CardTitle>Support tickets</CardTitle>
               <CardDescription>Open/in-progress.</CardDescription>
             </CardHeader>
-            <div className="px-6 pb-6 text-2xl font-semibold">{openTicketsCount}</div>
+            <CardContent>
+              <div className="text-3xl font-semibold tabular-nums">{formatInt(openTicketsCount)}</div>
+            </CardContent>
           </Card>
           <Card>
             <CardHeader>
               <CardTitle>Finance</CardTitle>
               <CardDescription>Refunds/chargebacks.</CardDescription>
             </CardHeader>
-            <div className="px-6 pb-6 text-sm text-foreground/60">Not enabled yet</div>
+            <CardContent>
+              <div className="text-sm text-foreground/60">Not enabled yet</div>
+            </CardContent>
           </Card>
         </div>
       </section>
 
+      ) : null}
+
+      {section === "analytics" ? (
+      <section className="space-y-3">
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div className="space-y-1">
+            <h2 className="text-lg font-semibold">Analytics (last 30 days)</h2>
+            <div className="text-sm text-foreground/60">Power BI-style overview using live platform data.</div>
+          </div>
+          <div className="text-xs text-foreground/60">Updated {now.toLocaleString("en-ZA")}</div>
+        </div>
+
+        <div className="grid gap-4 lg:grid-cols-12">
+          <Card className="lg:col-span-8">
+            <CardHeader>
+              <div className="flex items-center justify-between gap-3">
+                <div className="space-y-1">
+                  <CardTitle>Bookings trend</CardTitle>
+                  <CardDescription>Daily bookings created (30 days).</CardDescription>
+                </div>
+                <Badge variant="info">30d</Badge>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="flex flex-wrap items-baseline justify-between gap-3">
+                <div className="space-y-1">
+                  <div className="text-3xl font-semibold tabular-nums">{formatInt(bookingsMonthly)}</div>
+                  <div className="text-sm text-foreground/60">Avg/day: {formatInt(Math.round(bookingsMonthly / 30))}</div>
+                </div>
+                <div className="text-sm text-foreground/60">
+                  {bookingsDelta === null ? (
+                    <span>vs previous 30d: —</span>
+                  ) : (
+                    <span>
+                      vs previous 30d: {bookingsDelta >= 0 ? "+" : ""}
+                      {bookingsDelta.toFixed(0)}%
+                    </span>
+                  )}
+                </div>
+              </div>
+              <div className="mt-3">
+                <MiniBars values={bookingsSeries} className="text-accent/35" />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="lg:col-span-4">
+            <CardHeader>
+              <div className="flex items-center justify-between gap-3">
+                <div className="space-y-1">
+                  <CardTitle>Top cities</CardTitle>
+                  <CardDescription>Confirmed bookings + revenue (30 days).</CardDescription>
+                </div>
+                <Badge variant="info">30d</Badge>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {topCitiesRows.length === 0 ? (
+                <div className="text-sm text-foreground/60">No confirmed bookings in the last 30 days.</div>
+              ) : (
+                <div className="space-y-2">
+                  {topCitiesRows.map((r) => (
+                    <div key={r.city} className="flex items-center justify-between gap-3 text-sm">
+                      <div className="min-w-0">
+                        <div className="truncate font-medium">{r.city}</div>
+                        <div className="text-xs text-foreground/60">{formatInt(r.bookings)} bookings</div>
+                      </div>
+                      <div className="shrink-0 tabular-nums text-foreground/80">{formatMoneyZar(r.revenueCents)}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+
+        <div className="grid gap-4 lg:grid-cols-12">
+          <Card className="lg:col-span-6">
+            <CardHeader>
+              <div className="flex items-center justify-between gap-3">
+                <div className="space-y-1">
+                  <CardTitle>Revenue trend</CardTitle>
+                  <CardDescription>Confirmed booking revenue (ZAR).</CardDescription>
+                </div>
+                <Badge variant="info">30d</Badge>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="flex flex-wrap items-baseline justify-between gap-3">
+                <div className="space-y-1">
+                  <div className="text-3xl font-semibold tabular-nums">{formatMoneyZar(revenue30)}</div>
+                  <div className="text-sm text-foreground/60">Avg/day: {formatMoneyZar(Math.round(revenue30 / 30))}</div>
+                </div>
+                <div className="text-sm text-foreground/60">
+                  {revenueDelta === null ? (
+                    <span>vs previous 30d: —</span>
+                  ) : (
+                    <span>
+                      vs previous 30d: {revenueDelta >= 0 ? "+" : ""}
+                      {revenueDelta.toFixed(0)}%
+                    </span>
+                  )}
+                </div>
+              </div>
+              <div className="mt-3">
+                <MiniBars values={revenueSeries} className="text-accent/35" />
+              </div>
+              <div className="mt-2 text-xs text-foreground/60">If you support multiple currencies, split revenue by currency.</div>
+            </CardContent>
+          </Card>
+
+          <Card className="lg:col-span-6">
+            <CardHeader>
+              <div className="flex items-center justify-between gap-3">
+                <div className="space-y-1">
+                  <CardTitle>New users</CardTitle>
+                  <CardDescription>Signups created (30 days).</CardDescription>
+                </div>
+                <Badge variant="info">30d</Badge>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="flex flex-wrap items-baseline justify-between gap-3">
+                <div className="space-y-1">
+                  <div className="text-3xl font-semibold tabular-nums">{formatInt(signupsCurrent30)}</div>
+                  <div className="text-sm text-foreground/60">Avg/day: {formatInt(Math.round(signupsCurrent30 / 30))}</div>
+                </div>
+                <div className="text-sm text-foreground/60">
+                  {signupsPct === null ? (
+                    <span>vs previous 30d: —</span>
+                  ) : (
+                    <span>
+                      vs previous 30d: {signupsPct >= 0 ? "+" : ""}
+                      {signupsPct.toFixed(0)}%
+                    </span>
+                  )}
+                </div>
+              </div>
+              <div className="mt-3">
+                <MiniBars values={signupsSeries} className="text-accent/35" />
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </section>
+
+      ) : null}
+
+      {section === "vehicles" ? (
       <section className="space-y-3">
         <h2 className="text-lg font-semibold">Vehicle management</h2>
         <div className="text-sm text-foreground/60">
@@ -571,6 +1083,7 @@ export default async function AdminDashboardPage({
                     <th className="px-3 py-2">Host</th>
                     <th className="px-3 py-2">Status</th>
                     <th className="px-3 py-2">Approved</th>
+                    <th className="px-3 py-2">Docs</th>
                     <th className="px-3 py-2">Created</th>
                   </tr>
                 </thead>
@@ -592,6 +1105,34 @@ export default async function AdminDashboardPage({
                           {l.isApproved ? "Yes" : "No"}
                         </Badge>
                       </td>
+                      <td className="px-3 py-2">
+                        <div className="flex flex-wrap items-center gap-2 text-xs">
+                          <a
+                            href={`/api/admin/listing-documents/licenseDisk?listingId=${encodeURIComponent(l.id)}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="underline decoration-border text-foreground/80 hover:text-foreground"
+                          >
+                            Disk
+                          </a>
+                          <a
+                            href={`/api/admin/listing-documents/registration?listingId=${encodeURIComponent(l.id)}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="underline decoration-border text-foreground/80 hover:text-foreground"
+                          >
+                            Reg
+                          </a>
+                          <a
+                            href={`/api/admin/listing-documents/licenseCard?listingId=${encodeURIComponent(l.id)}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="underline decoration-border text-foreground/80 hover:text-foreground"
+                          >
+                            Card
+                          </a>
+                        </div>
+                      </td>
                       <td className="px-3 py-2">{iso(l.createdAt)}</td>
                     </tr>
                   ))}
@@ -602,144 +1143,269 @@ export default async function AdminDashboardPage({
         </Card>
       </section>
 
+      ) : null}
+
+      {section === "users" ? (
       <section className="space-y-3">
-        <h2 className="text-lg font-semibold">User management</h2>
-        <form className="flex flex-wrap items-center gap-2" action="/admin" method="get">
-          <Input name="q" defaultValue={q} placeholder="Search by email" className="max-w-sm" />
-          <Button type="submit" variant="secondary">Search</Button>
-        </form>
-        <div className="overflow-hidden rounded-xl border border-border shadow-sm">
-          <table className="w-full text-left text-sm">
-            <thead className="bg-muted">
-              <tr>
-                <th className="px-3 py-2">Email</th>
-                <th className="px-3 py-2">Role</th>
-                <th className="px-3 py-2">Status</th>
-                <th className="px-3 py-2">ID verify</th>
-                <th className="px-3 py-2">License</th>
-                <th className="px-3 py-2">Created</th>
-                <th className="px-3 py-2">Docs</th>
-                <th className="px-3 py-2">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {allUsers.map((u) => (
-                <tr key={u.id} className="border-t border-border">
-                  <td className="px-3 py-2">{u.email}</td>
-                  <td className="px-3 py-2">
-                    <Badge variant={badgeVariantForRole(u.role)}>{u.role}</Badge>
-                  </td>
-                  <td className="px-3 py-2">
-                    <Badge variant={badgeVariantForUserStatus(u.status)}>{u.status}</Badge>
-                  </td>
-                  <td className="px-3 py-2">
-                    <Badge variant={badgeVariantForVerificationStatus(u.idVerificationStatus)}>{u.idVerificationStatus}</Badge>
-                  </td>
-                  <td className="px-3 py-2">
-                    <Badge variant={badgeVariantForVerificationStatus(u.driversLicenseStatus)}>{u.driversLicenseStatus}</Badge>
-                  </td>
-                  <td className="px-3 py-2">{u.createdAt.toISOString().slice(0, 10)}</td>
-                  <td className="px-3 py-2">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <h2 className="text-lg font-semibold">User verification</h2>
+            <div className="text-sm text-foreground/60">
+              Review uploaded documents and update verification statuses.
+            </div>
+          </div>
+
+          <form className="flex flex-wrap items-center gap-2" action="/admin" method="get">
+            <input type="hidden" name="section" value={section} />
+            <Input name="q" defaultValue={q} placeholder="Search by email" className="max-w-sm" />
+            <Button type="submit" variant="secondary">
+              Search
+            </Button>
+          </form>
+        </div>
+
+        <div className="grid gap-4 lg:grid-cols-[520px_1fr]">
+          <div className="space-y-3">
+            {allUsers.length === 0 ? (
+              <Card>
+                <CardHeader>
+                  <CardTitle>No users found</CardTitle>
+                  <CardDescription>Try clearing the search term.</CardDescription>
+                </CardHeader>
+              </Card>
+            ) : (
+              allUsers.map((u) => {
+                const active = selectedUserId === u.id;
+                const clearHref = adminHref({ section: "users", q: q || null });
+                return (
+                  <Card key={u.id} className={active ? "border-accent/40 bg-accent-subtle" : undefined}>
+                    <CardHeader>
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div className="space-y-1">
+                          <CardTitle className="break-all">{u.email}</CardTitle>
+                          <CardDescription>Created {iso(u.createdAt)}</CardDescription>
+                          <div className="flex flex-wrap items-center gap-2 pt-1">
+                            <Badge variant={badgeVariantForRole(u.role)}>{u.role}</Badge>
+                            <Badge variant={badgeVariantForUserStatus(u.status)}>{u.status}</Badge>
+                          </div>
+                        </div>
+
+                        <div className="flex flex-wrap items-center gap-2">
+                          <Link
+                            href={adminHref({
+                              section: "users",
+                              q: q || null,
+                              userId: u.id,
+                              doc: "profile",
+                            })}
+                          >
+                            <Button variant={active && selectedDocKind === "profile" ? "primary" : "secondary"}>
+                              Profile
+                            </Button>
+                          </Link>
+                          <Link
+                            href={adminHref({
+                              section: "users",
+                              q: q || null,
+                              userId: u.id,
+                              doc: "id",
+                            })}
+                          >
+                            <Button variant={active && selectedDocKind === "id" ? "primary" : "secondary"}>
+                              ID
+                            </Button>
+                          </Link>
+                          <Link
+                            href={adminHref({
+                              section: "users",
+                              q: q || null,
+                              userId: u.id,
+                              doc: "license",
+                            })}
+                          >
+                            <Button variant={active && selectedDocKind === "license" ? "primary" : "secondary"}>
+                              DL
+                            </Button>
+                          </Link>
+                        </div>
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <div className="text-sm text-foreground/60">ID:</div>
+                        <Badge variant={badgeVariantForVerificationStatus(u.idVerificationStatus)}>
+                          {u.idVerificationStatus}
+                        </Badge>
+                        <div className="ml-2 text-sm text-foreground/60">License:</div>
+                        <Badge variant={badgeVariantForVerificationStatus(u.driversLicenseStatus)}>
+                          {u.driversLicenseStatus}
+                        </Badge>
+                      </div>
+
+                      <div className="mt-4 grid gap-2">
+                        <form action={setUserRole} className="flex flex-wrap items-center gap-2">
+                          <input type="hidden" name="userId" value={u.id} />
+                          <select
+                            name="role"
+                            defaultValue={u.role}
+                            className="rounded-md border border-border bg-card px-2 py-1 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-accent/30"
+                          >
+                            <option value="RENTER">RENTER</option>
+                            <option value="HOST">HOST</option>
+                            <option value="ADMIN">ADMIN</option>
+                          </select>
+                          <Button type="submit" variant="secondary">
+                            Update role
+                          </Button>
+                        </form>
+
+                        <form action={setUserStatus} className="flex flex-wrap items-center gap-2">
+                          <input type="hidden" name="userId" value={u.id} />
+                          <select
+                            name="status"
+                            defaultValue={u.status}
+                            className="rounded-md border border-border bg-card px-2 py-1 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-accent/30"
+                          >
+                            <option value="ACTIVE">ACTIVE</option>
+                            <option value="SUSPENDED">SUSPENDED</option>
+                          </select>
+                          <Button type="submit" variant="secondary">
+                            Update status
+                          </Button>
+                        </form>
+
+                        <form action={setUserVerification} className="flex flex-wrap items-center gap-2">
+                          <input type="hidden" name="userId" value={u.id} />
+                          <input type="hidden" name="field" value="idVerificationStatus" />
+                          <select
+                            name="status"
+                            defaultValue={u.idVerificationStatus}
+                            className="rounded-md border border-border bg-card px-2 py-1 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-accent/30"
+                          >
+                            <option value="UNVERIFIED">UNVERIFIED</option>
+                            <option value="PENDING">PENDING</option>
+                            <option value="VERIFIED">VERIFIED</option>
+                            <option value="REJECTED">REJECTED</option>
+                          </select>
+                          <Button type="submit" variant="secondary">
+                            Update ID status
+                          </Button>
+                        </form>
+
+                        <form action={setUserVerification} className="flex flex-wrap items-center gap-2">
+                          <input type="hidden" name="userId" value={u.id} />
+                          <input type="hidden" name="field" value="driversLicenseStatus" />
+                          <select
+                            name="status"
+                            defaultValue={u.driversLicenseStatus}
+                            className="rounded-md border border-border bg-card px-2 py-1 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-accent/30"
+                          >
+                            <option value="UNVERIFIED">UNVERIFIED</option>
+                            <option value="PENDING">PENDING</option>
+                            <option value="VERIFIED">VERIFIED</option>
+                            <option value="REJECTED">REJECTED</option>
+                          </select>
+                          <Button type="submit" variant="secondary">
+                            Update DL status
+                          </Button>
+                        </form>
+
+                        <div className="pt-1">
+                          <Link href={clearHref} className="text-sm text-foreground/60 underline decoration-border">
+                            Clear selection
+                          </Link>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })
+            )}
+          </div>
+
+          <div className="space-y-3">
+            <Card>
+              <CardHeader>
+                <CardTitle>Document preview</CardTitle>
+                <CardDescription>
+                  {selectedUser && selectedDocKind
+                    ? `${selectedUser.email} • ${selectedDocKind.toUpperCase()}`
+                    : selectedUser
+                      ? "Select a document type (Profile / ID / DL)"
+                      : "Select a user to preview documents"}
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {!selectedUser ? (
+                  <div className="text-sm text-foreground/60">
+                    Pick a user on the left, then choose Profile/ID/DL.
+                  </div>
+                ) : !selectedDocKind ? (
+                  <div className="text-sm text-foreground/60">
+                    Choose a document type to load a preview.
+                  </div>
+                ) : !selectedDocPreview ? (
+                  <div className="text-sm text-foreground/60">Loading…</div>
+                ) : selectedDocPreview.ok ? (
+                  <div className="space-y-3">
+                    <div className="overflow-hidden rounded-xl border border-border bg-card">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={selectedDocPreview.signedUrl}
+                        alt={`${selectedDocKind} document`}
+                        className="max-h-[70vh] w-full object-contain"
+                      />
+                    </div>
                     <div className="flex flex-wrap items-center gap-2">
-                      <a
-                        href={`/api/admin/user-documents/profile?email=${encodeURIComponent(u.email)}`}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="text-sm font-medium text-foreground/80 underline decoration-border hover:text-foreground"
-                      >
-                        Profile
+                      <a href={selectedDocPreview.signedUrl} target="_blank" rel="noreferrer">
+                        <Button>Open full</Button>
                       </a>
                       <a
-                        href={`/api/admin/user-documents/id?email=${encodeURIComponent(u.email)}`}
+                        href={`/api/admin/user-documents/${selectedDocKind}?userId=${encodeURIComponent(selectedUser.id)}`}
                         target="_blank"
                         rel="noreferrer"
-                        className="text-sm font-medium text-foreground/80 underline decoration-border hover:text-foreground"
                       >
-                        ID
+                        <Button variant="secondary">Open via API</Button>
                       </a>
+                      <div className="text-xs text-foreground/60">
+                        Signed URL (5 min) • {selectedDocPreview.bucket}
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <div className="text-sm font-medium text-foreground">Could not load document</div>
+                    <div className="text-sm text-foreground/60">{selectedDocPreview.error}</div>
+                    <div className="text-sm text-foreground/60">
+                      If this user uploaded docs, confirm the bucket exists (default: user-documents) and
+                      `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY` are set.
+                    </div>
+                    <div>
                       <a
-                        href={`/api/admin/user-documents/license?email=${encodeURIComponent(u.email)}`}
+                        href={`/api/admin/user-documents/${selectedDocKind}?userId=${encodeURIComponent(selectedUser.id)}`}
                         target="_blank"
                         rel="noreferrer"
-                        className="text-sm font-medium text-foreground/80 underline decoration-border hover:text-foreground"
+                        className="text-sm underline decoration-border"
                       >
-                        DL
+                        Open API response
                       </a>
                     </div>
-                  </td>
-                  <td className="px-3 py-2">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <form action={setUserRole} className="flex items-center gap-2">
-                        <input type="hidden" name="userId" value={u.id} />
-                        <select
-                          name="role"
-                          defaultValue={u.role}
-                          className="rounded-md border border-border bg-card px-2 py-1 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-accent/30"
-                        >
-                          <option value="RENTER">RENTER</option>
-                          <option value="HOST">HOST</option>
-                          <option value="ADMIN">ADMIN</option>
-                        </select>
-                        <Button type="submit" variant="secondary">Role</Button>
-                      </form>
-
-                      <form action={setUserStatus} className="flex items-center gap-2">
-                        <input type="hidden" name="userId" value={u.id} />
-                        <select
-                          name="status"
-                          defaultValue={u.status}
-                          className="rounded-md border border-border bg-card px-2 py-1 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-accent/30"
-                        >
-                          <option value="ACTIVE">ACTIVE</option>
-                          <option value="SUSPENDED">SUSPENDED</option>
-                        </select>
-                        <Button type="submit" variant="secondary">Status</Button>
-                      </form>
-
-                      <form action={setUserVerification} className="flex items-center gap-2">
-                        <input type="hidden" name="userId" value={u.id} />
-                        <input type="hidden" name="field" value="idVerificationStatus" />
-                        <select
-                          name="status"
-                          defaultValue={u.idVerificationStatus}
-                          className="rounded-md border border-border bg-card px-2 py-1 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-accent/30"
-                        >
-                          <option value="UNVERIFIED">UNVERIFIED</option>
-                          <option value="PENDING">PENDING</option>
-                          <option value="VERIFIED">VERIFIED</option>
-                          <option value="REJECTED">REJECTED</option>
-                        </select>
-                        <Button type="submit" variant="secondary">ID</Button>
-                      </form>
-
-                      <form action={setUserVerification} className="flex items-center gap-2">
-                        <input type="hidden" name="userId" value={u.id} />
-                        <input type="hidden" name="field" value="driversLicenseStatus" />
-                        <select
-                          name="status"
-                          defaultValue={u.driversLicenseStatus}
-                          className="rounded-md border border-border bg-card px-2 py-1 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-accent/30"
-                        >
-                          <option value="UNVERIFIED">UNVERIFIED</option>
-                          <option value="PENDING">PENDING</option>
-                          <option value="VERIFIED">VERIFIED</option>
-                          <option value="REJECTED">REJECTED</option>
-                        </select>
-                        <Button type="submit" variant="secondary">DL</Button>
-                      </form>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
         </div>
       </section>
 
+      ) : null}
+
+      {section === "bookings" ? (
       <section className="space-y-3">
         <h2 className="text-lg font-semibold">Booking & operations</h2>
 
         <form className="flex flex-wrap items-center gap-2" action="/admin" method="get">
+          <input type="hidden" name="section" value={section} />
           {q ? <input type="hidden" name="q" value={q} /> : null}
           <select
             name="bookingStatus"
@@ -872,6 +1538,9 @@ export default async function AdminDashboardPage({
         </div>
       </section>
 
+      ) : null}
+
+      {section === "payments" ? (
       <section className="space-y-3">
         <h2 className="text-lg font-semibold">Payments & financials</h2>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -1031,10 +1700,14 @@ export default async function AdminDashboardPage({
         </Card>
       </section>
 
+      ) : null}
+
+      {section === "risk" ? (
       <section className="space-y-3">
         <h2 className="text-lg font-semibold">Risk, trust & safety</h2>
 
         <form className="flex flex-wrap items-center gap-2" action="/admin" method="get">
+          <input type="hidden" name="section" value={section} />
           {q ? <input type="hidden" name="q" value={q} /> : null}
           <select
             name="incidentStatus"
@@ -1065,6 +1738,7 @@ export default async function AdminDashboardPage({
                     <tr>
                       <th className="px-3 py-2">Type</th>
                       <th className="px-3 py-2">Title</th>
+                      <th className="px-3 py-2">Details</th>
                       <th className="px-3 py-2">Reporter</th>
                       <th className="px-3 py-2">Status</th>
                       <th className="px-3 py-2">Created</th>
@@ -1078,6 +1752,15 @@ export default async function AdminDashboardPage({
                           <Badge variant="info">{r.type as IncidentType}</Badge>
                         </td>
                         <td className="px-3 py-2">{r.title}</td>
+                        <td className="px-3 py-2">
+                          {r.details ? (
+                            <div className="max-w-[520px] whitespace-pre-wrap break-words text-xs text-foreground/80">
+                              {r.details}
+                            </div>
+                          ) : (
+                            <span className="text-xs text-foreground/50">-</span>
+                          )}
+                        </td>
                         <td className="px-3 py-2">{r.user.email}</td>
                         <td className="px-3 py-2">
                           <Badge variant={badgeVariantForIncidentStatus(r.status)}>{r.status}</Badge>
@@ -1109,10 +1792,14 @@ export default async function AdminDashboardPage({
         </Card>
       </section>
 
+      ) : null}
+
+      {section === "support" ? (
       <section className="space-y-3">
         <h2 className="text-lg font-semibold">Support tools</h2>
 
         <form className="flex flex-wrap items-center gap-2" action="/admin" method="get">
+          <input type="hidden" name="section" value={section} />
           {q ? <input type="hidden" name="q" value={q} /> : null}
           <select
             name="ticketStatus"
@@ -1182,6 +1869,9 @@ export default async function AdminDashboardPage({
           </CardContent>
         </Card>
       </section>
+
+      ) : null}
+      </div>
     </main>
   );
 }

@@ -14,6 +14,7 @@ import {
 } from "@/app/lib/badgeVariants";
 import { prisma } from "@/app/lib/prisma";
 import { requireRole } from "@/app/lib/require";
+import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
 
 function iso(d: Date) {
   return d.toISOString().slice(0, 10);
@@ -22,6 +23,17 @@ function iso(d: Date) {
 export default async function HostDashboardPage() {
   const { dbUser, supabaseUser } = await requireRole("HOST");
   const hostId = dbUser.id;
+
+  const userDocsBucket = process.env.SUPABASE_USER_DOCS_BUCKET || "user-documents";
+  const profileImagePath =
+    typeof supabaseUser.user_metadata?.profileImagePath === "string"
+      ? supabaseUser.user_metadata.profileImagePath
+      : null;
+  let profileImageSignedUrl: string | null = null;
+  if (profileImagePath) {
+    const { data } = await supabaseAdmin().storage.from(userDocsBucket).createSignedUrl(profileImagePath, 60 * 10);
+    if (data?.signedUrl) profileImageSignedUrl = data.signedUrl;
+  }
 
   const now = new Date();
 
@@ -43,6 +55,7 @@ export default async function HostDashboardPage() {
         id: true,
         title: true,
         city: true,
+        imageUrl: true,
         dailyRateCents: true,
         currency: true,
         status: true,
@@ -280,12 +293,15 @@ export default async function HostDashboardPage() {
                 </label>
                 <Button type="submit" className="w-full">Save profile</Button>
               </form>
-              {typeof supabaseUser.user_metadata?.profileImagePath === "string" ? (
-                <img
-                  src={supabaseUser.user_metadata.profileImagePath}
-                  alt="Profile"
-                  className="w-24 h-24 rounded-full mt-4 object-cover border"
-                />
+              {profileImageSignedUrl ? (
+                <>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={profileImageSignedUrl}
+                    alt="Profile"
+                    className="w-24 h-24 rounded-full mt-4 object-cover border"
+                  />
+                </>
               ) : (
                 <div className="w-24 h-24 rounded-full bg-muted flex items-center justify-center mt-4">No photo</div>
               )}
@@ -370,6 +386,21 @@ export default async function HostDashboardPage() {
                   <CardDescription>{l.city}</CardDescription>
                 </CardHeader>
                 <CardContent>
+                  {l.imageUrl ? (
+                    <div className="mb-3 overflow-hidden rounded-xl border border-border bg-muted">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={l.imageUrl}
+                        alt={l.title}
+                        className="h-36 w-full object-cover"
+                        loading="lazy"
+                      />
+                    </div>
+                  ) : (
+                    <div className="mb-3 flex h-36 w-full items-center justify-center rounded-xl border border-border bg-muted text-sm text-foreground/60">
+                      No vehicle photo
+                    </div>
+                  )}
                   <div className="flex items-center justify-between">
                     <div className="text-sm">
                       {(l.dailyRateCents / 100).toFixed(0)} {l.currency}

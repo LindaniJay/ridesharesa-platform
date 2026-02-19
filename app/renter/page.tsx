@@ -5,6 +5,7 @@ import Button from "@/app/components/ui/Button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/app/components/ui/Card";
 import Input from "@/app/components/ui/Input";
 import Textarea from "@/app/components/ui/Textarea";
+import DocumentsUploadForm from "@/app/components/DocumentsUploadForm.client";
 import {
   badgeVariantForBookingStatus,
   badgeVariantForSupportTicketStatus,
@@ -12,6 +13,7 @@ import {
 } from "@/app/lib/badgeVariants";
 import { prisma } from "@/app/lib/prisma";
 import { requireRole } from "@/app/lib/require";
+import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
 
 function iso(d: Date) {
   return d.toISOString().slice(0, 10);
@@ -20,6 +22,17 @@ function iso(d: Date) {
 export default async function RenterDashboardPage() {
   const { dbUser, supabaseUser } = await requireRole("RENTER");
   const renterId = dbUser.id;
+
+  const userDocsBucket = process.env.SUPABASE_USER_DOCS_BUCKET || "user-documents";
+  const profileImagePath =
+    typeof supabaseUser.user_metadata?.profileImagePath === "string"
+      ? supabaseUser.user_metadata.profileImagePath
+      : null;
+  let profileImageSignedUrl: string | null = null;
+  if (profileImagePath) {
+    const { data } = await supabaseAdmin().storage.from(userDocsBucket).createSignedUrl(profileImagePath, 60 * 10);
+    if (data?.signedUrl) profileImageSignedUrl = data.signedUrl;
+  }
 
   const now = new Date();
 
@@ -280,48 +293,16 @@ export default async function RenterDashboardPage() {
               <CardDescription>Enter your details and upload verification images.</CardDescription>
             </CardHeader>
             <CardContent>
-              <form action="/api/account/documents" method="post" encType="multipart/form-data" className="space-y-3">
-                <label className="block">
-                  <div className="mb-1 text-sm">Full name</div>
-                  <Input name="name" defaultValue={dbUser.name || ""} required />
-                </label>
-                <label className="block">
-                  <div className="mb-1 text-sm">Phone number</div>
-                  <Input name="phone" type="tel" required placeholder="+27 123 456 7890" />
-                </label>
-                <label className="block">
-                  <div className="mb-1 text-sm">Date of birth</div>
-                  <Input name="dob" type="date" required />
-                </label>
-                <label className="block">
-                  <div className="mb-1 text-sm">Address</div>
-                  <Input name="address" required placeholder="Street, City, Country" />
-                </label>
-                <label className="block">
-                  <div className="mb-1 text-sm">ID number</div>
-                  <Input name="idNumber" required placeholder="ID or passport number" />
-                </label>
-                <label className="block">
-                  <div className="mb-1 text-sm">Profile photo</div>
-                  <Input name="profilePhoto" type="file" accept="image/*" required />
-                </label>
-                <label className="block">
-                  <div className="mb-1 text-sm">ID document</div>
-                  <Input name="idDocument" type="file" accept="image/*" required />
-                </label>
-                <label className="block">
-                  <div className="mb-1 text-sm">Driver’s license</div>
-                  <Input name="driversLicense" type="file" accept="image/*" required />
-                </label>
-                <Button type="submit" className="w-full">Save profile</Button>
-              </form>
-              {/* Display profile image if available */}
-              {typeof supabaseUser.user_metadata?.profileImagePath === "string" ? (
-                <img
-                  src={supabaseUser.user_metadata.profileImagePath}
-                  alt="Profile"
-                  className="w-24 h-24 rounded-full mt-4 object-cover border"
-                />
+              <DocumentsUploadForm successHref="/renter" nextHref="/renter" />
+              {profileImageSignedUrl ? (
+                <>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={profileImageSignedUrl}
+                    alt="Profile"
+                    className="w-24 h-24 rounded-full mt-4 object-cover border"
+                  />
+                </>
               ) : (
                 <div className="w-24 h-24 rounded-full bg-muted flex items-center justify-center mt-4">No photo</div>
               )}

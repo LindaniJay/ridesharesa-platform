@@ -17,6 +17,8 @@ export function supabaseAdmin() {
 
 export async function uploadListingImage(params: {
   hostId: string;
+  listingId?: string;
+  key?: string;
   file: File;
 }) {
   const bucket = process.env.SUPABASE_STORAGE_BUCKET || "listing-images";
@@ -35,7 +37,11 @@ export async function uploadListingImage(params: {
     .replace(/[^a-z0-9]/g, "");
 
   const safeExt = ext || "png";
-  const path = `${params.hostId}/${crypto.randomUUID()}.${safeExt}`;
+  const folder = params.listingId || params.hostId;
+  const name = params.key
+    ? `${params.key}-${crypto.randomUUID()}.${safeExt}`
+    : `${crypto.randomUUID()}.${safeExt}`;
+  const path = `${folder}/${name}`;
 
   const bytes = new Uint8Array(await params.file.arrayBuffer());
   const client = supabaseAdmin();
@@ -55,4 +61,34 @@ export async function uploadListingImage(params: {
     path,
     publicUrl: data.publicUrl,
   };
+}
+
+export async function uploadPrivateImage(params: {
+  bucket: string;
+  path: string;
+  file: File;
+  upsert?: boolean;
+}) {
+  if (!params.file.type.startsWith("image/")) {
+    throw new Error("Only image uploads are supported");
+  }
+
+  const maxBytes = 5 * 1024 * 1024;
+  if (params.file.size > maxBytes) {
+    throw new Error("Image too large (max 5MB)");
+  }
+
+  const bytes = new Uint8Array(await params.file.arrayBuffer());
+  const client = supabaseAdmin();
+
+  const { error } = await client.storage.from(params.bucket).upload(params.path, bytes, {
+    contentType: params.file.type,
+    upsert: params.upsert === true,
+  });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return { bucket: params.bucket, path: params.path };
 }

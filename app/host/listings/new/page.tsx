@@ -7,7 +7,12 @@ import Input from "@/app/components/ui/Input";
 import Textarea from "@/app/components/ui/Textarea";
 import { prisma } from "@/app/lib/prisma";
 import { requireRole } from "@/app/lib/require";
-import { uploadListingImage } from "@/app/lib/supabaseAdmin";
+import { uploadListingImage, uploadPrivateImage } from "@/app/lib/supabaseAdmin";
+
+function safeExtFromFileName(name: string) {
+  const ext = (name.split(".").pop() || "jpg").toLowerCase().replace(/[^a-z0-9]/g, "");
+  return ext || "jpg";
+}
 
 function errorMessage(code?: string) {
   switch (code) {
@@ -63,31 +68,23 @@ export default async function NewListingPage({
       redirect("/host/listings/new?error=location");
     }
 
-    // Upload each photo and store URLs
-    const photoUploads = async (file: File | null) => {
-      if (file instanceof File && file.size > 0) {
-        try {
-          const uploaded = await uploadListingImage({ hostId, file });
-          return uploaded.publicUrl;
-        } catch {
-          return undefined;
-        }
-      }
-      return undefined;
-    };
-    const leftPhotoUrl = await photoUploads(leftPhoto as File);
-    const rightPhotoUrl = await photoUploads(rightPhoto as File);
-    const interiorPhotoUrl = await photoUploads(interiorPhoto as File);
-    const exteriorPhotoUrl = await photoUploads(exteriorPhoto as File);
-    const damagePhotoUrl = await photoUploads(damagePhoto as File);
-    const licenseDiskImageUrl = await photoUploads(licenseDiskPhoto as File);
-    const registrationImageUrl = await photoUploads(registrationDoc as File);
-    const licenseCardImageUrl = await photoUploads(licenseCardPhoto as File);
+    const leftPhotoFile = leftPhoto instanceof File ? leftPhoto : null;
+    const rightPhotoFile = rightPhoto instanceof File ? rightPhoto : null;
+    const interiorPhotoFile = interiorPhoto instanceof File ? interiorPhoto : null;
+    const exteriorPhotoFile = exteriorPhoto instanceof File ? exteriorPhoto : null;
+    const damagePhotoFile = damagePhoto instanceof File ? damagePhoto : null;
+    const licenseDiskFile = licenseDiskPhoto instanceof File ? licenseDiskPhoto : null;
+    const registrationFile = registrationDoc instanceof File ? registrationDoc : null;
+    const licenseCardFile = licenseCardPhoto instanceof File ? licenseCardPhoto : null;
 
-    const primaryImageUrl =
-      leftPhotoUrl || rightPhotoUrl || interiorPhotoUrl || exteriorPhotoUrl || damagePhotoUrl || null;
+    if (!leftPhotoFile || !rightPhotoFile || !interiorPhotoFile || !exteriorPhotoFile) {
+      redirect("/host/listings/new?error=missing");
+    }
+    if (!licenseDiskFile || !registrationFile || !licenseCardFile) {
+      redirect("/host/listings/new?error=missing");
+    }
 
-    await prisma.listing.create({
+    const listing = await prisma.listing.create({
       data: {
         hostId,
         title,
@@ -98,15 +95,78 @@ export default async function NewListingPage({
         dailyRateCents: Math.round(dailyRate * 100),
         currency: "ZAR",
         status: "ACTIVE",
-        imageUrl: primaryImageUrl,
-        licenseDiskImageUrl,
-        registrationImageUrl,
-        licenseCardImageUrl,
+        imageUrl: null,
+        licenseDiskImageUrl: null,
+        registrationImageUrl: null,
+        licenseCardImageUrl: null,
         // isApproved stays false until admin approval
       },
+      select: { id: true },
     });
 
-    redirect("/host");
+    try {
+      const uploadPhoto = async (key: string, file: File | null) => {
+        if (!(file instanceof File) || file.size <= 0) return null;
+        const uploaded = await uploadListingImage({ hostId, listingId: listing.id, key, file });
+        return uploaded.publicUrl;
+      };
+
+      const uploadListingDoc = async (key: string, file: File) => {
+        const bucket = process.env.SUPABASE_LISTING_DOCS_BUCKET || "listing-documents";
+        const ext = safeExtFromFileName(file.name);
+        const path = `${listing.id}/${key}-${crypto.randomUUID()}.${ext}`;
+        await uploadPrivateImage({ bucket, path, file, upsert: false });
+        return path;
+      };
+
+      const [
+        leftPhotoUrl,
+        rightPhotoUrl,
+        interiorPhotoUrl,
+        exteriorPhotoUrl,
+        damagePhotoUrl,
+        licenseDiskPath,
+        registrationPath,
+        licenseCardPath,
+      ] = await Promise.all([
+        uploadPhoto("left", leftPhotoFile),
+        uploadPhoto("right", rightPhotoFile),
+        uploadPhoto("interior", interiorPhotoFile),
+        uploadPhoto("exterior", exteriorPhotoFile),
+        uploadPhoto("damage", damagePhotoFile),
+        uploadListingDoc("license-disk", licenseDiskFile),
+        uploadListingDoc("registration", registrationFile),
+        uploadListingDoc("license-card", licenseCardFile),
+      ]);
+
+      const primaryImageUrl =
+        leftPhotoUrl || rightPhotoUrl || interiorPhotoUrl || exteriorPhotoUrl || damagePhotoUrl || null;
+
+      // Required photos must upload successfully.
+      if (!leftPhotoUrl || !rightPhotoUrl || !interiorPhotoUrl || !exteriorPhotoUrl) {
+        throw new Error("Required photo upload failed");
+      }
+
+      await prisma.listing.update({
+        where: { id: listing.id },
+        data: {
+          imageUrl: primaryImageUrl,
+          licenseDiskImageUrl: licenseDiskPath,
+          registrationImageUrl: registrationPath,
+          licenseCardImageUrl: licenseCardPath,
+        },
+      });
+
+      redirect("/host");
+    } catch {
+      // Avoid leaving half-created listings if uploads fail.
+      try {
+        await prisma.listing.delete({ where: { id: listing.id } });
+      } catch {
+        // ignore
+      }
+      redirect("/host/listings/new?error=upload");
+    }
   }
 
   return (

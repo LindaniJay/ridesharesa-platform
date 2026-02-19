@@ -26,18 +26,37 @@ export async function GET() {
   const metadataRoleRaw = data.user.user_metadata?.role;
   const metadataRole = metadataRoleRaw === "HOST" || metadataRoleRaw === "RENTER" ? metadataRoleRaw : null;
 
-  const dbUser = await prisma.user.upsert({
-    where: { email },
-    create: {
-      email,
-      role: appRole ?? (metadataRole === "HOST" ? "HOST" : "RENTER"),
-      status: "ACTIVE",
-      idVerificationStatus: "UNVERIFIED",
-      driversLicenseStatus: "UNVERIFIED",
-    },
-    update: appRole === "ADMIN" ? { role: "ADMIN" } : {},
-    select: { email: true, role: true, status: true },
-  });
+  const desiredRole = appRole ?? metadataRole;
+
+  const existing = await prisma.user.findUnique({ where: { email }, select: { email: true, role: true, status: true } });
+
+  const select = { email: true, role: true, status: true } as const;
+
+  let dbUser: { email: string; role: "ADMIN" | "HOST" | "RENTER"; status: string };
+
+  if (!existing) {
+    dbUser = await prisma.user.create({
+      data: {
+        email,
+        role: desiredRole === "HOST" || desiredRole === "ADMIN" ? desiredRole : "RENTER",
+        status: "ACTIVE",
+        idVerificationStatus: "UNVERIFIED",
+        driversLicenseStatus: "UNVERIFIED",
+      },
+      select,
+    });
+  } else {
+    const update: Partial<{ role: "ADMIN" | "HOST" | "RENTER" }> = {};
+    if (desiredRole === "ADMIN") {
+      update.role = "ADMIN";
+    } else if ((desiredRole === "HOST" || desiredRole === "RENTER") && existing.role !== "ADMIN" && existing.role !== desiredRole) {
+      update.role = desiredRole;
+    }
+
+    dbUser = Object.keys(update).length
+      ? await prisma.user.update({ where: { email }, data: update, select })
+      : existing;
+  }
 
   if (dbUser.status === "SUSPENDED") {
     return NextResponse.json({ user: null });

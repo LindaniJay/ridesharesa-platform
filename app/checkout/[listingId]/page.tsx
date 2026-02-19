@@ -45,6 +45,7 @@ export default async function CheckoutPage({
       id: true,
       title: true,
       city: true,
+      imageUrl: true,
       dailyRateCents: true,
       currency: true,
     },
@@ -81,6 +82,17 @@ export default async function CheckoutPage({
           <CardDescription>{listing.city}</CardDescription>
         </CardHeader>
         <CardContent>
+          {listing.imageUrl ? (
+            <>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={listing.imageUrl}
+                alt={listing.title}
+                className="mb-3 h-40 w-full rounded-xl border border-border object-cover"
+                loading="lazy"
+              />
+            </>
+          ) : null}
           <div className="text-sm">
             {(listing.dailyRateCents / 100).toFixed(0)} {listing.currency}
             <span className="text-foreground/50"> / day</span>

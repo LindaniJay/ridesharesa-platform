@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { requireRole } from "@/app/lib/require";
+import { prisma } from "@/app/lib/prisma";
 import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
 
 function normalizeEmail(value: string) {
@@ -33,6 +34,24 @@ async function findSupabaseUserByEmail(email: string) {
   return null;
 }
 
+async function resolvePathFromStorage(params: {
+  bucket: string;
+  userId: string;
+  kind: Kind;
+}) {
+  const admin = supabaseAdmin();
+  const { data, error } = await admin.storage.from(params.bucket).list(params.userId, {
+    limit: 100,
+    offset: 0,
+  });
+  if (error) throw new Error(error.message);
+
+  const objects = data ?? [];
+  const match = objects.find((o) => typeof o.name === "string" && o.name.startsWith(`${params.kind}.`));
+  if (!match) return null;
+  return `${params.userId}/${match.name}`;
+}
+
 export async function GET(
   req: Request,
   context: { params: Promise<{ kind: string }> },
@@ -45,43 +64,86 @@ export async function GET(
   }
 
   const url = new URL(req.url);
-  const emailRaw = url.searchParams.get("email");
-  if (!emailRaw) {
-    return NextResponse.json({ error: "Missing email" }, { status: 400 });
+  const userIdRaw = url.searchParams.get("userId")?.trim() || null;
+  const emailRaw = url.searchParams.get("email")?.trim() || null;
+  if (!userIdRaw && !emailRaw) {
+    return NextResponse.json({ error: "Missing userId or email" }, { status: 400 });
   }
 
-  const email = normalizeEmail(emailRaw);
-  const supabaseUser = await findSupabaseUserByEmail(email);
-  if (!supabaseUser) {
-    return NextResponse.json({ error: "User not found in Supabase Auth" }, { status: 404 });
-  }
+  const email = emailRaw ? normalizeEmail(emailRaw) : null;
 
   const bucket = process.env.SUPABASE_USER_DOCS_BUCKET || "user-documents";
 
-  const metadata = (supabaseUser.user_metadata ?? {}) as Record<string, unknown>;
-  const path =
-    kindRaw === "profile"
-      ? (metadata.profileImagePath as string | undefined)
-      : kindRaw === "id"
-        ? (metadata.idDocumentImagePath as string | undefined)
-        : (metadata.driversLicenseImagePath as string | undefined);
+  try {
+    // Prefer Prisma user id (matches how documents are stored: <prismaUserId>/<kind>.<ext>)
+    const dbUser = userIdRaw
+      ? await prisma.user.findUnique({ where: { id: userIdRaw }, select: { id: true, email: true } })
+      : email
+        ? await prisma.user.findUnique({ where: { email }, select: { id: true, email: true } })
+        : null;
 
-  if (!path || typeof path !== "string") {
-    return NextResponse.json({ error: "No document uploaded for this user" }, { status: 404 });
-  }
+    // Best-effort: read stored metadata path from Supabase Auth.
+    // Not strictly required (we can list the Storage folder by Prisma user id).
+    const supabaseUser = email ? await findSupabaseUserByEmail(email).catch(() => null) : null;
+    const metadata = (supabaseUser?.user_metadata ?? {}) as Record<string, unknown>;
+    const metadataPath =
+      kindRaw === "profile"
+        ? (metadata.profileImagePath as string | undefined)
+        : kindRaw === "id"
+          ? (metadata.idDocumentImagePath as string | undefined)
+          : (metadata.driversLicenseImagePath as string | undefined);
 
-  const admin = supabaseAdmin();
-  const { data, error } = await admin.storage.from(bucket).createSignedUrl(path, 60 * 5);
-  if (error || !data?.signedUrl) {
+    const candidatePaths: string[] = [];
+    if (typeof metadataPath === "string" && metadataPath.trim()) {
+      candidatePaths.push(metadataPath);
+    }
+
+    if (dbUser?.id) {
+      const storagePath = await resolvePathFromStorage({ bucket, userId: dbUser.id, kind: kindRaw });
+      if (storagePath) candidatePaths.push(storagePath);
+    }
+
+    const path = candidatePaths.find((p) => typeof p === "string" && p.length > 0) || null;
+    if (!path) {
+      return NextResponse.json(
+        {
+          error:
+            "No document found for this user. If the user uploaded docs, ensure SUPABASE_SERVICE_ROLE_KEY is set and the bucket exists.",
+          hints: {
+            expectedBucket: bucket,
+            expectedPathPattern: dbUser?.id ? `${dbUser.id}/${kindRaw}.*` : undefined,
+          },
+        },
+        { status: 404 },
+      );
+    }
+
+    const admin = supabaseAdmin();
+    const { data, error } = await admin.storage.from(bucket).createSignedUrl(path, 60 * 5);
+    if (error || !data?.signedUrl) {
+      return NextResponse.json(
+        {
+          error:
+            error?.message ||
+            `Could not create signed URL (ensure bucket "${bucket}" exists and SUPABASE_SERVICE_ROLE_KEY is set).`,
+          path,
+        },
+        { status: 400 },
+      );
+    }
+
+    return NextResponse.redirect(data.signedUrl);
+  } catch (e) {
+    const message = e instanceof Error ? e.message : "Failed to fetch document";
     return NextResponse.json(
       {
-        error:
-          error?.message ||
-          `Could not create signed URL (ensure bucket \"${bucket}\" exists and is accessible).`,
+        error: message,
+        hints: {
+          requiredEnv: ["SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY"],
+          bucket,
+        },
       },
-      { status: 400 },
+      { status: 500 },
     );
   }
-
-  return NextResponse.redirect(data.signedUrl);
 }

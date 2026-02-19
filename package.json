@@ -8,6 +8,7 @@
   "scripts": {
     "predev": "node scripts/predev.mjs",
     "dev": "node scripts/dev.mjs",
+    "supabase:storage": "node scripts/setup-supabase-storage.mjs",
     "build": "node scripts/build.mjs",
     "start": "next start",
     "lint": "eslint",
