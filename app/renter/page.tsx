@@ -19,9 +19,58 @@ function iso(d: Date) {
   return d.toISOString().slice(0, 10);
 }
 
-export default async function RenterDashboardPage() {
+type RenterSection = "bookings" | "payments" | "profile" | "support" | "reviews";
+
+function parseSection(value: unknown): RenterSection | null {
+  const v = String(value ?? "").trim();
+  const allowed: readonly RenterSection[] = ["bookings", "payments", "profile", "support", "reviews"];
+  return allowed.includes(v as RenterSection) ? (v as RenterSection) : null;
+}
+
+function renterHref(params: Record<string, string | null | undefined>) {
+  const sp = new URLSearchParams();
+  for (const [k, v] of Object.entries(params)) {
+    if (!v) continue;
+    sp.set(k, v);
+  }
+  const qs = sp.toString();
+  return qs ? `/renter?${qs}` : "/renter";
+}
+
+function SidebarLink({
+  href,
+  active,
+  children,
+}: {
+  href: string;
+  active: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <Link
+      href={href}
+      aria-current={active ? "page" : undefined}
+      className={
+        active
+          ? "rounded-lg border border-accent/25 bg-accent-soft px-3 py-2 text-sm font-medium text-foreground"
+          : "rounded-lg border border-transparent px-3 py-2 text-sm font-medium text-foreground/80 hover:bg-muted hover:text-foreground"
+      }
+    >
+      {children}
+    </Link>
+  );
+}
+
+export default async function RenterDashboardPage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ section?: string }>;
+}) {
   const { dbUser, supabaseUser } = await requireRole("RENTER");
   const renterId = dbUser.id;
+
+  const resolved = searchParams ? await searchParams : undefined;
+  const section = parseSection(resolved?.section) ?? "bookings";
 
   const userDocsBucket = process.env.SUPABASE_USER_DOCS_BUCKET || "user-documents";
   const profileImagePath =
@@ -119,16 +168,48 @@ export default async function RenterDashboardPage() {
   }
 
   return (
-    <main className="space-y-8">
-      <div className="space-y-1">
-        <h1 className="text-2xl font-semibold tracking-tight">Renter dashboard</h1>
-        <p className="text-sm text-foreground/60">Manage your bookings, payments, and support.</p>
-      </div>
+    <main className="grid gap-6 lg:grid-cols-[260px_1fr]">
+      <aside className="space-y-4 lg:sticky lg:top-6 lg:self-start">
+        <div className="space-y-1">
+          <h1 className="text-2xl font-semibold tracking-tight">Renter dashboard</h1>
+          <p className="text-sm text-foreground/60">Manage your bookings, payments, and support.</p>
+        </div>
 
-      <section className="space-y-3">
-        <h2 className="text-lg font-semibold">Bookings overview</h2>
+        <Card>
+          <CardHeader>
+            <CardTitle>Sections</CardTitle>
+            <CardDescription>Choose what to manage.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <nav className="flex flex-col gap-1">
+              {(
+                [
+                  { key: "bookings", label: "Bookings" },
+                  { key: "payments", label: "Payments" },
+                  { key: "profile", label: "Profile" },
+                  { key: "support", label: "Support" },
+                  { key: "reviews", label: "Reviews" },
+                ] as const
+              ).map((s) => (
+                <SidebarLink
+                  key={s.key}
+                  href={renterHref({ section: s.key })}
+                  active={section === s.key}
+                >
+                  {s.label}
+                </SidebarLink>
+              ))}
+            </nav>
+          </CardContent>
+        </Card>
+      </aside>
 
-        <div className="grid gap-4 lg:grid-cols-3">
+      <div className="space-y-8">
+        {section === "bookings" ? (
+          <section className="space-y-3">
+            <h2 className="text-lg font-semibold">Bookings overview</h2>
+
+            <div className="grid gap-4 lg:grid-cols-3">
           <Card>
             <CardHeader>
               <CardTitle>Upcoming</CardTitle>
@@ -229,170 +310,178 @@ export default async function RenterDashboardPage() {
           </Card>
         </div>
 
-        <div className="text-sm">
-          <Link className="underline" href="/listings">
-            Search cars
-          </Link>
-        </div>
-      </section>
-
-      <section className="space-y-3">
-        <h2 className="text-lg font-semibold">Payments & wallet</h2>
-        <Card>
-          <CardHeader>
-            <CardTitle>Payment history</CardTitle>
-            <CardDescription>Invoices per booking (from booking totals).</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {past.length === 0 ? (
-              <div className="text-sm text-foreground/60">No payment history yet.</div>
-            ) : (
-              <div className="overflow-hidden rounded-xl border border-border">
-                <table className="w-full text-left text-sm">
-                  <thead className="bg-muted">
-                    <tr>
-                      <th className="px-3 py-2">Booking</th>
-                      <th className="px-3 py-2">Dates</th>
-                      <th className="px-3 py-2">Status</th>
-                      <th className="px-3 py-2">Total</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {past.map((b) => (
-                      <tr key={b.id} className="border-t border-border">
-                        <td className="px-3 py-2">
-                          <Link className="underline" href={`/bookings/${b.id}`}>
-                            {b.listing.title}
-                          </Link>
-                        </td>
-                        <td className="px-3 py-2">
-                          {iso(b.startDate)} → {iso(b.endDate)}
-                        </td>
-                        <td className="px-3 py-2">
-                          <Badge variant={badgeVariantForBookingStatus(b.status)}>{b.status}</Badge>
-                        </td>
-                        <td className="px-3 py-2">
-                          {(b.totalCents / 100).toFixed(0)} {b.currency}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </section>
-
-      <section className="space-y-3">
-        <h2 className="text-lg font-semibold">Profile & verification</h2>
-        <div className="grid gap-4 sm:grid-cols-3">
-          <Card>
-            <CardHeader>
-              <CardTitle>Profile creation</CardTitle>
-              <CardDescription>Enter your details and upload verification images.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <DocumentsUploadForm successHref="/renter" nextHref="/renter" />
-              {profileImageSignedUrl ? (
-                <>
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={profileImageSignedUrl}
-                    alt="Profile"
-                    className="w-24 h-24 rounded-full mt-4 object-cover border"
-                  />
-                </>
-              ) : (
-                <div className="w-24 h-24 rounded-full bg-muted flex items-center justify-center mt-4">No photo</div>
-              )}
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader>
-              <CardTitle>Driver’s license</CardTitle>
-              <CardDescription>Verification status stored in your profile.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Badge variant={badgeVariantForVerificationStatus(dbUser.driversLicenseStatus)}>{dbUser.driversLicenseStatus}</Badge>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader>
-              <CardTitle>ID verification</CardTitle>
-              <CardDescription>Verification status stored in your profile.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Badge variant={badgeVariantForVerificationStatus(dbUser.idVerificationStatus)}>{dbUser.idVerificationStatus}</Badge>
-            </CardContent>
-          </Card>
-        </div>
-      </section>
-
-      <section id="support" className="space-y-3">
-        <h2 className="text-lg font-semibold">Support & safety</h2>
-
-        <div className="grid gap-4 lg:grid-cols-2">
-          <Card>
-            <CardHeader>
-              <CardTitle>Contact support</CardTitle>
-              <CardDescription>Create a ticket for issues during a booking.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <form action={createSupportTicket} className="space-y-3">
-                <label className="block">
-                  <div className="mb-1 text-sm">Subject</div>
-                  <Input name="subject" required />
-                </label>
-                <label className="block">
-                  <div className="mb-1 text-sm">Message</div>
-                  <Textarea name="message" required rows={4} />
-                </label>
-                <Button className="w-full">Submit ticket</Button>
-              </form>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Your tickets</CardTitle>
-              <CardDescription>Recent support requests.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {supportTickets.length === 0 ? (
-                <div className="text-sm text-foreground/60">No tickets yet.</div>
-              ) : (
-                <div className="space-y-2">
-                  {supportTickets.map((t) => (
-                    <div key={t.id} className="rounded-xl border border-border bg-background p-3 text-sm">
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="font-medium">{t.subject}</div>
-                        <Badge variant={badgeVariantForSupportTicketStatus(t.status)}>{t.status}</Badge>
-                      </div>
-                      <div className="mt-1 text-foreground/60">Created {iso(t.createdAt)}</div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </div>
-      </section>
-
-      <section className="space-y-3">
-        <h2 className="text-lg font-semibold">Ratings & reviews</h2>
-        <Card>
-          <CardHeader>
-            <CardTitle>Reviews</CardTitle>
-            <CardDescription>Review flows can be enabled per completed booking.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="text-sm text-foreground/60">
-              Reviews are not enabled yet in this build.
+            <div className="text-sm">
+              <Link className="underline" href="/listings">
+                Search cars
+              </Link>
             </div>
-          </CardContent>
-        </Card>
-      </section>
+          </section>
+        ) : null}
+
+        {section === "payments" ? (
+          <section className="space-y-3">
+            <h2 className="text-lg font-semibold">Payments & wallet</h2>
+            <Card>
+              <CardHeader>
+                <CardTitle>Payment history</CardTitle>
+                <CardDescription>Invoices per booking (from booking totals).</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {past.length === 0 ? (
+                  <div className="text-sm text-foreground/60">No payment history yet.</div>
+                ) : (
+                  <div className="overflow-x-auto rounded-xl border border-border">
+                    <table className="min-w-[640px] w-full text-left text-sm">
+                      <thead className="bg-muted">
+                        <tr>
+                          <th className="px-3 py-2">Booking</th>
+                          <th className="px-3 py-2">Dates</th>
+                          <th className="px-3 py-2">Status</th>
+                          <th className="px-3 py-2">Total</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {past.map((b) => (
+                          <tr key={b.id} className="border-t border-border">
+                            <td className="px-3 py-2">
+                              <Link className="underline" href={`/bookings/${b.id}`}>
+                                {b.listing.title}
+                              </Link>
+                            </td>
+                            <td className="px-3 py-2">
+                              {iso(b.startDate)} → {iso(b.endDate)}
+                            </td>
+                            <td className="px-3 py-2">
+                              <Badge variant={badgeVariantForBookingStatus(b.status)}>{b.status}</Badge>
+                            </td>
+                            <td className="px-3 py-2">
+                              {(b.totalCents / 100).toFixed(0)} {b.currency}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </section>
+        ) : null}
+
+        {section === "profile" ? (
+          <section className="space-y-3">
+            <h2 className="text-lg font-semibold">Profile & verification</h2>
+            <div className="grid gap-4 sm:grid-cols-3">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Profile creation</CardTitle>
+                  <CardDescription>Enter your details and upload verification images.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <DocumentsUploadForm successHref="/renter" nextHref="/renter" />
+                  {profileImageSignedUrl ? (
+                    <>
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={profileImageSignedUrl}
+                        alt="Profile"
+                        className="mt-4 h-24 w-24 rounded-full border object-cover"
+                      />
+                    </>
+                  ) : (
+                    <div className="mt-4 flex h-24 w-24 items-center justify-center rounded-full bg-muted">No photo</div>
+                  )}
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader>
+                  <CardTitle>Driver’s license</CardTitle>
+                  <CardDescription>Verification status stored in your profile.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Badge variant={badgeVariantForVerificationStatus(dbUser.driversLicenseStatus)}>{dbUser.driversLicenseStatus}</Badge>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader>
+                  <CardTitle>ID verification</CardTitle>
+                  <CardDescription>Verification status stored in your profile.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Badge variant={badgeVariantForVerificationStatus(dbUser.idVerificationStatus)}>{dbUser.idVerificationStatus}</Badge>
+                </CardContent>
+              </Card>
+            </div>
+          </section>
+        ) : null}
+
+        {section === "support" ? (
+          <section className="space-y-3">
+            <h2 className="text-lg font-semibold">Support & safety</h2>
+
+            <div className="grid gap-4 lg:grid-cols-2">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Contact support</CardTitle>
+                  <CardDescription>Create a ticket for issues during a booking.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <form action={createSupportTicket} className="space-y-3">
+                    <label className="block">
+                      <div className="mb-1 text-sm">Subject</div>
+                      <Input name="subject" required />
+                    </label>
+                    <label className="block">
+                      <div className="mb-1 text-sm">Message</div>
+                      <Textarea name="message" required rows={4} />
+                    </label>
+                    <Button className="w-full">Submit ticket</Button>
+                  </form>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>Your tickets</CardTitle>
+                  <CardDescription>Recent support requests.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {supportTickets.length === 0 ? (
+                    <div className="text-sm text-foreground/60">No tickets yet.</div>
+                  ) : (
+                    <div className="space-y-2">
+                      {supportTickets.map((t) => (
+                        <div key={t.id} className="rounded-xl border border-border bg-background p-3 text-sm">
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="font-medium">{t.subject}</div>
+                            <Badge variant={badgeVariantForSupportTicketStatus(t.status)}>{t.status}</Badge>
+                          </div>
+                          <div className="mt-1 text-foreground/60">Created {iso(t.createdAt)}</div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          </section>
+        ) : null}
+
+        {section === "reviews" ? (
+          <section className="space-y-3">
+            <h2 className="text-lg font-semibold">Ratings & reviews</h2>
+            <Card>
+              <CardHeader>
+                <CardTitle>Reviews</CardTitle>
+                <CardDescription>Review flows can be enabled per completed booking.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="text-sm text-foreground/60">Reviews are not enabled yet in this build.</div>
+              </CardContent>
+            </Card>
+          </section>
+        ) : null}
+      </div>
     </main>
   );
 }

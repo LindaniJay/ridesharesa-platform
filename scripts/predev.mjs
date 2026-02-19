@@ -29,10 +29,14 @@ async function fileExists(filePath) {
 }
 
 function findNextDevPidsWindows() {
+  const root = projectRoot.replaceAll("'", "''");
   const psScript = [
     "$ErrorActionPreference = 'SilentlyContinue'",
-    "$procs = Get-CimInstance Win32_Process -Filter \"Name='node.exe'\" | Select-Object ProcessId, CommandLine",
-    "$procs | ConvertTo-Json -Compress",
+    `$root = '${root}'`,
+    "$needle = 'node_modules\\next\\dist\\server\\lib\\start-server.js'",
+    "Get-CimInstance Win32_Process -Filter \"Name='node.exe'\"",
+    "| Where-Object { $_.CommandLine -and ($_.CommandLine -like ('*' + $root + '*')) -and ($_.CommandLine -like ('*' + $needle + '*')) }",
+    "| Select-Object -ExpandProperty ProcessId",
   ].join("; ");
 
   const result = run("powershell", ["-NoProfile", "-Command", psScript]);
@@ -42,17 +46,11 @@ function findNextDevPidsWindows() {
   if (!stdout) return [];
 
   try {
-    const parsed = JSON.parse(stdout);
-    const list = Array.isArray(parsed) ? parsed : [parsed];
-
-    const nextStartServer = "node_modules\\next\\dist\\server\\lib\\start-server.js";
-
-    return list
-      .filter((p) =>
-        safeIncludes(p?.CommandLine, projectRoot) &&
-        safeIncludes(p?.CommandLine, nextStartServer)
-      )
-      .map((p) => Number(p.ProcessId))
+    return stdout
+      .split(/\r?\n/)
+      .map((s) => s.trim())
+      .filter(Boolean)
+      .map((s) => Number(s))
       .filter((pid) => Number.isFinite(pid));
   } catch {
     return [];
