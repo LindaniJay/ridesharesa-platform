@@ -245,6 +245,7 @@ export default async function AdminDashboardPage({
     openIncidentsCount,
     listingsAll,
     bookingsOps,
+    pendingEftBookings,
     supportTickets,
     incidentReports,
     hostsForPayout,
@@ -352,6 +353,19 @@ export default async function AdminDashboardPage({
         createdAt: true,
         renter: { select: { email: true } },
         listing: { select: { id: true, title: true, city: true, host: { select: { email: true } } } },
+      },
+    }),
+    prisma.booking.findMany({
+      where: { status: "PENDING_PAYMENT", stripeCheckoutSessionId: null },
+      orderBy: { createdAt: "desc" },
+      take: 50,
+      select: {
+        id: true,
+        totalCents: true,
+        currency: true,
+        createdAt: true,
+        renter: { select: { email: true } },
+        listing: { select: { title: true, host: { select: { email: true } } } },
       },
     }),
     prisma.supportTicket.findMany({
@@ -592,6 +606,8 @@ export default async function AdminDashboardPage({
 
   async function markManualBookingPaid(formData: FormData) {
     "use server";
+    await requireRole("ADMIN");
+
     const bookingId = String(formData.get("bookingId") ?? "");
     if (!bookingId) return;
 
@@ -1583,6 +1599,62 @@ export default async function AdminDashboardPage({
             </CardContent>
           </Card>
         </div>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>EFT confirmations</CardTitle>
+            <CardDescription>Bookings awaiting manual/EFT payment confirmation.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {pendingEftBookings.length === 0 ? (
+              <div className="text-sm text-foreground/60">No pending EFT bookings.</div>
+            ) : (
+              <div className="overflow-hidden rounded-xl border border-border">
+                <table className="w-full text-left text-sm">
+                  <thead className="bg-muted">
+                    <tr>
+                      <th className="px-3 py-2">Listing</th>
+                      <th className="px-3 py-2">Host</th>
+                      <th className="px-3 py-2">Renter</th>
+                      <th className="px-3 py-2">Total</th>
+                      <th className="px-3 py-2">Created</th>
+                      <th className="px-3 py-2">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {pendingEftBookings.map((b) => (
+                      <tr key={b.id} className="border-t border-border">
+                        <td className="px-3 py-2">{b.listing.title}</td>
+                        <td className="px-3 py-2">{b.listing.host.email}</td>
+                        <td className="px-3 py-2">{b.renter.email}</td>
+                        <td className="px-3 py-2">
+                          {(b.totalCents / 100).toFixed(0)} {b.currency}
+                        </td>
+                        <td className="px-3 py-2">{iso(b.createdAt)}</td>
+                        <td className="px-3 py-2">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <a
+                              className="text-sm underline"
+                              href={`/api/admin/booking-payment-proof/${encodeURIComponent(b.id)}`}
+                              target="_blank"
+                              rel="noreferrer"
+                            >
+                              View proof
+                            </a>
+                            <form action={markManualBookingPaid}>
+                              <input type="hidden" name="bookingId" value={b.id} />
+                              <Button type="submit" variant="secondary">Mark paid</Button>
+                            </form>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </CardContent>
+        </Card>
 
         <Card>
           <CardHeader>

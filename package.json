@@ -12,9 +12,9 @@
     "build": "node scripts/build.mjs",
     "start": "next start",
     "lint": "eslint",
-    "db:migrate": "prisma migrate dev",
-    "db:generate": "prisma generate",
-    "db:studio": "prisma studio",
+    "db:migrate": "node scripts/prisma.mjs migrate dev",
+    "db:generate": "node scripts/prisma.mjs generate",
+    "db:studio": "node scripts/prisma.mjs studio",
     "db:seed": "tsx prisma/seed.ts"
   },
   "dependencies": {

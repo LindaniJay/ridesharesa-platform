@@ -14,7 +14,7 @@ npm install
 
 Copy `.env.example` to `.env` and fill in:
 
-- `DATABASE_URL` (Supabase Postgres connection string for Prisma; pooled is fine)
+- `DATABASE_URL` (Supabase Postgres connection string; pooled is fine for runtime)
 - `DIRECT_URL` (Supabase direct connection string; recommended for migrations)
 - `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_STORAGE_BUCKET`
 - `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`
@@ -24,18 +24,26 @@ Copy `.env.example` to `.env` and fill in:
 3) Supabase
 
 - Create a Supabase project
-- Create a Storage bucket named `listing-images`
-	- Easiest dev setup: make it public
+- Run the storage setup helper (creates required buckets idempotently):
+
+```bash
+npm run supabase:storage
+```
 
 4) Prisma
 
-After pointing `DATABASE_URL` to your Supabase Postgres database:
+For a clean dev database, point `DATABASE_URL`/`DIRECT_URL` at a fresh Supabase project database and run:
 
 ```bash
 npm run db:generate
 npm run db:migrate
 npm run db:seed
 ```
+
+If `npm run db:migrate` reports Prisma **drift**:
+
+- Safest: use a fresh database (new Supabase project for dev)
+- Dev-only and disposable: run `node scripts/prisma.mjs migrate reset` (destructive)
 
 5) Stripe webhook (local)
 

@@ -12,6 +12,8 @@ import BookingStatusClient from "@/app/bookings/[id]/BookingStatusClient";
 
 type BookingPhotoKind = "host_handover" | "renter_pickup" | "renter_return" | "host_return";
 
+type PaymentProofKind = "payment_proof";
+
 const PHOTO_KINDS: Array<{ kind: BookingPhotoKind; label: string; helper: string }> = [
   { kind: "host_handover", label: "Host handover", helper: "Host uploads proof before pickup." },
   { kind: "renter_pickup", label: "Renter pickup", helper: "Renter uploads proof at pickup." },
@@ -45,6 +47,34 @@ async function listSignedBookingPhotos(params: { bookingId: string; kind: Bookin
   }
 
   return { ok: true as const, bucket, error: null as string | null, photos };
+}
+
+async function listSignedPaymentProofs(params: { bookingId: string; kind: PaymentProofKind }) {
+  const bucket = process.env.SUPABASE_BOOKING_PHOTOS_BUCKET || "booking-photos";
+  const admin = supabaseAdmin();
+
+  const { data, error } = await admin.storage.from(bucket).list(`${params.bookingId}/${params.kind}`, {
+    limit: 20,
+    offset: 0,
+    sortBy: { column: "name", order: "desc" },
+  });
+
+  if (error) {
+    return { ok: false as const, bucket, error: error.message, proofs: [] as Array<{ name: string; signedUrl: string }> };
+  }
+
+  const objects = data ?? [];
+  const proofs: Array<{ name: string; signedUrl: string }> = [];
+  for (const o of objects) {
+    if (!o.name) continue;
+    const path = `${params.bookingId}/${params.kind}/${o.name}`;
+    const signed = await admin.storage.from(bucket).createSignedUrl(path, 60 * 10);
+    if (signed.data?.signedUrl) {
+      proofs.push({ name: o.name, signedUrl: signed.data.signedUrl });
+    }
+  }
+
+  return { ok: true as const, bucket, error: null as string | null, proofs };
 }
 
 type BookingPageProps = {
@@ -125,6 +155,10 @@ export default async function BookingPage({
 
   const isPending = booking.status === "PENDING_PAYMENT";
   const isManualPayment = isPending && !booking.stripeCheckoutSessionId;
+
+  const paymentProofRes = isManualPayment && (isAdmin || isRenter)
+    ? await listSignedPaymentProofs({ bookingId: booking.id, kind: "payment_proof" })
+    : null;
 
   const rentalCents = Math.max(0, booking.totalCents - chauffeurCents);
 
@@ -221,6 +255,56 @@ export default async function BookingPage({
             <div className="text-xs text-foreground/60">
               After payment, an admin will confirm your booking. Keep your proof of payment in case support requests it.
             </div>
+
+            {isAdmin || isRenter ? (
+              <div className="space-y-2">
+                <div className="text-sm font-medium">Upload proof of payment</div>
+                <div className="text-xs text-foreground/60">Upload a screenshot/photo or a PDF. This is private (renter + admin).</div>
+
+                {isRenter ? (
+                  <form
+                    action={`/api/bookings/${encodeURIComponent(booking.id)}/payment-proof`}
+                    method="post"
+                    encType="multipart/form-data"
+                    className="flex flex-wrap items-center gap-2"
+                  >
+                    <input
+                      name="proof"
+                      type="file"
+                      accept="image/*,application/pdf"
+                      required
+                      className="max-w-[260px] text-sm"
+                    />
+                    <Button type="submit" variant="secondary">
+                      Upload proof
+                    </Button>
+                  </form>
+                ) : null}
+
+                {!paymentProofRes ? null : !paymentProofRes.ok ? (
+                  <div className="text-sm text-foreground/60">Could not load proofs: {paymentProofRes.error}</div>
+                ) : paymentProofRes.proofs.length === 0 ? (
+                  <div className="text-sm text-foreground/60">No proof uploaded yet.</div>
+                ) : (
+                  <div className="grid gap-2">
+                    {paymentProofRes.proofs.slice(0, 3).map((p) => (
+                      <a
+                        key={p.name}
+                        href={p.signedUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="rounded-xl border border-border bg-card p-3 text-sm"
+                      >
+                        Open proof (signed URL)
+                      </a>
+                    ))}
+                    {paymentProofRes.proofs.length > 3 ? (
+                      <div className="text-xs text-foreground/60">Showing latest 3 proofs.</div>
+                    ) : null}
+                  </div>
+                )}
+              </div>
+            ) : null}
           </CardContent>
         </Card>
       ) : null}
