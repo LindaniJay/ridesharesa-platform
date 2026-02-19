@@ -51,8 +51,6 @@ export default function NavbarClient() {
   const pathname = usePathname();
   const router = useRouter();
 
-  const waitlistHref = "mailto:rideshare.sasup@gmail.com?subject=RideShare%20SA%20%E2%80%94%20Waitlist%20signup&body=Hi%20RideShare%20SA%2C%0A%0APlease%20add%20me%20to%20the%20waitlist.%0A%0AName%3A%20%0AEmail%3A%20%0AInterest%20(Renter%2FHost)%3A%20%0A%0AThanks%2C%0A";
-
   const [email, setEmail] = useState<string | null>(null);
   const [role, setRole] = useState<"ADMIN" | "HOST" | "RENTER" | null>(null);
 
@@ -155,21 +153,6 @@ export default function NavbarClient() {
               </Link>
             </>
           )}
-        </div>
-      </div>
-
-      <div className="border-t border-border bg-muted/40">
-        <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-3 px-4 py-2">
-          <div className="text-xs text-foreground/70">
-            The platform is in early access: you can create your profile now. We’ll announce when bookings and full operations go live.
-          </div>
-
-          <a
-            href={waitlistHref}
-            className="shrink-0 rounded-lg border border-border bg-card px-3 py-1.5 text-xs font-medium text-foreground shadow-sm hover:bg-muted"
-          >
-            Join waitlist
-          </a>
         </div>
       </div>
 
