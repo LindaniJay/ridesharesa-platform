@@ -57,6 +57,19 @@ export default async function CheckoutPage({
   const dailyRateCents = listing.dailyRateCents;
   const currency = listing.currency;
 
+  const eft = {
+    bankName: process.env.EFT_BANK_NAME ?? "",
+    accountName: process.env.EFT_ACCOUNT_NAME ?? "",
+    accountNumber: process.env.EFT_ACCOUNT_NUMBER ?? "",
+    branchCode: process.env.EFT_BRANCH_CODE ?? "",
+  };
+  const hasEftDetails = Boolean(
+    eft.bankName.trim() &&
+      eft.accountName.trim() &&
+      eft.accountNumber.trim() &&
+      eft.branchCode.trim(),
+  );
+
   return (
     <main className="mx-auto max-w-xl space-y-4">
       <div className="text-sm text-foreground/60">
@@ -110,6 +123,8 @@ export default async function CheckoutPage({
             listingId={listingId}
             dailyRateCents={dailyRateCents}
             currency={currency}
+            eftDetails={eft}
+            hasEftDetails={hasEftDetails}
             initialStartDate={initialStartDate}
             initialEndDate={initialEndDate}
             initialChauffeurEnabled={initialChauffeurEnabled}

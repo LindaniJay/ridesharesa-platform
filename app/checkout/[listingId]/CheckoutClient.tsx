@@ -17,6 +17,13 @@ export default function CheckoutClient(props: {
   listingId: string;
   dailyRateCents: number;
   currency: string;
+  eftDetails: {
+    bankName: string;
+    accountName: string;
+    accountNumber: string;
+    branchCode: string;
+  };
+  hasEftDetails: boolean;
   initialStartDate?: string;
   initialEndDate?: string;
   initialChauffeurEnabled?: boolean;
@@ -239,6 +246,35 @@ export default function CheckoutClient(props: {
             <div className="text-xs text-foreground/60">Create a booking and pay via EFT using the reference provided.</div>
           </span>
         </label>
+
+        {paymentMethod === "eft" ? (
+          <div className="rounded-lg border border-border bg-background/40 p-3 text-xs">
+            <div className="font-medium text-foreground/80">Bank details</div>
+            {props.hasEftDetails ? (
+              <div className="mt-2 grid gap-2 text-foreground/70">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-foreground/60">Bank</span>
+                  <span>{props.eftDetails.bankName}</span>
+                </div>
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-foreground/60">Account name</span>
+                  <span>{props.eftDetails.accountName}</span>
+                </div>
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-foreground/60">Account number</span>
+                  <span>{props.eftDetails.accountNumber}</span>
+                </div>
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-foreground/60">Branch code</span>
+                  <span>{props.eftDetails.branchCode}</span>
+                </div>
+                <div className="mt-1 text-foreground/50">You’ll get a payment reference after creating the booking.</div>
+              </div>
+            ) : (
+              <div className="mt-2 text-foreground/60">Bank details are currently unavailable. Please contact support to complete payment.</div>
+            )}
+          </div>
+        ) : null}
       </div>
 
       {error ? <div className="text-sm text-red-600">{error}</div> : null}
