@@ -42,6 +42,7 @@ export default async function HostDashboardPage() {
     upcomingBookings,
     activeBookings,
     pastBookings,
+    recentMessages,
     supportTickets,
     confirmedTotals,
     pendingPayouts,
@@ -77,7 +78,7 @@ export default async function HostDashboardPage() {
         endDate: true,
         totalCents: true,
         currency: true,
-        renter: { select: { email: true } },
+        renter: { select: { email: true, name: true } },
         listing: { select: { title: true, city: true } },
       },
     }),
@@ -97,7 +98,7 @@ export default async function HostDashboardPage() {
         endDate: true,
         totalCents: true,
         currency: true,
-        renter: { select: { email: true } },
+        renter: { select: { email: true, name: true } },
         listing: { select: { title: true, city: true } },
       },
     }),
@@ -116,8 +117,30 @@ export default async function HostDashboardPage() {
         endDate: true,
         totalCents: true,
         currency: true,
-        renter: { select: { email: true } },
+        renter: { select: { email: true, name: true } },
         listing: { select: { title: true, city: true } },
+      },
+    }),
+    prisma.bookingMessage.findMany({
+      where: {
+        booking: {
+          listing: { hostId },
+        },
+      },
+      orderBy: { createdAt: "desc" },
+      take: 25,
+      select: {
+        id: true,
+        body: true,
+        createdAt: true,
+        booking: {
+          select: {
+            id: true,
+            listing: { select: { title: true } },
+            renter: { select: { email: true, name: true } },
+          },
+        },
+        sender: { select: { email: true, name: true, role: true } },
       },
     }),
     prisma.supportTicket.findMany({
@@ -189,7 +212,7 @@ export default async function HostDashboardPage() {
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div className="space-y-1">
           <h1 className="text-2xl font-semibold tracking-tight">Host dashboard</h1>
-          <p className="text-sm text-foreground/60">Earnings, bookings, vehicles, and support.</p>
+          <p className="text-sm text-foreground/60">Your vehicles, bookings, messages, and payouts in one place.</p>
         </div>
         <Link href="/host/listings/new">
           <Button>New vehicle</Button>
@@ -330,6 +353,14 @@ export default async function HostDashboardPage() {
 
       <section className="space-y-3">
         <h2 className="text-lg font-semibold">Payout history</h2>
+        <div className="flex flex-wrap items-center gap-2">
+          <a
+            href="/api/host/exports/payouts"
+            className="inline-flex items-center justify-center rounded-lg px-3.5 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/30 border border-border bg-card text-foreground shadow-sm hover:bg-muted"
+          >
+            Download my payouts (CSV)
+          </a>
+        </div>
         {recentPayouts.length === 0 ? (
           <Card>
             <CardHeader>
@@ -454,12 +485,19 @@ export default async function HostDashboardPage() {
                     <div className="flex items-start justify-between gap-2">
                       <div>
                         <div className="font-medium">{b.listing.title}</div>
-                        <div className="text-foreground/60">Renter: {b.renter.email}</div>
+                        <div className="text-foreground/60">
+                          Renter: {(b.renter.name && b.renter.name.trim()) || b.renter.email}
+                        </div>
                       </div>
                       <Badge variant={badgeVariantForBookingStatus(b.status)}>{b.status}</Badge>
                     </div>
                     <div className="mt-2 text-foreground/70">
                       {iso(b.startDate)} → {iso(b.endDate)}
+                    </div>
+                    <div className="mt-2">
+                      <Link className="text-sm font-medium underline" href={`/bookings/${b.id}`}>
+                        Open booking
+                      </Link>
                     </div>
                   </div>
                 ))
@@ -480,12 +518,19 @@ export default async function HostDashboardPage() {
                     <div className="flex items-start justify-between gap-2">
                       <div>
                         <div className="font-medium">{b.listing.title}</div>
-                        <div className="text-foreground/60">Renter: {b.renter.email}</div>
+                        <div className="text-foreground/60">
+                          Renter: {(b.renter.name && b.renter.name.trim()) || b.renter.email}
+                        </div>
                       </div>
                       <Badge variant={badgeVariantForBookingStatus(b.status)}>{b.status}</Badge>
                     </div>
                     <div className="mt-2 text-foreground/70">
                       {iso(b.startDate)} → {iso(b.endDate)}
+                    </div>
+                    <div className="mt-2">
+                      <Link className="text-sm font-medium underline" href={`/bookings/${b.id}`}>
+                        Open booking
+                      </Link>
                     </div>
                   </div>
                 ))
@@ -536,6 +581,42 @@ export default async function HostDashboardPage() {
             )}
           </CardContent>
         </Card>
+      </section>
+
+      <section className="space-y-3">
+        <h2 className="text-lg font-semibold">Messages</h2>
+        {recentMessages.length === 0 ? (
+          <Card>
+            <CardHeader>
+              <CardTitle>No messages yet</CardTitle>
+              <CardDescription>Messages show up when you, a renter, or an admin chats on a booking.</CardDescription>
+            </CardHeader>
+          </Card>
+        ) : (
+          <div className="space-y-2">
+            {recentMessages.map((m) => {
+              const senderName = (m.sender.name && m.sender.name.trim()) || m.sender.email;
+              const renterName =
+                (m.booking.renter.name && m.booking.renter.name.trim()) || m.booking.renter.email;
+              return (
+                <Card key={m.id}>
+                  <CardHeader>
+                    <CardTitle className="text-base">{m.booking.listing.title}</CardTitle>
+                    <CardDescription>
+                      {senderName} ({m.sender.role}) • Renter: {renterName} • {new Date(m.createdAt).toLocaleString()}
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-2">
+                    <div className="text-sm text-foreground/80">{m.body}</div>
+                    <Link className="text-sm font-medium underline" href={`/bookings/${m.booking.id}`}>
+                      Open chat
+                    </Link>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+        )}
       </section>
 
       <section className="space-y-3">
