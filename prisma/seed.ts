@@ -4,6 +4,7 @@ import { PrismaClient } from "@prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { Pool } from "pg";
 import { createClient } from "@supabase/supabase-js";
+import type { SupabaseClient } from "@supabase/supabase-js";
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
@@ -18,7 +19,9 @@ function normalizeEmail(email: string) {
 }
 
 async function ensureSupabaseAuthUser(params: {
-  supabase: ReturnType<typeof createClient>;
+  // Supabase client is a generic factory; avoid `ReturnType<typeof createClient>`
+  // because it can collapse generics to `never` during TS builds (e.g. Vercel).
+  supabase: SupabaseClient<any, any, any, any, any>;
   email: string;
   password: string;
   role: SeedRole;
