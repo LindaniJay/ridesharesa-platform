@@ -57,6 +57,21 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Invalid date range" }, { status: 400 });
   }
 
+  const reservedStatuses: Array<"PENDING_APPROVAL" | "CONFIRMED"> = ["PENDING_APPROVAL", "CONFIRMED"];
+  const conflict = await prisma.booking.findFirst({
+    where: {
+      listingId: listing.id,
+      status: { in: reservedStatuses },
+      startDate: { lt: end },
+      endDate: { gt: start },
+    },
+    select: { id: true },
+  });
+
+  if (conflict) {
+    return NextResponse.json({ error: "This vehicle is not available for the selected dates." }, { status: 409 });
+  }
+
   const chauffeurEnabled = parsed.data.chauffeur?.enabled === true;
   const chauffeurKm = chauffeurEnabled ? parsed.data.chauffeur?.kilometers ?? 0 : 0;
   if (chauffeurEnabled && chauffeurKm <= 0) {

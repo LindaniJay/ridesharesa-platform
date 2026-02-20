@@ -7,6 +7,7 @@ import { supabaseServer } from "@/app/lib/supabase/server";
 const BodySchema = z
   .object({
     name: z.string().trim().min(1).max(120).optional(),
+    surname: z.string().trim().min(1).max(120).optional(),
     role: z.enum(["RENTER", "HOST"]).optional(),
   })
   .strict();
@@ -52,6 +53,7 @@ export async function POST(req: Request) {
   }
 
   const requestedName = parsed.data.name ?? null;
+  const requestedSurname = parsed.data.surname ?? null;
   const requestedRole = parsed.data.role;
 
   const metadataRoleRaw = (user?.user_metadata as { role?: unknown } | null | undefined)?.role;
@@ -59,7 +61,7 @@ export async function POST(req: Request) {
 
   const existing = await prisma.user.findUnique({
     where: { email },
-    select: { id: true, role: true, name: true },
+    select: { id: true, role: true, name: true, surname: true },
   });
 
   if (existing) {
@@ -67,6 +69,10 @@ export async function POST(req: Request) {
     // Fill name if missing.
     if (!existing.name && requestedName) {
       await prisma.user.update({ where: { email }, data: { name: requestedName } });
+    }
+
+    if (!existing.surname && requestedSurname) {
+      await prisma.user.update({ where: { email }, data: { surname: requestedSurname } });
     }
 
     // If a user chose HOST at signup but the DB row already exists as RENTER
@@ -82,6 +88,7 @@ export async function POST(req: Request) {
     data: {
       email,
       name: requestedName,
+      surname: requestedSurname,
       role: requestedRole ?? "RENTER",
       status: "ACTIVE",
       idVerificationStatus: "UNVERIFIED",

@@ -42,10 +42,34 @@ export default async function ListingsPage({
         ? ({ dailyRateCents: "desc" } as const)
         : ({ createdAt: "desc" } as const);
 
+    const now = new Date();
+    const reservedStatuses: Array<"PENDING_APPROVAL" | "CONFIRMED"> = ["PENDING_APPROVAL", "CONFIRMED"];
+
+    const startDate = start ? new Date(start) : null;
+    const endDate = end ? new Date(end) : null;
+    const hasValidDates =
+      Boolean(startDate && endDate) &&
+      !Number.isNaN(startDate!.getTime()) &&
+      !Number.isNaN(endDate!.getTime()) &&
+      endDate!.getTime() > startDate!.getTime();
+
   const listings = await prisma.listing.findMany({
     where: {
       status: "ACTIVE",
       isApproved: true,
+      bookings: {
+        none: hasValidDates
+          ? {
+              status: { in: reservedStatuses },
+              startDate: { lt: endDate! },
+              endDate: { gt: startDate! },
+            }
+          : {
+              status: { in: reservedStatuses },
+              startDate: { lte: now },
+              endDate: { gte: now },
+            },
+      },
       ...(q
         ? {
             OR: [

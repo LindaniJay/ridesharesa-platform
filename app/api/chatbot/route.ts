@@ -1,17 +1,32 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 
 import { prisma } from "@/app/lib/prisma";
 import { supabaseServer } from "@/app/lib/supabase/server";
 
 export const runtime = "nodejs";
 
-type ChatActionRequest =
-  | { lang?: string; action: "help" }
-  | { lang?: string; action: "listBookings" }
-  | { lang?: string; action: "getVerification" }
-  | { lang?: string; action: "cancelBooking"; data: { bookingId: string } }
-  | { lang?: string; action: "createTicket"; data: { subject: string; message: string } }
-  | { lang?: string; message: string };
+type ChatbotContext =
+  | null
+  | {
+      pending?: {
+        kind: "pickCity";
+        for: "listings";
+      };
+    };
+
+type ChatActionRequestBase = { lang?: string; context?: ChatbotContext };
+
+type ChatActionRequest = ChatActionRequestBase &
+  (
+    | { action: "help" }
+    | { action: "listBookings" }
+    | { action: "listHostBookings" }
+    | { action: "listHostListings" }
+    | { action: "getVerification" }
+    | { action: "cancelBooking"; data: { bookingId: string } }
+    | { action: "createTicket"; data: { subject: string; message: string } }
+    | { message: string }
+  );
 
 type QuickReply = {
   id: string;
@@ -19,6 +34,8 @@ type QuickReply = {
   action:
     | { kind: "help" }
     | { kind: "listBookings" }
+    | { kind: "listHostBookings" }
+    | { kind: "listHostListings" }
     | { kind: "getVerification" }
     | { kind: "startTicket" }
     | { kind: "send"; text: string }
@@ -37,6 +54,7 @@ type ChatbotResponse = {
   messages: Array<{ text: string }>;
   quickReplies?: QuickReply[];
   cards?: BotCard[];
+  context?: ChatbotContext;
 };
 
 type ChatLang = "en" | "zu" | "af";
@@ -54,6 +72,9 @@ const I18N: Record<ChatLang, Record<string, string>> = {
     greeting_guest:
       "Hello! Ask me anything about bookings, documents, and how the platform works. Sign in to view your bookings and create tickets.",
     menu_bookings: "My bookings",
+    menu_host_bookings: "Guest bookings",
+    menu_host_listings: "My vehicles",
+    menu_host_dashboard: "Host dashboard",
     menu_docs: "Document status",
     menu_ticket: "Create support ticket",
     menu_assist: "Roadside assist",
@@ -61,6 +82,8 @@ const I18N: Record<ChatLang, Record<string, string>> = {
     menu_how: "How it works",
     menu_payments: "Payments (Card/EFT)",
     menu_signin: "Sign in",
+    ask_city: "Which city do you need a car in?",
+    city_suggestions: "Here are cities with approved listings:",
     assist_title: "Roadside assist",
     assist_line1: "Flat tyre, out of fuel, or you’re stuck?",
     assist_line2: "Open Assist and send your location to request help.",
@@ -86,6 +109,9 @@ const I18N: Record<ChatLang, Record<string, string>> = {
     greeting_guest:
       "Sawubona! Buza mayelana nokubhuka, amadokhumenti, nokuthi kusebenza kanjani. Ngena ukuze ubone okubhukile futhi udale ithikithi lokusekelwa.",
     menu_bookings: "Okubhukile kwami",
+    menu_host_bookings: "Okubhukile kwezivakashi",
+    menu_host_listings: "Izimoto zami",
+    menu_host_dashboard: "Iphaneli ye-Host",
     menu_docs: "Isimo samadokhumenti",
     menu_ticket: "Dala ithikithi lokusekelwa",
     menu_assist: "Usizo lomgwaqo",
@@ -93,6 +119,8 @@ const I18N: Record<ChatLang, Record<string, string>> = {
     menu_how: "Kusebenza kanjani",
     menu_payments: "Izinkokhelo (Ikhadi/EFT)",
     menu_signin: "Ngena",
+    ask_city: "Udinga imoto kuphi (iliphi idolobha)?",
+    city_suggestions: "Nawa amadolobha anezimoto ezigunyaziwe:",
     assist_title: "Usizo lomgwaqo",
     assist_line1: "Ithayi ephumile umoya, uphelelwe uphethiloli, noma ubambekile?",
     assist_line2: "Vula i-Assist bese uthumela indawo yakho ukuze uthole usizo.",
@@ -118,6 +146,9 @@ const I18N: Record<ChatLang, Record<string, string>> = {
     greeting_guest:
       "Hallo! Vra my enigiets oor besprekings, dokumente en hoe die platform werk. Meld aan om jou besprekings te sien en ’n ondersteuningstiket te skep.",
     menu_bookings: "My besprekings",
+    menu_host_bookings: "Gastebesprekings",
+    menu_host_listings: "My voertuie",
+    menu_host_dashboard: "Gasheer-paneel",
     menu_docs: "Dokumentstatus",
     menu_ticket: "Skep ondersteuningstiket",
     menu_assist: "Padbystand",
@@ -125,6 +156,8 @@ const I18N: Record<ChatLang, Record<string, string>> = {
     menu_how: "Hoe dit werk",
     menu_payments: "Betalings (Kaart/EFT)",
     menu_signin: "Meld aan",
+    ask_city: "In watter stad het jy ’n motor nodig?",
+    city_suggestions: "Hier is stede met goedgekeurde voertuie:",
     assist_title: "Padbystand",
     assist_line1: "Pap band, sonder brandstof, of jy sit vas?",
     assist_line2: "Open Assist en stuur jou ligging om hulp te vra.",
@@ -153,6 +186,13 @@ function t(lang: ChatLang, key: string) {
 
 function uid() {
   return `${Date.now()}_${Math.random().toString(16).slice(2)}`;
+}
+
+function ensureContext(resp: ChatbotResponse): ChatbotResponse {
+  return {
+    ...resp,
+    context: typeof resp.context === "undefined" ? null : resp.context,
+  };
 }
 
 function slugifyCity(city: string) {
@@ -209,8 +249,65 @@ async function getAuthedDbUserOrNull() {
   }
 }
 
-function helpResponse(lang: ChatLang, params?: { signedIn?: boolean }): ChatbotResponse {
-  const signedIn = Boolean(params?.signedIn);
+function helpResponse(
+  lang: ChatLang,
+  params?: { user?: { role: "HOST" | "RENTER" } | null },
+): ChatbotResponse {
+  const role = params?.user?.role ?? null;
+  const signedIn = Boolean(role);
+
+  const quickReplies: QuickReply[] = !signedIn
+    ? [
+        { id: uid(), label: t(lang, "menu_listings"), action: { kind: "send", text: "Show me listings" } },
+        { id: uid(), label: t(lang, "menu_how"), action: { kind: "send", text: "How it works" } },
+        { id: uid(), label: t(lang, "menu_assist"), action: { kind: "send", text: "Roadside assist" } },
+        { id: uid(), label: t(lang, "menu_payments"), action: { kind: "send", text: "How do payments work?" } },
+        { id: uid(), label: t(lang, "menu_signin"), action: { kind: "send", text: "Sign in" } },
+      ]
+    : role === "HOST"
+      ? [
+          { id: uid(), label: t(lang, "menu_host_dashboard"), action: { kind: "send", text: "Host dashboard" } },
+          { id: uid(), label: t(lang, "menu_host_listings"), action: { kind: "listHostListings" } },
+          { id: uid(), label: t(lang, "menu_host_bookings"), action: { kind: "listHostBookings" } },
+          { id: uid(), label: t(lang, "menu_ticket"), action: { kind: "startTicket" } },
+          { id: uid(), label: t(lang, "menu_assist"), action: { kind: "send", text: "Roadside assist" } },
+          { id: uid(), label: t(lang, "menu_listings"), action: { kind: "send", text: "Show me listings" } },
+        ]
+      : [
+          { id: uid(), label: t(lang, "menu_bookings"), action: { kind: "listBookings" } },
+          { id: uid(), label: t(lang, "menu_docs"), action: { kind: "getVerification" } },
+          { id: uid(), label: t(lang, "menu_ticket"), action: { kind: "startTicket" } },
+          { id: uid(), label: t(lang, "menu_assist"), action: { kind: "send", text: "Roadside assist" } },
+          { id: uid(), label: t(lang, "menu_listings"), action: { kind: "send", text: "Show me listings" } },
+          { id: uid(), label: t(lang, "menu_how"), action: { kind: "send", text: "How it works" } },
+        ];
+
+  const cards: BotCard[] = [
+    {
+      id: uid(),
+      title: "Quick links",
+      lines:
+        role === "HOST"
+          ? ["Host dashboard", "My vehicles", "Guest bookings"]
+          : ["Browse listings", "Roadside assist", "Learn how it works"],
+      actions:
+        role === "HOST"
+          ? [
+              { label: "Dashboard", action: { kind: "send", text: "Host dashboard" } },
+              { label: "Vehicles", action: { kind: "listHostListings" } },
+              { label: "Bookings", action: { kind: "listHostBookings" } },
+              { label: "Terms", action: { kind: "send", text: "Terms" } },
+              { label: "Privacy", action: { kind: "send", text: "Privacy" } },
+            ]
+          : [
+              { label: "Listings", action: { kind: "send", text: "Show me listings" } },
+              { label: "Assist", action: { kind: "send", text: "Roadside assist" } },
+              { label: "How it works", action: { kind: "send", text: "How it works" } },
+              { label: "Terms", action: { kind: "send", text: "Terms" } },
+              { label: "Privacy", action: { kind: "send", text: "Privacy" } },
+            ],
+    },
+  ];
 
   return {
     messages: [
@@ -218,36 +315,9 @@ function helpResponse(lang: ChatLang, params?: { signedIn?: boolean }): ChatbotR
         text: signedIn ? t(lang, "greeting_signed_in") : t(lang, "greeting_guest"),
       },
     ],
-    quickReplies: signedIn
-      ? [
-          { id: uid(), label: t(lang, "menu_bookings"), action: { kind: "listBookings" } },
-          { id: uid(), label: t(lang, "menu_docs"), action: { kind: "getVerification" } },
-          { id: uid(), label: t(lang, "menu_ticket"), action: { kind: "startTicket" } },
-          { id: uid(), label: t(lang, "menu_assist"), action: { kind: "send", text: "Roadside assist" } },
-          { id: uid(), label: t(lang, "menu_listings"), action: { kind: "send", text: "Show me listings" } },
-          { id: uid(), label: t(lang, "menu_how"), action: { kind: "send", text: "How it works" } },
-        ]
-      : [
-          { id: uid(), label: t(lang, "menu_listings"), action: { kind: "send", text: "Show me listings" } },
-          { id: uid(), label: t(lang, "menu_how"), action: { kind: "send", text: "How it works" } },
-          { id: uid(), label: t(lang, "menu_assist"), action: { kind: "send", text: "Roadside assist" } },
-          { id: uid(), label: t(lang, "menu_payments"), action: { kind: "send", text: "How do payments work?" } },
-          { id: uid(), label: t(lang, "menu_signin"), action: { kind: "send", text: "Sign in" } },
-        ],
-    cards: [
-      {
-        id: uid(),
-        title: "Quick links",
-        lines: ["Browse listings", "Roadside assist", "Learn how it works"],
-        actions: [
-          { label: "Listings", action: { kind: "send", text: "Show me listings" } },
-          { label: "Assist", action: { kind: "send", text: "Roadside assist" } },
-          { label: "How it works", action: { kind: "send", text: "How it works" } },
-          { label: "Terms", action: { kind: "send", text: "Terms" } },
-          { label: "Privacy", action: { kind: "send", text: "Privacy" } },
-        ],
-      },
-    ],
+    quickReplies,
+    cards,
+    context: null,
   };
 }
 
@@ -326,6 +396,114 @@ async function listBookings(dbUserId: string): Promise<ChatbotResponse> {
       { id: uid(), label: "Show help", action: { kind: "help" } },
       { id: uid(), label: "Create support ticket", action: { kind: "startTicket" } },
     ],
+  };
+}
+
+async function listHostListings(hostId: string): Promise<ChatbotResponse> {
+  const listings = await prisma.listing.findMany({
+    where: { hostId },
+    orderBy: { createdAt: "desc" },
+    take: 6,
+    select: {
+      id: true,
+      title: true,
+      city: true,
+      dailyRateCents: true,
+      currency: true,
+      status: true,
+      isApproved: true,
+    },
+  });
+
+  if (listings.length === 0) {
+    return {
+      messages: [{ text: "You don’t have any vehicles listed yet." }],
+      cards: [{ id: uid(), title: "Create a vehicle listing", href: "/host/listings/new" }],
+      quickReplies: [
+        { id: uid(), label: "New vehicle", action: { kind: "send", text: "Create a new vehicle" } },
+        { id: uid(), label: "Show help", action: { kind: "help" } },
+      ],
+      context: null,
+    };
+  }
+
+  return {
+    messages: [{ text: "Here are your most recent vehicles:" }],
+    cards: listings.map((l) => ({
+      id: uid(),
+      title: l.title,
+      lines: [
+        `City: ${l.city}`,
+        `Rate: ${(l.dailyRateCents / 100).toFixed(0)} ${l.currency} / day`,
+        `Status: ${l.status}${l.isApproved ? "" : " (needs approval)"}`,
+      ],
+      href: `/listings/${l.id}`,
+    })),
+    quickReplies: [
+      { id: uid(), label: "New vehicle", action: { kind: "send", text: "Create a new vehicle" } },
+      { id: uid(), label: "Host dashboard", action: { kind: "send", text: "Host dashboard" } },
+      { id: uid(), label: "Show help", action: { kind: "help" } },
+    ],
+    context: null,
+  };
+}
+
+async function listHostBookings(hostId: string): Promise<ChatbotResponse> {
+  const now = new Date();
+  const bookings = await prisma.booking.findMany({
+    where: {
+      listing: { hostId },
+      status: "CONFIRMED",
+      endDate: { gte: now },
+    },
+    orderBy: { startDate: "asc" },
+    take: 8,
+    select: {
+      id: true,
+      status: true,
+      startDate: true,
+      endDate: true,
+      totalCents: true,
+      currency: true,
+      listing: { select: { title: true, city: true } },
+      renter: { select: { name: true, email: true } },
+    },
+  });
+
+  if (bookings.length === 0) {
+    return {
+      messages: [{ text: "No upcoming guest bookings found." }],
+      quickReplies: [
+        { id: uid(), label: "My vehicles", action: { kind: "listHostListings" } },
+        { id: uid(), label: "Host dashboard", action: { kind: "send", text: "Host dashboard" } },
+        { id: uid(), label: "Show help", action: { kind: "help" } },
+      ],
+      context: null,
+    };
+  }
+
+  const cards: BotCard[] = bookings.map((b) => ({
+    id: uid(),
+    title: `Booking ${b.id.slice(0, 8)}`,
+    lines: [
+      `${b.listing.title} (${b.listing.city})`,
+      `Dates: ${b.startDate.toISOString().slice(0, 10)} → ${b.endDate.toISOString().slice(0, 10)}`,
+      `Guest: ${b.renter.name ?? b.renter.email}`,
+      `Total: ${(b.totalCents / 100).toFixed(0)} ${b.currency}`,
+      `Status: ${b.status}`,
+    ],
+    href: `/bookings/${b.id}`,
+  }));
+
+  return {
+    messages: [{ text: "Here are upcoming guest bookings:" }],
+    cards,
+    quickReplies: [
+      { id: uid(), label: "My vehicles", action: { kind: "listHostListings" } },
+      { id: uid(), label: "Host dashboard", action: { kind: "send", text: "Host dashboard" } },
+      { id: uid(), label: "Show help", action: { kind: "help" } },
+    ],
+    context: null,
   };
 }
 
@@ -426,15 +604,56 @@ async function createTicket(dbUserId: string, subject: string, message: string):
 }
 
 function normalizeText(message: string) {
-  return message.toLowerCase().trim().replace(/\s+/g, " ");
+  return message
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9\s'\-]/g, " ")
+    .replace(/\s+/g, " ");
+}
+
+function extractCityFromMessage(raw: string): string | null {
+  const clean = raw.trim();
+  // Common patterns: "in Cape Town", "car in Durban", "Cape Town"
+  const inMatch = /\b(?:in|at|near)\s+([a-z][a-z\s'\-]{2,40})$/i.exec(clean);
+  if (inMatch?.[1]) return inMatch[1].trim();
+
+  const carInMatch = /\b(?:car|vehicle)\s+in\s+([a-z][a-z\s'\-]{2,40})$/i.exec(clean);
+  if (carInMatch?.[1]) return carInMatch[1].trim();
+
+  // If user just typed a city name, it will be handled when context.pending.kind === "pickCity".
+  return null;
+}
+
+async function getApprovedListingCities(params: { query?: string; take: number }) {
+  const { query, take } = params;
+  return await prisma.listing.findMany({
+    where: {
+      status: "ACTIVE",
+      isApproved: true,
+      ...(query
+        ? {
+            city: {
+              contains: query.slice(0, 50),
+              mode: "insensitive",
+            },
+          }
+        : {}),
+    },
+    select: { city: true },
+    distinct: ["city"],
+    take,
+    orderBy: { city: "asc" },
+  });
 }
 
 async function answerMessage(
   message: string,
   dbUser: Awaited<ReturnType<typeof getAuthedDbUserOrNull>>,
   lang: ChatLang,
+  context: ChatbotContext | undefined,
 ): Promise<ChatbotResponse> {
   const text = normalizeText(message);
+  const pending = context?.pending ?? null;
 
   // Greetings
   if (
@@ -455,6 +674,39 @@ async function answerMessage(
   // NOTE: actual language injected by POST handler below
   if (!text || text === "help" || text.includes("menu")) return { messages: [{ text: "help" }] };
 
+  // Pending flow: city selection for listings
+  if (pending?.kind === "pickCity" && pending.for === "listings") {
+    const query = message.trim().slice(0, 50);
+    const cities = await getApprovedListingCities({ query, take: 6 });
+    if (cities.length === 0) {
+      const top = await getApprovedListingCities({ take: 6 });
+      return {
+        messages: [{ text: `I couldn’t find approved listings in “${query}”. ${t(lang, "ask_city")}` }],
+        cards: [{ id: uid(), title: "Browse all listings", href: "/listings" }],
+        quickReplies: top.map((c) => ({
+          id: uid(),
+          label: c.city,
+          action: { kind: "send", text: `Car in ${c.city}` },
+        })),
+        context: { pending: { kind: "pickCity", for: "listings" } },
+      };
+    }
+
+    return {
+      messages: [{ text: t(lang, "city_suggestions") }],
+      cards: cities.map((c) => ({
+        id: uid(),
+        title: c.city,
+        href: `/cities/${slugifyCity(c.city)}`,
+      })),
+      quickReplies: [
+        { id: uid(), label: "All listings", action: { kind: "send", text: "Show me listings" } },
+        { id: uid(), label: "Show help", action: { kind: "help" } },
+      ],
+      context: null,
+    };
+  }
+
   // Auth-aware shortcuts: make common phrases "just work"
   if (dbUser) {
     if (text === "my bookings" || text === "bookings" || text.includes("recent bookings")) {
@@ -473,6 +725,15 @@ async function answerMessage(
     const cancelMatch = /^(cancel booking|cancel)\s+([a-z0-9_-]{6,})$/.exec(text);
     if (cancelMatch) {
       return await cancelBooking(dbUser.id, cancelMatch[2]);
+    }
+
+    if (dbUser.role === "HOST") {
+      if (text === "my vehicles" || text === "my vehicle" || text.includes("my listings") || text.includes("vehicles")) {
+        return await listHostListings(dbUser.id);
+      }
+      if (text.includes("guest bookings") || text.includes("host bookings") || text.includes("my guest bookings")) {
+        return await listHostBookings(dbUser.id);
+      }
     }
   }
 
@@ -543,6 +804,29 @@ async function answerMessage(
         },
       ],
       quickReplies: [{ id: uid(), label: "Show help", action: { kind: "help" } }],
+      context: null,
+    };
+  }
+
+  if (text.includes("host dashboard") || text === "dashboard" || text === "host") {
+    return {
+      messages: [{ text: "Opening your host dashboard:" }],
+      cards: [{ id: uid(), title: "Host dashboard", href: "/host" }],
+      quickReplies: [
+        { id: uid(), label: "My vehicles", action: { kind: "listHostListings" } },
+        { id: uid(), label: "Guest bookings", action: { kind: "listHostBookings" } },
+        { id: uid(), label: "Show help", action: { kind: "help" } },
+      ],
+      context: null,
+    };
+  }
+
+  if (text.includes("new vehicle") || text.includes("create vehicle") || text.includes("create a new vehicle")) {
+    return {
+      messages: [{ text: "You can create a new vehicle listing here:" }],
+      cards: [{ id: uid(), title: "New vehicle", href: "/host/listings/new" }],
+      quickReplies: [{ id: uid(), label: "Show help", action: { kind: "help" } }],
+      context: null,
     };
   }
 
@@ -551,6 +835,7 @@ async function answerMessage(
       messages: [{ text: "You can sign in here:" }],
       cards: [{ id: uid(), title: "Sign in", href: "/sign-in" }],
       quickReplies: [{ id: uid(), label: "Show help", action: { kind: "help" } }],
+      context: null,
     };
   }
 
@@ -559,6 +844,7 @@ async function answerMessage(
       messages: [{ text: "You can read the Terms here:" }],
       cards: [{ id: uid(), title: "Terms", href: "/terms" }],
       quickReplies: [{ id: uid(), label: "Show help", action: { kind: "help" } }],
+      context: null,
     };
   }
 
@@ -567,14 +853,42 @@ async function answerMessage(
       messages: [{ text: "You can read the Privacy Policy here:" }],
       cards: [{ id: uid(), title: "Privacy", href: "/privacy" }],
       quickReplies: [{ id: uid(), label: "Show help", action: { kind: "help" } }],
+      context: null,
     };
   }
 
-  if (text.includes("listing") || text.includes("listings") || text.includes("browse")) {
+  // Listings flow (optionally city-aware)
+  if (text.includes("listing") || text.includes("listings") || text.includes("browse") || text.includes("rent") || text.includes("car") || text.includes("vehicle")) {
+    const extractedCity = extractCityFromMessage(message);
+    if (extractedCity) {
+      const cities = await getApprovedListingCities({ query: extractedCity, take: 6 });
+      if (cities.length > 0) {
+        return {
+          messages: [{ text: t(lang, "city_suggestions") }],
+          cards: cities.map((c) => ({
+            id: uid(),
+            title: c.city,
+            href: `/cities/${slugifyCity(c.city)}`,
+          })),
+          quickReplies: [
+            { id: uid(), label: "All listings", action: { kind: "send", text: "Show me listings" } },
+            { id: uid(), label: "Show help", action: { kind: "help" } },
+          ],
+          context: null,
+        };
+      }
+    }
+
+    const top = await getApprovedListingCities({ take: 6 });
     return {
-      messages: [{ text: "Sure — here are the listings:" }],
-      cards: [{ id: uid(), title: "Browse listings", href: "/listings" }],
-      quickReplies: [{ id: uid(), label: "Search by city", action: { kind: "send", text: "I want a car in Cape Town" } }],
+      messages: [{ text: t(lang, "ask_city") }],
+      cards: [{ id: uid(), title: "Browse all listings", href: "/listings" }],
+      quickReplies: top.map((c) => ({
+        id: uid(),
+        label: c.city,
+        action: { kind: "send", text: `Car in ${c.city}` },
+      })),
+      context: { pending: { kind: "pickCity", for: "listings" } },
     };
   }
 
@@ -590,32 +904,8 @@ async function answerMessage(
         { id: uid(), label: "Show help", action: { kind: "help" } },
         { id: uid(), label: "Browse listings", action: { kind: "send", text: "Show me listings" } },
       ],
+      context: null,
     };
-  }
-
-  // City hint: try to suggest a matching city route from active listings
-  if (text.includes("in ") || text.includes("cape") || text.includes("johannes") || text.includes("durban")) {
-    const q = text.replace(/^.*\bin\b/, "").trim();
-    const query = (q.length >= 3 ? q : text).slice(0, 50);
-
-    const cities = await prisma.listing.findMany({
-      where: { status: "ACTIVE", isApproved: true, city: { contains: query, mode: "insensitive" } },
-      select: { city: true },
-      take: 5,
-      distinct: ["city"],
-    });
-
-    if (cities.length > 0) {
-      return {
-        messages: [{ text: "Here are cities with approved listings:" }],
-        cards: cities.map((c) => ({
-          id: uid(),
-          title: c.city,
-          href: `/cities/${slugifyCity(c.city)}`,
-        })),
-        quickReplies: [{ id: uid(), label: "All listings", action: { kind: "send", text: "Show me listings" } }],
-      };
-    }
   }
 
   if (text.includes("document") || text.includes("verification") || text.includes("verify") || text.includes("license")) {
@@ -631,6 +921,7 @@ async function answerMessage(
         { id: uid(), label: "Document status", action: { kind: "getVerification" } },
         { id: uid(), label: "Show help", action: { kind: "help" } },
       ],
+      context: null,
     };
   }
 
@@ -648,6 +939,7 @@ async function answerMessage(
         { id: uid(), label: "Sign in", action: { kind: "send", text: "Sign in" } },
         { id: uid(), label: "Show help", action: { kind: "help" } },
       ],
+      context: null,
     };
   }
 
@@ -663,23 +955,25 @@ async function answerMessage(
       { id: uid(), label: "Browse listings", action: { kind: "send", text: "Show me listings" } },
       { id: uid(), label: "Create support ticket", action: { kind: "startTicket" } },
     ],
+    context: null,
   };
 }
 
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
   let body: ChatActionRequest;
   try {
     body = (await req.json()) as ChatActionRequest;
   } catch {
-    return NextResponse.json(helpResponse("en", { signedIn: false }));
+    return NextResponse.json(helpResponse("en", { user: null }));
   }
 
   const lang = pickLang(body.lang);
 
   const dbUser = await getAuthedDbUserOrNull();
+  const helpUser = dbUser && (dbUser.role === "HOST" || dbUser.role === "RENTER") ? { role: dbUser.role } : null;
 
   if ("action" in body) {
-    if (body.action === "help") return NextResponse.json(helpResponse(lang, { signedIn: Boolean(dbUser) }));
+    if (body.action === "help") return NextResponse.json(helpResponse(lang, { user: helpUser }));
 
     if (body.action === "listBookings") {
       if (!dbUser) return NextResponse.json(mustSignInResponse());
@@ -730,11 +1024,11 @@ export async function POST(req: Request) {
 
   if ("message" in body) {
     try {
-      const resp = await answerMessage(body.message, dbUser, lang);
+      const resp = await answerMessage(body.message, dbUser, lang, body.context);
 
       // Special-case: greeting/help placeholder emitted above
       if (resp.messages.length === 1 && resp.messages[0]?.text === "help") {
-        return NextResponse.json(helpResponse(lang, { signedIn: Boolean(dbUser) }));
+        return NextResponse.json(helpResponse(lang, { user: helpUser }));
       }
 
       // Translate a few common top-level prompts for support intent
@@ -755,5 +1049,5 @@ export async function POST(req: Request) {
     }
   }
 
-  return NextResponse.json(helpResponse(lang, { signedIn: Boolean(dbUser) }));
+  return NextResponse.json(helpResponse(lang, { user: helpUser }));
 }

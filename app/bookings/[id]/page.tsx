@@ -9,6 +9,7 @@ import { prisma } from "@/app/lib/prisma";
 import { requireUser } from "@/app/lib/require";
 import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
 import BookingStatusClient from "@/app/bookings/[id]/BookingStatusClient";
+import BookingActions from "@/app/bookings/[id]/BookingActions.client";
 import BookingChat from "@/app/bookings/[id]/BookingChat.client";
 
 type BookingPhotoKind = "host_handover" | "renter_pickup" | "renter_return" | "host_return";
@@ -220,6 +221,10 @@ export default async function BookingPage({
       </div>
 
       <BookingStatusClient status={booking.status} method={isManualPayment ? "manual" : "stripe"} />
+
+      {isRenter && booking.status !== "CANCELLED" ? (
+        <BookingActions bookingId={booking.id} currentEndDateISO={booking.endDate.toISOString()} />
+      ) : null}
 
       <BookingChat bookingId={booking.id} viewerId={viewerId} />
 

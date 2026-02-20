@@ -1,9 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 
 import Button from "@/app/components/ui/Button";
-import Input from "@/app/components/ui/Input";
 
 export default function DocumentsUploadForm({
   successHref,
@@ -17,6 +16,10 @@ export default function DocumentsUploadForm({
   const [driversLicense, setDriversLicense] = useState<File | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
+  const profileRef = useRef<HTMLInputElement | null>(null);
+  const idRef = useRef<HTMLInputElement | null>(null);
+  const licenseRef = useRef<HTMLInputElement | null>(null);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -63,18 +66,94 @@ export default function DocumentsUploadForm({
 
   return (
     <form onSubmit={onSubmit} className="space-y-3">
-      <label className="block">
-        <div className="mb-1 text-sm">Profile photo</div>
-        <Input type="file" accept="image/*" onChange={(e) => setProfilePhoto(e.target.files?.[0] || null)} />
-      </label>
-      <label className="block">
-        <div className="mb-1 text-sm">ID document</div>
-        <Input type="file" accept="image/*" onChange={(e) => setIdDocument(e.target.files?.[0] || null)} />
-      </label>
-      <label className="block">
-        <div className="mb-1 text-sm">Driver’s license</div>
-        <Input type="file" accept="image/*" onChange={(e) => setDriversLicense(e.target.files?.[0] || null)} />
-      </label>
+      <input
+        ref={profileRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={(e) => setProfilePhoto(e.target.files?.[0] || null)}
+      />
+      <input
+        ref={idRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={(e) => setIdDocument(e.target.files?.[0] || null)}
+      />
+      <input
+        ref={licenseRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={(e) => setDriversLicense(e.target.files?.[0] || null)}
+      />
+
+      <div className="space-y-2">
+        <div className="text-sm font-medium text-foreground/80">Required images</div>
+
+        <div className="rounded-lg border border-border bg-card p-3 text-sm">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <div className="font-medium">Profile photo</div>
+              <div className="text-xs text-foreground/60">Face/portrait photo.</div>
+            </div>
+            <Button
+              type="button"
+              variant="secondary"
+              disabled={loading}
+              onClick={() => profileRef.current?.click()}
+              className="shrink-0"
+            >
+              Choose image
+            </Button>
+          </div>
+          <div className="mt-2 text-xs text-foreground/60">
+            {profilePhoto ? profilePhoto.name : "No image selected"}
+          </div>
+        </div>
+
+        <div className="rounded-lg border border-border bg-card p-3 text-sm">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <div className="font-medium">ID document</div>
+              <div className="text-xs text-foreground/60">ID / passport image.</div>
+            </div>
+            <Button
+              type="button"
+              variant="secondary"
+              disabled={loading}
+              onClick={() => idRef.current?.click()}
+              className="shrink-0"
+            >
+              Choose image
+            </Button>
+          </div>
+          <div className="mt-2 text-xs text-foreground/60">
+            {idDocument ? idDocument.name : "No image selected"}
+          </div>
+        </div>
+
+        <div className="rounded-lg border border-border bg-card p-3 text-sm">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <div className="font-medium">Driver’s license</div>
+              <div className="text-xs text-foreground/60">License front/back (single image).</div>
+            </div>
+            <Button
+              type="button"
+              variant="secondary"
+              disabled={loading}
+              onClick={() => licenseRef.current?.click()}
+              className="shrink-0"
+            >
+              Choose image
+            </Button>
+          </div>
+          <div className="mt-2 text-xs text-foreground/60">
+            {driversLicense ? driversLicense.name : "No image selected"}
+          </div>
+        </div>
+      </div>
 
       {error ? <div className="text-sm text-red-600">{error}</div> : null}
 

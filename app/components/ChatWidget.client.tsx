@@ -20,6 +20,8 @@ type ChatAction =
   | { kind: "send"; text: string }
   | { kind: "help" }
   | { kind: "listBookings" }
+  | { kind: "listHostBookings" }
+  | { kind: "listHostListings" }
   | { kind: "getVerification" }
   | { kind: "cancelBooking"; bookingId: string }
   | { kind: "startTicket" }
@@ -43,6 +45,7 @@ type ChatbotResponse = {
   messages: Array<{ text: string }>;
   quickReplies?: QuickReply[];
   cards?: BotCard[];
+  context?: ChatbotContext;
 };
 
 type ChatLang = "en" | "zu" | "af";
@@ -59,6 +62,24 @@ type PendingTicket =
       step: "subject" | "message";
       subject?: string;
     };
+
+type ChatbotContext =
+  | null
+  | {
+      pending?: {
+        kind: "pickCity";
+        for: "listings";
+      };
+    };
+
+type PersistedChatState = {
+  lang: ChatLang | null;
+  messages: ChatMessage[];
+  quickReplies: QuickReply[];
+  cards: BotCard[];
+  pendingTicket: PendingTicket;
+  context: ChatbotContext;
+};
 
 function uid() {
   return `${Date.now()}_${Math.random().toString(16).slice(2)}`;
@@ -94,6 +115,7 @@ export default function ChatWidget() {
   const [busy, setBusy] = useState(false);
   const [lang, setLang] = useState<ChatLang | null>(null);
   const [needsLangPick, setNeedsLangPick] = useState(false);
+  const [context, setContext] = useState<ChatbotContext>(null);
 
   const listRef = useRef<HTMLDivElement | null>(null);
 
@@ -106,6 +128,41 @@ export default function ChatWidget() {
     el.scrollTop = el.scrollHeight;
   }, [open, messages.length, cards.length, quickReplies.length]);
 
+  // Load persisted chat state once.
+  useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem("rs_chat_state_v2");
+      if (!raw) return;
+      const parsed = JSON.parse(raw) as Partial<PersistedChatState>;
+      if (parsed.lang === "en" || parsed.lang === "zu" || parsed.lang === "af") setLang(parsed.lang);
+      if (Array.isArray(parsed.messages)) setMessages(parsed.messages);
+      if (Array.isArray(parsed.quickReplies)) setQuickReplies(parsed.quickReplies);
+      if (Array.isArray(parsed.cards)) setCards(parsed.cards);
+      if (parsed.pendingTicket === null || typeof parsed.pendingTicket === "object") setPendingTicket(parsed.pendingTicket as PendingTicket);
+      if (parsed.context === null || typeof parsed.context === "object") setContext(parsed.context as ChatbotContext);
+    } catch {
+      // ignore
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Persist chat state.
+  useEffect(() => {
+    try {
+      const state: PersistedChatState = {
+        lang,
+        messages,
+        quickReplies,
+        cards,
+        pendingTicket,
+        context,
+      };
+      window.localStorage.setItem("rs_chat_state_v2", JSON.stringify(state));
+    } catch {
+      // ignore
+    }
+  }, [lang, messages, quickReplies, cards, pendingTicket, context]);
+
   async function appendBot(resp: ChatbotResponse) {
     const newMessages: ChatMessage[] = resp.messages.map((m) => ({
       id: uid(),
@@ -115,6 +172,7 @@ export default function ChatWidget() {
     setMessages((prev) => [...prev, ...newMessages]);
     setQuickReplies(resp.quickReplies ?? []);
     setCards(resp.cards ?? []);
+    if (typeof resp.context !== "undefined") setContext(resp.context ?? null);
   }
 
   async function handleAction(action: ChatAction) {
@@ -132,37 +190,49 @@ export default function ChatWidget() {
       }
 
       if (action.kind === "createTicket") {
-        const resp = await callChatbot({ lang: lang ?? "en", action: "createTicket", data: action });
+        const resp = await callChatbot({ lang: lang ?? "en", action: "createTicket", data: action, context });
         await appendBot(resp);
         return;
       }
 
       if (action.kind === "help") {
-        const resp = await callChatbot({ lang: lang ?? "en", action: "help" });
+        const resp = await callChatbot({ lang: lang ?? "en", action: "help", context });
         await appendBot(resp);
         return;
       }
 
       if (action.kind === "listBookings") {
-        const resp = await callChatbot({ lang: lang ?? "en", action: "listBookings" });
+        const resp = await callChatbot({ lang: lang ?? "en", action: "listBookings", context });
+        await appendBot(resp);
+        return;
+      }
+
+      if (action.kind === "listHostBookings") {
+        const resp = await callChatbot({ lang: lang ?? "en", action: "listHostBookings", context });
+        await appendBot(resp);
+        return;
+      }
+
+      if (action.kind === "listHostListings") {
+        const resp = await callChatbot({ lang: lang ?? "en", action: "listHostListings", context });
         await appendBot(resp);
         return;
       }
 
       if (action.kind === "getVerification") {
-        const resp = await callChatbot({ lang: lang ?? "en", action: "getVerification" });
+        const resp = await callChatbot({ lang: lang ?? "en", action: "getVerification", context });
         await appendBot(resp);
         return;
       }
 
       if (action.kind === "cancelBooking") {
-        const resp = await callChatbot({ lang: lang ?? "en", action: "cancelBooking", data: action });
+        const resp = await callChatbot({ lang: lang ?? "en", action: "cancelBooking", data: action, context });
         await appendBot(resp);
         return;
       }
 
       if (action.kind === "send") {
-        const resp = await callChatbot({ lang: lang ?? "en", message: action.text });
+        const resp = await callChatbot({ lang: lang ?? "en", message: action.text, context });
         await appendBot(resp);
         return;
       }
@@ -234,7 +304,7 @@ export default function ChatWidget() {
 
     setBusy(true);
     try {
-      const resp = await callChatbot({ lang, action: "help" });
+      const resp = await callChatbot({ lang, action: "help", context });
       await appendBot(resp);
     } finally {
       setBusy(false);
@@ -248,6 +318,7 @@ export default function ChatWidget() {
   }, [open]);
 
   useEffect(() => {
+    if (lang) return;
     const saved = typeof window !== "undefined" ? window.localStorage.getItem("rs_chat_lang") : null;
     if (saved === "en" || saved === "zu" || saved === "af") {
       setLang(saved);
@@ -258,7 +329,24 @@ export default function ChatWidget() {
     if (browser.toLowerCase().startsWith("af")) setLang("af");
     else if (browser.toLowerCase().startsWith("zu")) setLang("zu");
     else setLang("en");
-  }, []);
+  }, [lang]);
+
+  function resetChat() {
+    setMessages([]);
+    setQuickReplies([]);
+    setCards([]);
+    setPendingTicket(null);
+    setContext(null);
+    setNeedsLangPick(false);
+    try {
+      window.localStorage.removeItem("rs_chat_state_v2");
+    } catch {
+      // ignore
+    }
+
+    // Re-run the welcome flow if the widget is open.
+    if (open) setTimeout(() => void ensureWelcome(), 0);
+  }
 
   async function pickLang(next: ChatLang) {
     setLang(next);
@@ -276,40 +364,75 @@ export default function ChatWidget() {
   }
 
   return (
-    <div className="fixed bottom-4 right-4 z-50">
+    <div
+      className={cn(
+        "fixed z-50",
+        open
+          ? "inset-x-0 bottom-0 px-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] sm:inset-auto sm:bottom-4 sm:right-4 sm:px-0 sm:pb-0"
+          : "bottom-[calc(1rem+env(safe-area-inset-bottom))] right-4",
+      )}
+    >
       {open ? (
-        <div className="w-[92vw] max-w-[420px]">
-          <Card className="overflow-hidden">
-            <CardHeader className="flex flex-row items-center justify-between gap-3">
-              <CardTitle className="text-base">Help & Support</CardTitle>
-              <Button variant="ghost" onClick={() => setOpen(false)} aria-label="Close chat">
-                Close
-              </Button>
+        <div className="mx-auto w-full max-w-[520px] sm:mx-0 sm:w-[420px] sm:max-w-[420px]">
+          <Card className="flex h-[70dvh] max-h-[640px] w-full flex-col overflow-hidden p-0 sm:h-[560px]">
+            <CardHeader className="flex flex-row items-start justify-between gap-3 border-b border-border bg-card px-4 py-3">
+              <div className="min-w-0 space-y-0.5">
+                <CardTitle className="truncate text-base">Help & Support</CardTitle>
+                <div className="text-xs text-foreground/60">
+                  {busy ? "Assistant is typing…" : "Ask about bookings, listings, payments, documents."}
+                </div>
+              </div>
+              <div className="flex shrink-0 items-center gap-1">
+                <Button
+                  variant="ghost"
+                  onClick={resetChat}
+                  aria-label="Reset chat"
+                  disabled={busy}
+                  className="px-2.5"
+                >
+                  Reset
+                </Button>
+                <Button
+                  variant="ghost"
+                  onClick={() => setOpen(false)}
+                  aria-label="Close chat"
+                  className="px-2.5"
+                >
+                  Close
+                </Button>
+              </div>
             </CardHeader>
-            <CardContent className="space-y-3">
+
+            <CardContent className="mt-0 flex min-h-0 flex-1 flex-col gap-3 bg-background px-4 py-3">
               <div
                 ref={listRef}
-                className="h-[340px] overflow-auto rounded-xl border border-border bg-background/40 p-3"
+                className="min-h-0 flex-1 overflow-auto rounded-xl border border-border bg-muted/40 p-3"
               >
                 <div className="space-y-2">
                   {messages.map((m) => (
                     <div
                       key={m.id}
                       className={cn(
-                        "max-w-[88%] rounded-xl px-3 py-2 text-sm",
+                        "max-w-[88%] whitespace-pre-wrap rounded-2xl px-3 py-2 text-sm leading-relaxed",
                         m.role === "user"
                           ? "ml-auto bg-accent text-accent-foreground"
-                          : "bg-card text-foreground",
+                          : "border border-border bg-card text-foreground",
                       )}
                     >
                       {m.text}
                     </div>
                   ))}
 
+                  {busy ? (
+                    <div className="max-w-[70%] rounded-2xl border border-border bg-card px-3 py-2 text-sm text-foreground/70">
+                      Typing…
+                    </div>
+                  ) : null}
+
                   {cards.length > 0 ? (
                     <div className="mt-2 grid gap-2">
                       {cards.map((c) => (
-                        <div key={c.id} className="rounded-xl border border-border bg-card p-3">
+                        <div key={c.id} className="rounded-xl border border-border bg-card p-3 shadow-sm">
                           <div className="text-sm font-medium">{c.title}</div>
                           {c.lines?.length ? (
                             <div className="mt-1 space-y-0.5 text-xs text-foreground/70">
@@ -348,12 +471,12 @@ export default function ChatWidget() {
               </div>
 
               {quickReplies.length > 0 ? (
-                <div className="flex flex-wrap gap-2">
+                <div className="flex gap-2 overflow-x-auto pb-1 sm:flex-wrap sm:overflow-visible">
                   {quickReplies.map((q) => (
                     <Button
                       key={q.id}
                       variant="secondary"
-                      className="px-3 py-1.5 text-xs"
+                      className="shrink-0 px-3 py-1.5 text-xs"
                       onClick={() => void handleAction(q.action)}
                       disabled={busy}
                     >
@@ -364,12 +487,12 @@ export default function ChatWidget() {
               ) : null}
 
               {needsLangPick ? (
-                <div className="flex flex-wrap gap-2">
+                <div className="flex gap-2 overflow-x-auto pb-1 sm:flex-wrap sm:overflow-visible">
                   {(Object.keys(LANG_LABEL) as ChatLang[]).map((code) => (
                     <Button
                       key={code}
                       variant="secondary"
-                      className="px-3 py-1.5 text-xs"
+                      className="shrink-0 px-3 py-1.5 text-xs"
                       onClick={() => void pickLang(code)}
                       disabled={busy}
                     >
@@ -391,8 +514,10 @@ export default function ChatWidget() {
                   onChange={(e) => setInput(e.target.value)}
                   placeholder={pendingTicket ? "Type your answer…" : "Ask a question…"}
                   disabled={busy}
+                  enterKeyHint="send"
+                  autoComplete="off"
                 />
-                <Button type="submit" disabled={!canSend}>
+                <Button type="submit" disabled={!canSend} className="shrink-0">
                   Send
                 </Button>
               </form>

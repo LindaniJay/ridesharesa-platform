@@ -57,8 +57,17 @@ export default async function ListingDetailsPage({
   const carryQS = carry.toString();
 
   const now = new Date();
+  const reservedStatuses: Array<"PENDING_APPROVAL" | "CONFIRMED"> = ["PENDING_APPROVAL", "CONFIRMED"];
 
-  const [listing, upcomingBookings] = await Promise.all([
+  const startDate = start ? new Date(start) : null;
+  const endDate = end ? new Date(end) : null;
+  const hasValidDates =
+    Boolean(startDate && endDate) &&
+    !Number.isNaN(startDate!.getTime()) &&
+    !Number.isNaN(endDate!.getTime()) &&
+    endDate!.getTime() > startDate!.getTime();
+
+  const [listing, upcomingBookings, conflictForSelectedDates] = await Promise.all([
     prisma.listing.findFirst({
       where: { id, status: "ACTIVE", isApproved: true },
       select: {
@@ -77,13 +86,24 @@ export default async function ListingDetailsPage({
     prisma.booking.findMany({
       where: {
         listingId: id,
-        status: { in: ["CONFIRMED", "PENDING_PAYMENT", "PENDING_APPROVAL"] },
+        status: { in: reservedStatuses },
         endDate: { gte: now },
       },
       orderBy: { startDate: "asc" },
       take: 8,
       select: { startDate: true, endDate: true, status: true },
     }),
+    hasValidDates
+      ? prisma.booking.findFirst({
+          where: {
+            listingId: id,
+            status: { in: reservedStatuses },
+            startDate: { lt: endDate! },
+            endDate: { gt: startDate! },
+          },
+          select: { id: true },
+        })
+      : Promise.resolve(null),
   ]);
 
   if (!listing) notFound();
@@ -93,6 +113,8 @@ export default async function ListingDetailsPage({
     new Set([listing.imageUrl || null, ...galleryFromStorage].filter((u): u is string => Boolean(u))),
   );
   const heroUrl = gallery[0] || null;
+
+  const isUnavailableForSelectedDates = Boolean(conflictForSelectedDates);
 
   return (
     <main className="space-y-6">
@@ -155,6 +177,11 @@ export default async function ListingDetailsPage({
               <CardDescription>Select dates to continue to checkout.</CardDescription>
             </CardHeader>
             <CardContent>
+              {isUnavailableForSelectedDates ? (
+                <div className="mb-3 rounded-xl border border-border bg-card p-3 text-sm text-foreground/70">
+                  This vehicle is not available for the selected dates. Please choose different dates.
+                </div>
+              ) : null}
               <form
                 action={`/checkout/${listing.id}`}
                 method="GET"
@@ -183,7 +210,7 @@ export default async function ListingDetailsPage({
                 </div>
 
                 <div className="sm:col-span-2 flex flex-wrap gap-2">
-                  <Button type="submit" className="w-full sm:w-auto">
+                  <Button type="submit" className="w-full sm:w-auto" disabled={isUnavailableForSelectedDates}>
                     Continue to checkout
                   </Button>
                   <Link className="text-sm underline" href={carryQS ? `/listings?${carryQS}` : "/listings"}>
@@ -246,9 +273,13 @@ export default async function ListingDetailsPage({
             <div className="text-xs text-black/50 dark:text-white/50">Select dates to book</div>
           </div>
           <div className="pointer-events-auto">
-            <Link href={carryQS ? `/checkout/${listing.id}?${carryQS}` : `/checkout/${listing.id}`}>
-              <Button>Book</Button>
-            </Link>
+            {isUnavailableForSelectedDates ? (
+              <Button disabled>Not available</Button>
+            ) : (
+              <Link href={carryQS ? `/checkout/${listing.id}?${carryQS}` : `/checkout/${listing.id}`}>
+                <Button>Book</Button>
+              </Link>
+            )}
           </div>
         </div>
       </div>

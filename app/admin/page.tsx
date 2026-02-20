@@ -775,7 +775,7 @@ export default async function AdminDashboardPage({
 
     await prisma.user.update({
       where: { id: dbUser.id },
-      data: { name: name || null },
+      data: { name: name || null, surname: surname || null },
     });
 
     revalidatePath("/admin");

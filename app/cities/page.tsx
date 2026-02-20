@@ -19,8 +19,21 @@ function slugifyCity(city: string) {
 }
 
 export default async function CitiesIndexPage() {
+  const now = new Date();
+  const reservedStatuses: Array<"PENDING_APPROVAL" | "CONFIRMED"> = ["PENDING_APPROVAL", "CONFIRMED"];
+
   const listings = await prisma.listing.findMany({
-    where: { status: "ACTIVE", isApproved: true },
+    where: {
+      status: "ACTIVE",
+      isApproved: true,
+      bookings: {
+        none: {
+          status: { in: reservedStatuses },
+          startDate: { lte: now },
+          endDate: { gte: now },
+        },
+      },
+    },
     select: { city: true, country: true },
     take: 500,
   });

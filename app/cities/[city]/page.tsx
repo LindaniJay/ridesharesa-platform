@@ -29,8 +29,21 @@ export default async function CityPage({ params }: CityPageProps) {
   const resolvedParams = await params;
   const citySlug = normalize(decodeURIComponent(resolvedParams.city));
 
+  const now = new Date();
+  const reservedStatuses: Array<"PENDING_APPROVAL" | "CONFIRMED"> = ["PENDING_APPROVAL", "CONFIRMED"];
+
   const listings = await prisma.listing.findMany({
-    where: { status: "ACTIVE", isApproved: true },
+    where: {
+      status: "ACTIVE",
+      isApproved: true,
+      bookings: {
+        none: {
+          status: { in: reservedStatuses },
+          startDate: { lte: now },
+          endDate: { gte: now },
+        },
+      },
+    },
     orderBy: { createdAt: "desc" },
     take: 200,
     select: {

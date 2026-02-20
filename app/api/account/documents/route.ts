@@ -131,6 +131,9 @@ export async function POST(req: Request) {
       name:
         (typeof data.user.user_metadata?.name === "string" && data.user.user_metadata.name.trim()) ||
         null,
+      surname:
+        (typeof data.user.user_metadata?.surname === "string" && data.user.user_metadata.surname.trim()) ||
+        null,
       role: roleFromSupabaseUser(data.user),
       status: "ACTIVE",
       idVerificationStatus: "UNVERIFIED",

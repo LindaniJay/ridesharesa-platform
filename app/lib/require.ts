@@ -12,6 +12,7 @@ export type AuthedUser = {
     id: string;
     email: string;
     name: string | null;
+    surname: string | null;
     role: Role;
     status: UserStatus;
     idVerificationStatus: VerificationStatus;
@@ -22,12 +23,14 @@ export type AuthedUser = {
 async function getOrCreateDbUser(params: {
   email: string;
   name?: string | null;
+  surname?: string | null;
   role?: Role | null;
 }) {
   const select = {
     id: true,
     email: true,
     name: true,
+    surname: true,
     role: true,
     status: true,
     idVerificationStatus: true,
@@ -41,6 +44,7 @@ async function getOrCreateDbUser(params: {
       data: {
         email: params.email,
         name: params.name ?? null,
+        surname: params.surname ?? null,
         role: params.role ?? "RENTER",
         status: "ACTIVE",
         idVerificationStatus: "UNVERIFIED",
@@ -50,10 +54,11 @@ async function getOrCreateDbUser(params: {
     });
   }
 
-  const update: Partial<{ name: string | null; role: Role }> = {};
+  const update: Partial<{ name: string | null; surname: string | null; role: Role }> = {};
 
   // Only fill name if missing.
   if (!existing.name && params.name) update.name = params.name;
+  if (!existing.surname && params.surname) update.surname = params.surname;
 
   // Role rules:
   // - Never grant ADMIN from client-controlled metadata.
@@ -89,6 +94,10 @@ export async function requireUser(): Promise<AuthedUser> {
     (typeof data.user.user_metadata?.name === "string" && data.user.user_metadata.name.trim()) ||
     null;
 
+  const surname =
+    (typeof data.user.user_metadata?.surname === "string" && data.user.user_metadata.surname.trim()) ||
+    null;
+
   // ADMIN is only allowed from server-controlled app_metadata.
   // (Supabase Auth app_metadata can only be written via service role.)
   const appRoleRaw = data.user.app_metadata?.role;
@@ -102,6 +111,7 @@ export async function requireUser(): Promise<AuthedUser> {
   const dbUser = await getOrCreateDbUser({
     email,
     name,
+    surname,
     role: appRole ?? metadataRole,
   });
 

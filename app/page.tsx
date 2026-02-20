@@ -222,9 +222,22 @@ export default async function Home() {
     host: { reviewsReceived: Array<{ rating: number }> };
   }> = [];
 
+  const now = new Date();
+  const reservedStatuses: Array<"PENDING_APPROVAL" | "CONFIRMED"> = ["PENDING_APPROVAL", "CONFIRMED"];
+
   try {
     topListingsRaw = await prisma.listing.findMany({
-      where: { status: "ACTIVE", isApproved: true },
+      where: {
+        status: "ACTIVE",
+        isApproved: true,
+        bookings: {
+          none: {
+            status: { in: reservedStatuses },
+            startDate: { lte: now },
+            endDate: { gte: now },
+          },
+        },
+      },
       orderBy: { createdAt: "desc" },
       take: 5,
       select: {
