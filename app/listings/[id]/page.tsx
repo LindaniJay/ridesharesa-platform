@@ -77,7 +77,7 @@ export default async function ListingDetailsPage({
     prisma.booking.findMany({
       where: {
         listingId: id,
-        status: { in: ["CONFIRMED", "PENDING_PAYMENT"] },
+        status: { in: ["CONFIRMED", "PENDING_PAYMENT", "PENDING_APPROVAL"] },
         endDate: { gte: now },
       },
       orderBy: { startDate: "asc" },

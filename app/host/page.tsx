@@ -65,7 +65,7 @@ export default async function HostDashboardPage() {
     prisma.booking.findMany({
       where: {
         listing: { hostId },
-        status: { in: ["CONFIRMED", "PENDING_PAYMENT"] },
+        status: "CONFIRMED",
         startDate: { gt: now },
       },
       orderBy: { startDate: "asc" },

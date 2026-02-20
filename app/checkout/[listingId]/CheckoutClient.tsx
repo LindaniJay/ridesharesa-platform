@@ -7,6 +7,19 @@ import Input from "@/app/components/ui/Input";
 
 const CHAUFFEUR_RATE_CENTS_PER_KM = 10 * 100;
 
+function formatMoney(amountCents: number, currency: string) {
+  const c = currency || "ZAR";
+  try {
+    return new Intl.NumberFormat("en-ZA", {
+      style: "currency",
+      currency: c,
+      maximumFractionDigits: 0,
+    }).format(amountCents / 100);
+  } catch {
+    return `${(amountCents / 100).toFixed(0)} ${c}`;
+  }
+}
+
 function daysBetween(start: Date, end: Date) {
   const ms = end.getTime() - start.getTime();
   const days = Math.ceil(ms / (1000 * 60 * 60 * 24));
@@ -141,12 +154,12 @@ export default function CheckoutClient(props: {
         <div className="mt-1 text-xs text-foreground/50">End date must be after start date.</div>
       </label>
 
-      <div className="pt-2 text-sm font-medium text-foreground/80">Price</div>
+      <div className="pt-2 text-sm font-medium text-foreground/80">Booking calculator</div>
       <div className="rounded-lg border border-border bg-card p-3 text-sm">
         <div className="flex items-center justify-between">
           <span className="text-foreground/60">Daily rate</span>
           <span>
-            {(props.dailyRateCents / 100).toFixed(0)} {props.currency}
+            {formatMoney(props.dailyRateCents, props.currency)}
           </span>
         </div>
         <div className="mt-2 flex items-center justify-between">
@@ -158,7 +171,7 @@ export default function CheckoutClient(props: {
           <span className="text-foreground/60">Rental total</span>
           <span>
             {pricing && pricing.days > 0
-              ? `${(pricing.baseCents / 100).toFixed(0)} ${props.currency}`
+              ? formatMoney(pricing.baseCents, props.currency)
               : "—"}
           </span>
         </div>
@@ -195,7 +208,7 @@ export default function CheckoutClient(props: {
                 <span className="text-foreground/60">Chauffeur total</span>
                 <span>
                   {pricing && pricing.days > 0 && chauffeurEnabled
-                    ? `${(pricing.chauffeurCents / 100).toFixed(0)} ${props.currency}`
+                    ? formatMoney(pricing.chauffeurCents, props.currency)
                     : "—"}
                 </span>
               </div>
@@ -208,7 +221,7 @@ export default function CheckoutClient(props: {
           <span>Total</span>
           <span>
             {pricing && pricing.days > 0
-              ? `${(pricing.totalCents / 100).toFixed(0)} ${props.currency}`
+              ? formatMoney(pricing.totalCents, props.currency)
               : "Select dates"}
           </span>
         </div>

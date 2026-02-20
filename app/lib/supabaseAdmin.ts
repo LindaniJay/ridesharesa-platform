@@ -27,9 +27,9 @@ export async function uploadListingImage(params: {
     throw new Error("Only image uploads are supported");
   }
 
-  const maxBytes = 5 * 1024 * 1024;
+  const maxBytes = 8 * 1024 * 1024;
   if (params.file.size > maxBytes) {
-    throw new Error("Image too large (max 5MB)");
+    throw new Error("Image too large (max 8MB)");
   }
 
   const ext = (params.file.name.split(".").pop() || "png")
@@ -73,9 +73,9 @@ export async function uploadPrivateImage(params: {
     throw new Error("Only image uploads are supported");
   }
 
-  const maxBytes = 5 * 1024 * 1024;
+  const maxBytes = 8 * 1024 * 1024;
   if (params.file.size > maxBytes) {
-    throw new Error("Image too large (max 5MB)");
+    throw new Error("Image too large (max 8MB)");
   }
 
   const bytes = new Uint8Array(await params.file.arrayBuffer());

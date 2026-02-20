@@ -82,7 +82,7 @@ export default function DocumentsUploadForm({
         {loading ? "Uploading…" : "Upload documents"}
       </Button>
 
-      <div className="text-xs text-foreground/60">Images only • Max 5MB each</div>
+      <div className="text-xs text-foreground/60">Images only • Max 8MB each</div>
     </form>
   );
 }

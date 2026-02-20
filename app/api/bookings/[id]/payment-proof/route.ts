@@ -66,9 +66,9 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
     return badRequest("Only images or PDF proofs are supported");
   }
 
-  const maxBytes = 5 * 1024 * 1024;
+  const maxBytes = 8 * 1024 * 1024;
   if (file.size > maxBytes) {
-    return badRequest("File too large (max 5MB)");
+    return badRequest("File too large (max 8MB)");
   }
 
   const bucket = process.env.SUPABASE_BOOKING_PHOTOS_BUCKET || "booking-photos";

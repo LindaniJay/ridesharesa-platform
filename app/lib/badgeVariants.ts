@@ -23,6 +23,8 @@ export function badgeVariantForBookingStatus(status: BookingStatus): BadgeVarian
       return "success";
     case "PENDING_PAYMENT":
       return "warning";
+    case "PENDING_APPROVAL":
+      return "info";
     case "CANCELLED":
       return "danger";
     default:

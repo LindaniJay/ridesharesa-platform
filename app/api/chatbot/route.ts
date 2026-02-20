@@ -70,7 +70,7 @@ const I18N: Record<ChatLang, Record<string, string>> = {
       "Please sign in to use that feature. You can still ask general questions while signed out.",
     cancel_done: "Done — I cancelled that booking.",
     cancel_only_pending:
-      "For safety, I can only cancel bookings that are still PENDING_PAYMENT. If you need help with a confirmed booking, please create a support ticket.",
+          "For safety, I can only cancel bookings that are still PENDING_PAYMENT (unpaid). If payment was received (PENDING_APPROVAL) or the booking is confirmed, please create a support ticket.",
     verify_title: "Here’s your current verification status:",
     verify_card: "Documents",
     sign_in_here: "You can sign in here:",
@@ -102,7 +102,7 @@ const I18N: Record<ChatLang, Record<string, string>> = {
       "Sicela ungene ukuze usebenzise lo msebenzi. Usengabuza imibuzo ejwayelekile ungakangeni.",
     cancel_done: "Kulungile — ngikhansele lokho kubhuka.",
     cancel_only_pending:
-      "Ukuze kuphephe, ngingakhansele kuphela okubhukile okusese PENDING_PAYMENT. Uma kudingeka usizo ngokubhuka okuqinisekisiwe, sicela udale ithikithi lokusekelwa.",
+          "Ukuze kuphephe, ngingakhansele kuphela okubhukile okusese PENDING_PAYMENT (okungakakhokhwa). Uma inkokhelo isitholiwe (PENDING_APPROVAL) noma ukubhuka sekuqinisekisiwe, sicela udale ithikithi lokusekelwa.",
     verify_title: "Nansi isimo sakho sokuqinisekisa:",
     verify_card: "Amadokhumenti",
     sign_in_here: "Ngena lapha:",
@@ -134,7 +134,7 @@ const I18N: Record<ChatLang, Record<string, string>> = {
       "Meld asseblief aan om daardie funksie te gebruik. Jy kan nog algemene vrae vra terwyl jy afgemeld is.",
     cancel_done: "Reg — ek het daardie bespreking gekanselleer.",
     cancel_only_pending:
-      "Vir veiligheid kan ek net besprekings kanselleer wat nog PENDING_PAYMENT is. As jy hulp nodig het met ’n bevestigde bespreking, skep asseblief ’n ondersteuningstiket.",
+          "Vir veiligheid kan ek net besprekings kanselleer wat nog PENDING_PAYMENT (onbetaal) is. As betaling reeds ontvang is (PENDING_APPROVAL) of die bespreking bevestig is, skep asseblief ’n ondersteuningstiket.",
     verify_title: "Hier is jou huidige verifikasiestatus:",
     verify_card: "Dokumente",
     sign_in_here: "Jy kan hier aanmeld:",
@@ -347,7 +347,7 @@ async function cancelBooking(dbUserId: string, bookingId: string): Promise<Chatb
       messages: [
         {
           text:
-            "For safety, I can only cancel bookings that are still PENDING_PAYMENT. If you need help with a confirmed booking, please create a support ticket.",
+            "For safety, I can only cancel bookings that are still PENDING_PAYMENT (unpaid). If payment was received (PENDING_APPROVAL) or the booking is confirmed, please create a support ticket.",
         },
       ],
       quickReplies: [
@@ -583,7 +583,7 @@ async function answerMessage(
       messages: [
         {
           text:
-            "Payments can be made by card (Stripe) or Instant EFT (manual). If you choose EFT, you’ll see a reference on your booking page and the booking stays PENDING_PAYMENT until an admin confirms payment.",
+            "Payments can be made by card (Stripe) or Instant EFT (manual). Stripe bookings move to PENDING_APPROVAL after payment and require an admin to approve before they become CONFIRMED. EFT bookings stay PENDING_PAYMENT until an admin confirms payment.",
         },
       ],
       quickReplies: [

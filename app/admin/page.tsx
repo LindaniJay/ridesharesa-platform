@@ -5,6 +5,8 @@ import Badge from "@/app/components/ui/Badge";
 import Button from "@/app/components/ui/Button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/app/components/ui/Card";
 import Input from "@/app/components/ui/Input";
+import AdminProfilePhotoForm from "@/app/admin/AdminProfilePhotoForm.client";
+import AdminPayoutCalculator from "@/app/admin/AdminPayoutCalculator.client";
 import {
   badgeVariantForBookingStatus,
   badgeVariantForIncidentStatus,
@@ -97,10 +99,12 @@ function parseStatus<T extends string>(value: unknown, allowed: readonly T[]) {
 
 type AdminSection =
   | "overview"
+  | "settings"
   | "analytics"
   | "vehicles"
   | "users"
   | "bookings"
+  | "messages"
   | "payments"
   | "risk"
   | "support";
@@ -160,10 +164,12 @@ function parseSection(value: unknown): AdminSection | null {
   const v = String(value ?? "").trim();
   const allowed: readonly AdminSection[] = [
     "overview",
+    "settings",
     "analytics",
     "vehicles",
     "users",
     "bookings",
+    "messages",
     "payments",
     "risk",
     "support",
@@ -194,7 +200,7 @@ export default async function AdminDashboardPage({
     doc?: string;
   }>;
 }) {
-  await requireRole("ADMIN");
+  const { dbUser: viewerDbUser, supabaseUser: viewerSupabaseUser } = await requireRole("ADMIN");
 
   const resolved = searchParams ? await searchParams : undefined;
   const q = (resolved?.q ?? "").trim();
@@ -203,6 +209,7 @@ export default async function AdminDashboardPage({
   const selectedDocKind = parseUserDocKind(resolved?.doc);
   const bookingStatus = parseStatus<BookingStatus>(resolved?.bookingStatus, [
     "PENDING_PAYMENT",
+    "PENDING_APPROVAL",
     "CONFIRMED",
     "CANCELLED",
   ] as const);
@@ -227,6 +234,26 @@ export default async function AdminDashboardPage({
 
   const trendStart = new Date(monthAgo);
   trendStart.setHours(0, 0, 0, 0);
+
+  const userDocsBucket = process.env.SUPABASE_USER_DOCS_BUCKET || "user-documents";
+  const viewerProfileImagePath =
+    typeof viewerSupabaseUser.user_metadata?.profileImagePath === "string"
+      ? viewerSupabaseUser.user_metadata.profileImagePath
+      : null;
+  let viewerProfileImageSignedUrl: string | null = null;
+  if (viewerProfileImagePath) {
+    const { data } = await supabaseAdmin().storage.from(userDocsBucket).createSignedUrl(viewerProfileImagePath, 60 * 10);
+    if (data?.signedUrl) viewerProfileImageSignedUrl = data.signedUrl;
+  }
+
+  const viewerName =
+    (typeof viewerSupabaseUser.user_metadata?.name === "string" && viewerSupabaseUser.user_metadata.name.trim()) ||
+    viewerDbUser.name ||
+    "";
+
+  const viewerSurname =
+    (typeof viewerSupabaseUser.user_metadata?.surname === "string" && viewerSupabaseUser.user_metadata.surname.trim()) ||
+    "";
 
   const [
     pendingListings,
@@ -278,8 +305,9 @@ export default async function AdminDashboardPage({
       where: q
         ? {
             email: { contains: q.toLowerCase(), mode: "insensitive" },
+            role: { not: "ADMIN" },
           }
-        : undefined,
+        : { role: { not: "ADMIN" } },
       orderBy: { createdAt: "desc" },
       take: 50,
       select: {
@@ -346,6 +374,7 @@ export default async function AdminDashboardPage({
         id: true,
         status: true,
         stripeCheckoutSessionId: true,
+        paidAt: true,
         startDate: true,
         endDate: true,
         totalCents: true,
@@ -496,6 +525,8 @@ export default async function AdminDashboardPage({
       })
     : null;
 
+  const selectedUserAllowed = selectedUser ? selectedUser.role !== "ADMIN" : true;
+
   let selectedDocPreview:
     | {
         ok: true;
@@ -511,7 +542,7 @@ export default async function AdminDashboardPage({
       }
     | null = null;
 
-  if (selectedUserId && selectedDocKind) {
+  if (selectedUserId && selectedDocKind && selectedUserAllowed) {
     try {
       selectedDocPreview = await getUserDocSignedUrl({ userId: selectedUserId, kind: selectedDocKind });
     } catch (e) {
@@ -629,6 +660,33 @@ export default async function AdminDashboardPage({
     revalidatePath("/admin");
   }
 
+  async function approveBooking(formData: FormData) {
+    "use server";
+    await requireRole("ADMIN");
+
+    const bookingId = String(formData.get("bookingId") ?? "");
+    if (!bookingId) return;
+
+    const booking = await prisma.booking.findUnique({
+      where: { id: bookingId },
+      select: { id: true, status: true, paidAt: true },
+    });
+
+    if (!booking) return;
+    if (booking.status !== "PENDING_APPROVAL") return;
+    if (!booking.paidAt) return;
+
+    await prisma.booking.update({
+      where: { id: bookingId },
+      data: { status: "CONFIRMED" },
+    });
+
+    revalidatePath("/admin");
+    revalidatePath("/host");
+    revalidatePath("/renter");
+    revalidatePath(`/bookings/${bookingId}`);
+  }
+
   async function setSupportTicketStatus(formData: FormData) {
     "use server";
     const ticketId = String(formData.get("ticketId") ?? "");
@@ -696,16 +754,69 @@ export default async function AdminDashboardPage({
     revalidatePath("/admin");
   }
 
+  async function updateMyProfile(formData: FormData) {
+    "use server";
+    const { supabaseUser, dbUser } = await requireRole("ADMIN");
+
+    const nameRaw = String(formData.get("name") ?? "").trim();
+    const surnameRaw = String(formData.get("surname") ?? "").trim();
+
+    const name = nameRaw ? nameRaw.slice(0, 120) : "";
+    const surname = surnameRaw ? surnameRaw.slice(0, 120) : "";
+
+    await supabaseAdmin().auth.admin.updateUserById(supabaseUser.id, {
+      user_metadata: {
+        ...supabaseUser.user_metadata,
+        name: name || null,
+        surname: surname || null,
+        profileUpdatedAt: new Date().toISOString(),
+      },
+    });
+
+    await prisma.user.update({
+      where: { id: dbUser.id },
+      data: { name: name || null },
+    });
+
+    revalidatePath("/admin");
+  }
+
   const sidebarSections: { key: AdminSection; label: string }[] = [
     { key: "overview", label: "Overview" },
+    { key: "settings", label: "Settings" },
     { key: "analytics", label: "Analytics" },
     { key: "vehicles", label: "Vehicles" },
     { key: "users", label: "Users" },
     { key: "bookings", label: "Bookings" },
+    { key: "messages", label: "Messages" },
     { key: "payments", label: "Payments" },
     { key: "risk", label: "Risk & safety" },
     { key: "support", label: "Support" },
   ];
+
+  const bookingChats = section === "messages"
+    ? await prisma.booking.findMany({
+        orderBy: { updatedAt: "desc" },
+        select: {
+          id: true,
+          status: true,
+          createdAt: true,
+          listing: { select: { id: true, title: true, host: { select: { email: true } } } },
+          renter: { select: { email: true } },
+          _count: { select: { messages: true } },
+          messages: {
+            take: 1,
+            orderBy: { createdAt: "desc" },
+            select: {
+              body: true,
+              createdAt: true,
+              sender: { select: { email: true, role: true } },
+            },
+          },
+        },
+        take: 200,
+      })
+    : null;
 
   const currentQuery = {
     q: q || undefined,
@@ -721,6 +832,44 @@ export default async function AdminDashboardPage({
           <h1 className="text-2xl font-semibold tracking-tight">Admin dashboard</h1>
           <p className="text-sm text-foreground/60">Operations, finance, trust & safety, and support.</p>
         </div>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Signed in</CardTitle>
+            <CardDescription className="break-all">{viewerDbUser.email}</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="flex items-center gap-3">
+              {viewerProfileImageSignedUrl ? (
+                <img
+                  src={viewerProfileImageSignedUrl}
+                  alt="Profile"
+                  className="h-10 w-10 rounded-full border border-border object-cover"
+                />
+              ) : (
+                <div className="h-10 w-10 rounded-full border border-border bg-muted" aria-label="No profile photo" />
+              )}
+              <div className="min-w-0 space-y-1">
+                <div className="text-sm text-foreground/60">
+                  {viewerName ? (
+                    <div>
+                      {viewerName}
+                      {viewerSurname ? ` ${viewerSurname}` : ""}
+                    </div>
+                  ) : (
+                    <div>No name set.</div>
+                  )}
+                </div>
+                <Link
+                  href={adminHref({ section: "settings", ...currentQuery })}
+                  className="text-sm font-medium text-accent hover:underline"
+                >
+                  Open settings
+                </Link>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
         <Card>
           <CardHeader>
@@ -880,6 +1029,58 @@ export default async function AdminDashboardPage({
 
       ) : null}
 
+      {section === "settings" ? (
+        <section className="space-y-3">
+          <h2 className="text-lg font-semibold">Settings</h2>
+          <div className="grid gap-4 lg:grid-cols-2">
+            <Card>
+              <CardHeader>
+                <CardTitle>Profile</CardTitle>
+                <CardDescription>Update your name and surname.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <form action={updateMyProfile} className="space-y-3">
+                  <label className="block">
+                    <div className="mb-1 text-sm">Name</div>
+                    <Input name="name" defaultValue={viewerName} placeholder="Name" />
+                  </label>
+                  <label className="block">
+                    <div className="mb-1 text-sm">Surname</div>
+                    <Input name="surname" defaultValue={viewerSurname} placeholder="Surname" />
+                  </label>
+                  <Button type="submit" className="w-full">
+                    Save
+                  </Button>
+                </form>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Profile photo</CardTitle>
+                <CardDescription>Images only • Max 8MB</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {viewerProfileImageSignedUrl ? (
+                  <div className="flex items-center gap-3">
+                    <img
+                      src={viewerProfileImageSignedUrl}
+                      alt="Profile"
+                      className="h-16 w-16 rounded-full border border-border object-cover"
+                    />
+                    <div className="text-sm text-foreground/60">Current photo</div>
+                  </div>
+                ) : (
+                  <div className="text-sm text-foreground/60">No profile photo yet.</div>
+                )}
+
+                <AdminProfilePhotoForm />
+              </CardContent>
+            </Card>
+          </div>
+        </section>
+      ) : null}
+
       {section === "analytics" ? (
       <section className="space-y-3">
         <div className="flex flex-wrap items-end justify-between gap-3">
@@ -887,7 +1088,15 @@ export default async function AdminDashboardPage({
             <h2 className="text-lg font-semibold">Analytics (last 30 days)</h2>
             <div className="text-sm text-foreground/60">Power BI-style overview using live platform data.</div>
           </div>
-          <div className="text-xs text-foreground/60">Updated {now.toLocaleString("en-ZA")}</div>
+          <div className="flex flex-wrap items-center gap-3">
+            <a
+              className="inline-flex items-center justify-center rounded-lg px-3.5 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/30 border border-border bg-card text-foreground shadow-sm hover:bg-muted"
+              href="/api/admin/exports/stats"
+            >
+              Download stats (CSV)
+            </a>
+            <div className="text-xs text-foreground/60">Updated {now.toLocaleString("en-ZA")}</div>
+          </div>
         </div>
 
         <div className="grid gap-4 lg:grid-cols-12">
@@ -1344,17 +1553,23 @@ export default async function AdminDashboardPage({
               <CardHeader>
                 <CardTitle>Document preview</CardTitle>
                 <CardDescription>
-                  {selectedUser && selectedDocKind
-                    ? `${selectedUser.email} • ${selectedDocKind.toUpperCase()}`
-                    : selectedUser
-                      ? "Select a document type (Profile / ID / DL)"
-                      : "Select a user to preview documents"}
+                  {selectedUser && !selectedUserAllowed
+                    ? "Admins are hidden from verification"
+                    : selectedUser && selectedDocKind
+                      ? `${selectedUser.email} • ${selectedDocKind.toUpperCase()}`
+                      : selectedUser
+                        ? "Select a document type (Profile / ID / DL)"
+                        : "Select a user to preview documents"}
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 {!selectedUser ? (
                   <div className="text-sm text-foreground/60">
                     Pick a user on the left, then choose Profile/ID/DL.
+                  </div>
+                ) : !selectedUserAllowed ? (
+                  <div className="text-sm text-foreground/60">
+                    Admin accounts are not included in the verification workflow.
                   </div>
                 ) : !selectedDocKind ? (
                   <div className="text-sm text-foreground/60">
@@ -1430,6 +1645,7 @@ export default async function AdminDashboardPage({
           >
             <option value="">All statuses</option>
             <option value="PENDING_PAYMENT">PENDING_PAYMENT</option>
+            <option value="PENDING_APPROVAL">PENDING_APPROVAL</option>
             <option value="CONFIRMED">CONFIRMED</option>
             <option value="CANCELLED">CANCELLED</option>
           </select>
@@ -1507,7 +1723,12 @@ export default async function AdminDashboardPage({
                       </td>
                       <td className="px-3 py-2">{iso(b.createdAt)}</td>
                       <td className="px-3 py-2">
-                        {!b.stripeCheckoutSessionId && b.status === "PENDING_PAYMENT" ? (
+                        {b.status === "PENDING_APPROVAL" ? (
+                          <form action={approveBooking}>
+                            <input type="hidden" name="bookingId" value={b.id} />
+                            <Button type="submit" variant="secondary">Approve</Button>
+                          </form>
+                        ) : !b.stripeCheckoutSessionId && b.status === "PENDING_PAYMENT" ? (
                           <form action={markManualBookingPaid}>
                             <input type="hidden" name="bookingId" value={b.id} />
                             <Button type="submit" variant="secondary">Mark paid</Button>
@@ -1558,7 +1779,15 @@ export default async function AdminDashboardPage({
 
       {section === "payments" ? (
       <section className="space-y-3">
-        <h2 className="text-lg font-semibold">Payments & financials</h2>
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <h2 className="text-lg font-semibold">Payments & financials</h2>
+          <a
+            className="inline-flex items-center justify-center rounded-lg px-3.5 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/30 border border-border bg-card text-foreground shadow-sm hover:bg-muted"
+            href="/api/admin/exports/payouts"
+          >
+            Download payouts (CSV)
+          </a>
+        </div>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <Card>
             <CardHeader>
@@ -1655,6 +1884,8 @@ export default async function AdminDashboardPage({
             )}
           </CardContent>
         </Card>
+
+        <AdminPayoutCalculator />
 
         <Card>
           <CardHeader>
@@ -1772,6 +2003,59 @@ export default async function AdminDashboardPage({
         </Card>
       </section>
 
+      ) : null}
+
+      {section === "messages" ? (
+      <section className="space-y-3">
+        <h2 className="text-lg font-semibold">Messages</h2>
+        <p className="text-sm text-foreground/60">Admins can see and open any booking chat.</p>
+
+        <div className="overflow-hidden rounded-xl border border-border shadow-sm">
+          <table className="w-full text-left text-sm">
+            <thead className="bg-muted">
+              <tr>
+                <th className="px-3 py-2">Booking</th>
+                <th className="px-3 py-2">Host</th>
+                <th className="px-3 py-2">Renter</th>
+                <th className="px-3 py-2">Last message</th>
+                <th className="px-3 py-2">Count</th>
+              </tr>
+            </thead>
+            <tbody>
+              {(bookingChats ?? []).map((b) => {
+                const last = b.messages[0] ?? null;
+                return (
+                  <tr key={b.id} className="border-t border-border">
+                    <td className="px-3 py-2">
+                      <div className="font-medium">{b.listing.title}</div>
+                      <div className="text-xs text-foreground/60">
+                        <Link className="text-accent hover:underline" href={`/bookings/${encodeURIComponent(b.id)}`}>
+                          Open chat
+                        </Link>
+                      </div>
+                    </td>
+                    <td className="px-3 py-2">{b.listing.host.email}</td>
+                    <td className="px-3 py-2">{b.renter.email}</td>
+                    <td className="px-3 py-2">
+                      {last ? (
+                        <div>
+                          <div className="text-xs text-foreground/60">
+                            {last.sender.email} • {last.sender.role} • {last.createdAt.toISOString().slice(0, 16).replace("T", " ")}
+                          </div>
+                          <div className="line-clamp-2">{last.body}</div>
+                        </div>
+                      ) : (
+                        <span className="text-foreground/60">No messages</span>
+                      )}
+                    </td>
+                    <td className="px-3 py-2 tabular-nums">{b._count.messages}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </section>
       ) : null}
 
       {section === "risk" ? (

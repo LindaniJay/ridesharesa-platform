@@ -9,6 +9,7 @@ import { prisma } from "@/app/lib/prisma";
 import { requireUser } from "@/app/lib/require";
 import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
 import BookingStatusClient from "@/app/bookings/[id]/BookingStatusClient";
+import BookingChat from "@/app/bookings/[id]/BookingChat.client";
 
 type BookingPhotoKind = "host_handover" | "renter_pickup" | "renter_return" | "host_return";
 
@@ -153,8 +154,10 @@ export default async function BookingPage({
     })),
   );
 
-  const isPending = booking.status === "PENDING_PAYMENT";
-  const isManualPayment = isPending && !booking.stripeCheckoutSessionId;
+  const isPendingPayment = booking.status === "PENDING_PAYMENT";
+  const isPendingApproval = booking.status === "PENDING_APPROVAL";
+  const isPending = isPendingPayment || isPendingApproval;
+  const isManualPayment = isPendingPayment && !booking.stripeCheckoutSessionId;
 
   const paymentProofRes = isManualPayment && (isAdmin || isRenter)
     ? await listSignedPaymentProofs({ bookingId: booking.id, kind: "payment_proof" })
@@ -175,6 +178,26 @@ export default async function BookingPage({
       eft.branchCode.trim(),
   );
 
+  const heading =
+    booking.status === "CONFIRMED"
+      ? "Booking confirmed"
+      : booking.status === "CANCELLED"
+        ? "Booking cancelled"
+        : booking.status === "PENDING_APPROVAL"
+          ? "Booking awaiting admin approval"
+          : "Booking pending";
+
+  const subheading =
+    booking.status === "CONFIRMED"
+      ? "Your reservation is confirmed."
+      : booking.status === "CANCELLED"
+        ? "This booking has been cancelled."
+        : booking.status === "PENDING_APPROVAL"
+          ? "Payment was received. An admin must approve this booking before it is confirmed."
+          : isManualPayment
+            ? "Complete payment via Instant EFT so an admin can confirm it."
+            : "Payment is processing. This page will update after Stripe confirms payment.";
+
   return (
     <main className="mx-auto max-w-xl space-y-4">
       <div className="text-sm text-black/60 dark:text-white/60">
@@ -190,19 +213,26 @@ export default async function BookingPage({
       </div>
 
       <div className="space-y-1">
-        <h1 className="text-2xl font-semibold tracking-tight">
-          {isPending ? "Booking pending" : "Booking confirmed"}
-        </h1>
+        <h1 className="text-2xl font-semibold tracking-tight">{heading}</h1>
         <p className="text-sm text-foreground/60">
-          {isPending
-            ? isManualPayment
-              ? "Complete payment via Instant EFT to confirm this booking."
-              : "Payment is processing. This page will update after Stripe confirms payment."
-            : "Your reservation is confirmed."}
+          {subheading}
         </p>
       </div>
 
-      <BookingStatusClient pending={isPending} method={isManualPayment ? "manual" : "stripe"} />
+      <BookingStatusClient status={booking.status} method={isManualPayment ? "manual" : "stripe"} />
+
+      <BookingChat bookingId={booking.id} viewerId={viewerId} />
+
+      {isAdmin || isRenter ? (
+        <div className="flex flex-wrap items-center gap-2">
+          <a
+            href={`/api/bookings/${encodeURIComponent(booking.id)}/receipt`}
+            className="inline-flex items-center justify-center rounded-lg px-3.5 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/30 border border-border bg-card text-foreground shadow-sm hover:bg-muted"
+          >
+            Download receipt (PDF)
+          </a>
+        </div>
+      ) : null}
 
       {isManualPayment ? (
         <Card>
@@ -486,6 +516,14 @@ export default async function BookingPage({
         <Link href="/listings">
           <Button>Browse more</Button>
         </Link>
+        {isAdmin || isRenter ? (
+          <a
+            className="inline-flex items-center justify-center rounded-lg px-3.5 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/30 border border-border bg-card text-foreground shadow-sm hover:bg-muted"
+            href={`/api/bookings/${encodeURIComponent(booking.id)}/receipt`}
+          >
+            Download receipt (PDF)
+          </a>
+        ) : null}
         {isPending ? (
           <Link href={`/checkout/${booking.listing.id}?start=${encodeURIComponent(booking.startDate.toISOString().slice(0, 10))}&end=${encodeURIComponent(booking.endDate.toISOString().slice(0, 10))}${chauffeurKm > 0 ? `&chauffeurKm=${encodeURIComponent(String(chauffeurKm))}&chauffeur=1` : ""}`}>
             <Button variant="secondary">Try payment again</Button>

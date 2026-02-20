@@ -89,7 +89,7 @@ export default async function RenterDashboardPage({
     prisma.booking.findMany({
       where: {
         renterId,
-        status: { in: ["CONFIRMED", "PENDING_PAYMENT"] },
+        status: { in: ["CONFIRMED", "PENDING_PAYMENT", "PENDING_APPROVAL"] },
         startDate: { gt: now },
       },
       orderBy: { startDate: "asc" },
@@ -107,7 +107,7 @@ export default async function RenterDashboardPage({
     prisma.booking.findMany({
       where: {
         renterId,
-        status: "CONFIRMED",
+        status: { in: ["CONFIRMED", "PENDING_APPROVAL"] },
         startDate: { lte: now },
         endDate: { gte: now },
       },
@@ -126,7 +126,7 @@ export default async function RenterDashboardPage({
     prisma.booking.findMany({
       where: {
         renterId,
-        status: { in: ["CONFIRMED", "CANCELLED"] },
+        status: { in: ["CONFIRMED", "PENDING_APPROVAL", "CANCELLED"] },
         endDate: { lt: now },
       },
       orderBy: { endDate: "desc" },

@@ -36,6 +36,7 @@ enum ListingStatus {
 
 enum BookingStatus {
   PENDING_PAYMENT
+  PENDING_APPROVAL
   CONFIRMED
   CANCELLED
 }
@@ -89,6 +90,8 @@ model User {
 
   // Renter
   bookings Booking[]
+
+  bookingMessagesSent BookingMessage[]
 
   favorites Favorite[]
 
@@ -170,9 +173,27 @@ model Booking {
   incidentReports IncidentReport[]
   reviews         Review[]
 
+  messages BookingMessage[]
+
   @@index([listingId])
   @@index([renterId])
   @@index([status])
+}
+
+model BookingMessage {
+  id        String   @id @default(cuid())
+  bookingId String
+  booking   Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  senderId  String
+  sender    User     @relation(fields: [senderId], references: [id], onDelete: Cascade)
+
+  body      String
+
+  createdAt DateTime @default(now())
+
+  @@index([bookingId])
+  @@index([senderId])
+  @@index([createdAt])
 }
 
 model SupportTicket {

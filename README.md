@@ -2,6 +2,10 @@
 
 Full-stack Next.js marketplace demo with roles (ADMIN/HOST/RENTER), listings + map, and checkout via Stripe.
 
+## Product docs
+
+- Onboarding (Host & Renter): [docs/onboarding.md](docs/onboarding.md)
+
 ## Local setup
 
 1) Install deps
@@ -39,17 +43,9 @@ npm run db:generate
 npm run db:migrate
 npm run db:seed
 ```
-
-If `npm run db:migrate` reports Prisma **drift**:
-
-- Safest: use a fresh database (new Supabase project for dev)
-- Dev-only and disposable: run `node scripts/prisma.mjs migrate reset` (destructive)
-
 5) Stripe webhook (local)
 
 Use the Stripe CLI to forward webhooks to your dev server:
-
-```bash
 stripe listen --forward-to localhost:3000/api/stripe/webhook
 ```
 
@@ -67,8 +63,6 @@ This repo can be shipped as an **installable PWA** (Add to Home Screen) that wor
 
 ### Install / “app” behavior
 
-- Android: open the site in Chrome → **Install app**
-- iOS: open the site in Safari → **Share** → **Add to Home Screen**
 
 ### Push notifications (Web Push)
 
@@ -85,6 +79,26 @@ npm install
 
 2) Generate VAPID keys:
 
+
+## Scripts
+
+### Grant admin access
+
+Admins must be granted via Supabase Auth `app_metadata.role=ADMIN` (service-role only). This repo includes a helper script that:
+- creates the auth user if missing
+- sets `app_metadata.role=ADMIN`
+- sets/resets the user password from `ADMIN_INITIAL_PASSWORD`
+- upserts the Prisma `User` row to `role=ADMIN`
+
+Usage:
+- Set env vars: `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `DATABASE_URL`
+- Choose a password approach:
+	- Same password for all: set `ADMIN_INITIAL_PASSWORD`
+	- Sequential passwords: set `ADMIN_INITIAL_PASSWORD_BASE` (and optionally `ADMIN_INITIAL_PASSWORD_START`)
+	- Explicit per user: pass args as `email=password`
+- Run:
+	- `node scripts/grant-admins.mjs <email1> <email2> ...`
+	- or `node scripts/grant-admins.mjs <email1=password1> <email2=password2> ...`
 ```bash
 npx web-push generate-vapid-keys --json
 ```
