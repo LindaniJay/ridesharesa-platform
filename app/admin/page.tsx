@@ -1,6 +1,8 @@
 import { revalidatePath } from "next/cache";
 import Link from "next/link";
 
+export const dynamic = "force-dynamic";
+
 import Badge from "@/app/components/ui/Badge";
 import Button from "@/app/components/ui/Button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/app/components/ui/Card";

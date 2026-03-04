@@ -1,6 +1,9 @@
 import { spawn } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
+import { loadEnvFiles } from "./load-env.mjs";
+
+loadEnvFiles();
 
 function sleep(ms) {
   return new Promise((r) => setTimeout(r, ms));

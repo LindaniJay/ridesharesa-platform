@@ -50,9 +50,8 @@ export default function SignUpPage() {
     }).catch(() => null);
 
     setLoading(false);
-    // After signup, take the user to their dashboard
-    // where they can complete profile & documents.
-    router.push(role === "HOST" ? "/host" : "/renter");
+    // Redirect to profile creation to complete required documents
+    router.push("/profile/create");
     router.refresh();
   }
 

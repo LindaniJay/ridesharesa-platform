@@ -1,5 +1,7 @@
 import Link from "next/link";
 
+export const dynamic = "force-dynamic";
+
 import Badge from "@/app/components/ui/Badge";
 import Button from "@/app/components/ui/Button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/app/components/ui/Card";
@@ -13,7 +15,7 @@ import {
   badgeVariantForVerificationStatus,
 } from "@/app/lib/badgeVariants";
 import { prisma } from "@/app/lib/prisma";
-import { requireRole } from "@/app/lib/require";
+import { requireRoleWithProfile } from "@/app/lib/require";
 import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
 
 function iso(d: Date) {
@@ -21,7 +23,7 @@ function iso(d: Date) {
 }
 
 export default async function HostDashboardPage() {
-  const { dbUser, supabaseUser } = await requireRole("HOST");
+  const { dbUser, supabaseUser } = await requireRoleWithProfile("HOST");
   const hostId = dbUser.id;
 
   const userDocsBucket = process.env.SUPABASE_USER_DOCS_BUCKET || "user-documents";
@@ -193,7 +195,7 @@ export default async function HostDashboardPage() {
   async function createSupportTicket(formData: FormData) {
     "use server";
 
-    const { dbUser } = await requireRole("HOST");
+    const { dbUser } = await requireRoleWithProfile("HOST");
     const subject = String(formData.get("subject") ?? "").trim();
     const message = String(formData.get("message") ?? "").trim();
     if (!subject || !message) return;

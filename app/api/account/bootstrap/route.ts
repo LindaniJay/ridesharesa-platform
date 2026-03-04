@@ -59,42 +59,76 @@ export async function POST(req: Request) {
   const metadataRoleRaw = (user?.user_metadata as { role?: unknown } | null | undefined)?.role;
   const metadataRole = metadataRoleRaw === "HOST" || metadataRoleRaw === "RENTER" ? metadataRoleRaw : null;
 
-  const existing = await prisma.user.findUnique({
-    where: { email },
-    select: { id: true, role: true, name: true, surname: true },
-  });
+  let existing: { id: string; role: "ADMIN" | "HOST" | "RENTER"; name: string | null; surname: string | null } | null;
+  try {
+    existing = await prisma.user.findUnique({
+      where: { email },
+      select: { id: true, role: true, name: true, surname: true },
+    });
+  } catch (e) {
+    return NextResponse.json(
+      {
+        ok: false,
+        reason: "DB_UNREACHABLE",
+        message: process.env.NODE_ENV !== "production" ? (e instanceof Error ? e.message : String(e)) : undefined,
+      },
+      { status: 503 },
+    );
+  }
 
   if (existing) {
     // Do not allow changing role via bootstrap.
     // Fill name if missing.
-    if (!existing.name && requestedName) {
-      await prisma.user.update({ where: { email }, data: { name: requestedName } });
-    }
+    try {
+      if (!existing.name && requestedName) {
+        await prisma.user.update({ where: { email }, data: { name: requestedName } });
+      }
 
-    if (!existing.surname && requestedSurname) {
-      await prisma.user.update({ where: { email }, data: { surname: requestedSurname } });
-    }
+      if (!existing.surname && requestedSurname) {
+        await prisma.user.update({ where: { email }, data: { surname: requestedSurname } });
+      }
 
-    // If a user chose HOST at signup but the DB row already exists as RENTER
-    // (e.g. created earlier by a background sync), allow a one-way promotion.
-    if (existing.role === "RENTER" && requestedRole === "HOST" && metadataRole === "HOST") {
-      await prisma.user.update({ where: { email }, data: { role: "HOST" } });
+      // If a user chose HOST at signup but the DB row already exists as RENTER
+      // (e.g. created earlier by a background sync), allow a one-way promotion.
+      if (existing.role === "RENTER" && requestedRole === "HOST" && metadataRole === "HOST") {
+        await prisma.user.update({ where: { email }, data: { role: "HOST" } });
+      }
+    } catch (e) {
+      return NextResponse.json(
+        {
+          ok: false,
+          reason: "DB_UNREACHABLE",
+          message: process.env.NODE_ENV !== "production" ? (e instanceof Error ? e.message : String(e)) : undefined,
+        },
+        { status: 503 },
+      );
     }
 
     return NextResponse.json({ ok: true });
   }
 
-  await prisma.user.create({
-    data: {
-      email,
-      name: requestedName,
-      surname: requestedSurname,
-      role: requestedRole ?? "RENTER",
-      status: "ACTIVE",
-      idVerificationStatus: "UNVERIFIED",
-      driversLicenseStatus: "UNVERIFIED",
-    },
-  });
+  try {
+    await prisma.user.create({
+      data: {
+        email,
+        name: requestedName,
+        surname: requestedSurname,
+        role: requestedRole ?? "RENTER",
+        status: "ACTIVE",
+        idVerificationStatus: "UNVERIFIED",
+        driversLicenseStatus: "UNVERIFIED",
+      },
+    });
+  } catch (e) {
+    return NextResponse.json(
+      {
+        ok: false,
+        reason: "DB_UNREACHABLE",
+        message: process.env.NODE_ENV !== "production" ? (e instanceof Error ? e.message : String(e)) : undefined,
+      },
+      { status: 503 },
+    );
+  }
 
   return NextResponse.json({ ok: true }, { status: 201 });
 }

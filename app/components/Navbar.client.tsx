@@ -56,6 +56,7 @@ export default function NavbarClient() {
 
   useEffect(() => {
     let cancelled = false;
+    const supabase = supabaseBrowser();
 
     async function load() {
       try {
@@ -76,7 +77,25 @@ export default function NavbarClient() {
 
     void load();
 
-    const { data: sub } = supabaseBrowser().auth.onAuthStateChange(() => {
+    // If the Supabase project/anon key changed, the browser can keep an old refresh token.
+    // That produces noisy 400s in the console. Treat it as a sign-out.
+    (async () => {
+      try {
+        const { error } = await supabase.auth.getSession();
+        const message = (error as { message?: unknown } | null)?.message;
+        if (typeof message === "string" && /invalid\s*refresh\s*token/i.test(message)) {
+          await supabase.auth.signOut();
+          if (!cancelled) {
+            setEmail(null);
+            setRole(null);
+          }
+        }
+      } catch {
+        // Ignore.
+      }
+    })();
+
+    const { data: sub } = supabase.auth.onAuthStateChange(() => {
       void load();
     });
 

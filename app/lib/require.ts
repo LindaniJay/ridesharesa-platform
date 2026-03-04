@@ -124,3 +124,55 @@ export async function requireRole(requiredRole: Role): Promise<AuthedUser> {
   if (authed.dbUser.role !== requiredRole) redirect("/");
   return authed;
 }
+
+/**
+ * Check if user has completed profile (uploaded verification documents).
+ * Users must upload profile photo, ID document, and driver's license.
+ */
+export function isProfileComplete(user: AuthedUser): boolean {
+  // Profile is complete if verification documents have been submitted
+  // (status is no longer UNVERIFIED)
+  return (
+    user.dbUser.idVerificationStatus !== "UNVERIFIED" &&
+    user.dbUser.driversLicenseStatus !== "UNVERIFIED"
+  );
+}
+
+/**
+ * Require authenticated user with complete profile.
+ * Redirects to /profile/create if profile is incomplete.
+ * Admins bypass the profile completion check.
+ */
+export async function requireCompleteProfile(): Promise<AuthedUser> {
+  const authed = await requireUser();
+  
+  // Admins don't need to complete profile
+  if (authed.dbUser.role === "ADMIN") return authed;
+  
+  if (!isProfileComplete(authed)) {
+    redirect("/profile/create");
+  }
+  
+  return authed;
+}
+
+/**
+ * Require specific role with complete profile.
+ * Admins bypass the profile completion check.
+ */
+export async function requireRoleWithProfile(requiredRole: Role): Promise<AuthedUser> {
+  const authed = await requireUser();
+  
+  // Check role first
+  if (authed.dbUser.role !== requiredRole) redirect("/");
+  
+  // Admins don't need to complete profile
+  if (authed.dbUser.role === "ADMIN") return authed;
+  
+  // Check profile completion
+  if (!isProfileComplete(authed)) {
+    redirect("/profile/create");
+  }
+  
+  return authed;
+}

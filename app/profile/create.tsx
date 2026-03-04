@@ -45,7 +45,16 @@ export default function ProfileCreatePage() {
         return;
       }
 
-      window.location.href = "/renter";
+      // Fetch user role to redirect to appropriate dashboard
+      const meRes = await fetch("/api/me", { cache: "no-store" });
+      const meData = (await meRes.json().catch(() => null)) as null | {
+        user: { role: "ADMIN" | "HOST" | "RENTER" } | null;
+      };
+
+      const role = meData?.user?.role;
+      const redirectPath = role === "ADMIN" ? "/admin" : role === "HOST" ? "/host" : "/renter";
+      
+      window.location.href = redirectPath;
     } catch {
       setError("Upload failed. Please try again.");
     } finally {

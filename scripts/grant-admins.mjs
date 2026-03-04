@@ -1,8 +1,10 @@
-import "dotenv/config";
+import { loadEnvFiles } from "./load-env.mjs";
 import { PrismaClient } from "@prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { Pool } from "pg";
 import { createClient } from "@supabase/supabase-js";
+
+loadEnvFiles();
 
 const rawArgs = process.argv.slice(2);
 if (rawArgs.length === 0) {

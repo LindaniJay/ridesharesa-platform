@@ -1,6 +1,9 @@
 import { spawn } from "node:child_process";
 import path from "node:path";
 import fs from "node:fs";
+import { loadEnvFiles } from "./load-env.mjs";
+
+loadEnvFiles();
 
 const workspaceRoot = process.cwd();
 const env = { ...process.env };
