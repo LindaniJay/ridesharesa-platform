@@ -22,37 +22,57 @@ export default function SignUpPage() {
     setError(null);
     setLoading(true);
 
-    const { data, error: signUpError } = await supabaseBrowser().auth.signUp({
-      email,
-      password,
-      options: {
-        data: { name: name || undefined, role },
-      },
-    });
+    try {
+      // Add timeout to prevent infinite loading
+      const timeoutPromise = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error("Request timeout - please try again")), 30000)
+      );
 
-    if (signUpError) {
-      setError(signUpError.message);
+      const { data, error: signUpError } = await Promise.race([
+        supabaseBrowser().auth.signUp({
+          email,
+          password,
+          options: {
+            data: { name: name || undefined, role },
+          },
+        }),
+        timeoutPromise,
+      ]);
+
+      if (signUpError) {
+        setError(signUpError.message);
+        setLoading(false);
+        return;
+      }
+
+      // If email confirmation is enabled, the session may be null.
+      if (!data.session) {
+        setLoading(false);
+        router.push("/sign-in?checkEmail=1");
+        return;
+      }
+
+      const bootstrapRes = await fetch("/api/account/bootstrap", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ name: name || undefined, role }),
+      });
+
+      if (!bootstrapRes.ok) {
+        const json = await bootstrapRes.json().catch(() => ({}));
+        setError(`Setup failed: ${json.message || json.error || "Unknown error"}`);
+        setLoading(false);
+        return;
+      }
+
       setLoading(false);
-      return;
-    }
-
-    // If email confirmation is enabled, the session may be null.
-    if (!data.session) {
+      // Redirect to dashboard - profile can be completed from there
+      router.push(role === "HOST" ? "/host" : "/renter");
+      router.refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "An error occurred. Please try again.");
       setLoading(false);
-      router.push("/sign-in?checkEmail=1");
-      return;
     }
-
-    await fetch("/api/account/bootstrap", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ name: name || undefined, role }),
-    }).catch(() => null);
-
-    setLoading(false);
-    // Redirect to profile creation to complete required documents
-    router.push("/profile/create");
-    router.refresh();
   }
 
   return (

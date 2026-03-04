@@ -65,10 +65,18 @@ export default function SignInClient() {
     setError(null);
     setLoading(true);
 
-    const { error: signInError } = await supabaseBrowser().auth.signInWithPassword({
-      email: email.trim().toLowerCase(),
-      password,
-    });
+    try {
+      // Add timeout for sign-in request
+      const timeoutPromise = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error("Sign-in request timeout - please try again")), 30000)
+      );
+
+      const signInPromise = supabaseBrowser().auth.signInWithPassword({
+        email: email.trim().toLowerCase(),
+        password,
+      });
+
+      const { error: signInError } = await Promise.race([signInPromise, timeoutPromise]);
 
     if (signInError) {
       const raw = String(signInError.message || "Sign-in failed");
@@ -83,49 +91,74 @@ export default function SignInClient() {
       return;
     }
 
-    // Ensure DB user exists / is hydrated.
-    const bootstrapOk = await fetch("/api/account/bootstrap", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({}),
-    })
-      .then(async (r) => {
-        const json = (await r.json().catch(() => null)) as null | { ok?: boolean };
-        return Boolean(json?.ok);
-      })
-      .catch(() => false);
+      // Ensure DB user exists / is hydrated with timeout (30s for first compile)
+      let bootstrapOk = false;
+      let bootstrapError = "";
+      try {
+        const bootstrapRes = await Promise.race([
+          fetch("/api/account/bootstrap", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({}),
+          }),
+          new Promise<Response>((_, reject) =>
+            setTimeout(() => reject(new Error("Bootstrap timeout - server may be slow")), 30000)
+          ),
+        ]);
+        const json = (await bootstrapRes.json().catch(() => null)) as null | { ok?: boolean; error?: string; message?: string };
+        bootstrapOk = Boolean(json?.ok);
+        if (!bootstrapOk && json) {
+          bootstrapError = json.error || json.message || "Unknown error";
+        }
+      } catch (e) {
+        bootstrapOk = false;
+        bootstrapError = e instanceof Error ? e.message : "Unknown error";
+      }
 
-    if (!bootstrapOk) {
-      setLoading(false);
-      setError(
-        "Signed in, but the server couldn’t finish setup (Supabase may be disabled due to TLS/cert issues). Clear site data for this app to remove the __supabase_dev_disable cookie, then try again.",
-      );
-      return;
-    }
+      if (!bootstrapOk) {
+        setLoading(false);
+        setError(
+          "Signed in, but the server couldn't finish setup. Please refresh the page and try again.",
+        );
+        return;
+      }
 
-    const me = await fetch("/api/me", { cache: "no-store" })
-      .then(async (r) => (await r.json()) as MeResponse)
-      .catch(() => ({ user: null } as MeResponse));
+      // Fetch user profile with timeout
+      let me: MeResponse = { user: null };
+      try {
+        me = await Promise.race([
+          fetch("/api/me", { cache: "no-store" }).then(async (r) => (await r.json()) as MeResponse),
+          new Promise<MeResponse>((_, reject) =>
+            setTimeout(() => reject(new Error("Profile fetch timeout")), 15000)
+          ),
+        ]);
+      } catch (e) {
+        me = { user: null };
+      }
 
-    if (!me.user) {
-      setLoading(false);
-      setError(
-        "Signed in, but your profile/role could not be loaded. If you’re on a corporate network, fix TLS trust (NODE_EXTRA_CA_CERTS) and clear site data, then retry.",
-      );
-      return;
-    }
+      if (!me.user) {
+        setLoading(false);
+        setError(
+          "Signed in, but your profile could not be loaded. Please refresh the page and try again.",
+        );
+        return;
+      }
 
-    const fallback = defaultDashboardForRole(me.user.role);
-    const destination =
-      isProtectedDashboardPath(callbackUrl) && !isAllowedDashboardPathForRole(callbackUrl, me.user.role)
-        ? fallback
-        : callbackUrl === "/"
+      const fallback = defaultDashboardForRole(me.user.role);
+      const destination =
+        isProtectedDashboardPath(callbackUrl) && !isAllowedDashboardPathForRole(callbackUrl, me.user.role)
           ? fallback
-          : callbackUrl;
+          : callbackUrl === "/"
+            ? fallback
+            : callbackUrl;
 
-    setLoading(false);
-    router.push(destination);
-    router.refresh();
+      setLoading(false);
+      router.push(destination);
+      router.refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Sign-in failed. Please try again.");
+      setLoading(false);
+    }
   }
 
   return (

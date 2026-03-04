@@ -119,6 +119,7 @@ export default async function BookingPage({
     select: {
       id: true,
       status: true,
+      paymentReference: true,
       stripeCheckoutSessionId: true,
       days: true,
       totalCents: true,
@@ -250,13 +251,38 @@ export default async function BookingPage({
           <CardContent className="space-y-3 text-sm">
             <div className="rounded-xl border border-border bg-card p-3">
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <div className="text-foreground/60">Reference</div>
-                <div className="font-mono text-xs">RS-{booking.id}</div>
+                <div className="text-foreground/60">Payment Reference</div>
+                <div className="font-mono text-xl font-bold tracking-wider text-green-600 dark:text-green-400">
+                  {booking.paymentReference || `RS-${booking.id}`}
+                </div>
               </div>
-              <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
-                <div className="text-foreground/60">Amount</div>
-                <div className="font-medium">
-                  {(booking.totalCents / 100).toFixed(0)} {booking.currency}
+              <div className="mt-3 border-t border-border pt-3">
+                <div className="text-xs font-semibold uppercase tracking-wide text-foreground/70 mb-2">Price Breakdown</div>
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-foreground/60">
+                      {booking.listing.title} × {booking.days} {booking.days === 1 ? "day" : "days"}
+                    </span>
+                    <span className="font-mono text-xs">
+                      {((booking.listing.dailyRateCents * booking.days) / 100).toFixed(0)} {booking.currency}
+                    </span>
+                  </div>
+                  {chauffeurKm > 0 ? (
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="text-foreground/60">
+                        Chauffeur service ({chauffeurKm} km @ R{(chauffeurRateCentsPerKm / 100).toFixed(0)}/km)
+                      </span>
+                      <span className="font-mono text-xs">
+                        {(chauffeurCents / 100).toFixed(0)} {booking.currency}
+                      </span>
+                    </div>
+                  ) : null}
+                  <div className="flex items-center justify-between gap-3 border-t border-border pt-2 mt-2">
+                    <span className="font-semibold text-foreground">Total Amount Due</span>
+                    <span className="font-bold text-lg">
+                      R{(booking.totalCents / 100).toFixed(0)}
+                    </span>
+                  </div>
                 </div>
               </div>
             </div>
@@ -287,6 +313,15 @@ export default async function BookingPage({
                   Bank details are currently unavailable. Please contact support to complete payment.
                 </div>
               )}
+            </div>
+
+            <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3">
+              <div className="flex gap-2">
+                <span className="text-amber-600 dark:text-amber-400 font-bold">⚠</span>
+                <div className="text-xs text-foreground/80">
+                  <strong>Important:</strong> Please include the payment reference <span className="font-mono font-bold">{booking.paymentReference || `RS-${booking.id}`}</span> in your bank transfer description so we can match your payment quickly.
+                </div>
+              </div>
             </div>
 
             <div className="text-xs text-foreground/60">

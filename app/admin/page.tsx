@@ -331,8 +331,10 @@ export default async function AdminDashboardPage({
         totalCents: true,
         currency: true,
         createdAt: true,
+        paymentReference: true,
+        stripeCheckoutSessionId: true,
         renter: { select: { email: true } },
-        listing: { select: { title: true } },
+        listing: { select: { title: true, host: { select: { email: true } } } },
       },
     }),
     prisma.user.count(),
@@ -375,6 +377,7 @@ export default async function AdminDashboardPage({
       select: {
         id: true,
         status: true,
+        paymentReference: true,
         stripeCheckoutSessionId: true,
         paidAt: true,
         startDate: true,
@@ -1694,6 +1697,7 @@ export default async function AdminDashboardPage({
                     <th className="px-3 py-2">Dates</th>
                     <th className="px-3 py-2">Status</th>
                     <th className="px-3 py-2">Payment</th>
+                    <th className="px-3 py-2">Ref#</th>
                     <th className="px-3 py-2">Total</th>
                     <th className="px-3 py-2">Created</th>
                     <th className="px-3 py-2">Actions</th>
@@ -1719,6 +1723,13 @@ export default async function AdminDashboardPage({
                         <Badge variant={b.stripeCheckoutSessionId ? "info" : "warning"}>
                           {b.stripeCheckoutSessionId ? "Stripe" : "EFT"}
                         </Badge>
+                      </td>
+                      <td className="px-3 py-2">
+                        {b.paymentReference ? (
+                          <span className="font-mono text-sm font-semibold">{b.paymentReference}</span>
+                        ) : (
+                          <span className="text-xs text-foreground/50">—</span>
+                        )}
                       </td>
                       <td className="px-3 py-2">
                         {(b.totalCents / 100).toFixed(0)} {b.currency}

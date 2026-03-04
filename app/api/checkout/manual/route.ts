@@ -24,6 +24,30 @@ function daysBetween(start: Date, end: Date) {
 
 const CHAUFFEUR_RATE_CENTS_PER_KM = 10 * 100;
 
+// Generate a unique 6-digit payment reference code
+async function generatePaymentReference(): Promise<string> {
+  let attempts = 0;
+  const maxAttempts = 10;
+
+  while (attempts < maxAttempts) {
+    const code = String(Math.floor(Math.random() * 900000) + 100000); // 6-digit number
+
+    const existing = await prisma.booking.findUnique({
+      where: { paymentReference: code },
+      select: { id: true },
+    });
+
+    if (!existing) {
+      return code;
+    }
+
+    attempts++;
+  }
+
+  // Fallback: use timestamp-based code if collision happens too many times
+  return String(Math.floor(Date.now() % 900000) + 100000);
+}
+
 export async function POST(req: Request) {
   const { dbUser } = await requireRole("RENTER");
   const renterId = dbUser.id;
@@ -81,10 +105,13 @@ export async function POST(req: Request) {
   const chauffeurCents = chauffeurEnabled && chauffeurKm > 0 ? chauffeurKm * CHAUFFEUR_RATE_CENTS_PER_KM : 0;
   const totalCents = baseCents + chauffeurCents;
 
+  const paymentReference = await generatePaymentReference();
+
   const booking = await prisma.booking.create({
     data: {
       listingId: listing.id,
       renterId,
+      paymentReference,
       startDate: start,
       endDate: end,
       days,

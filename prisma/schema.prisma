@@ -150,11 +150,12 @@ model Listing {
 }
 
 model Booking {
-  id        String        @id @default(cuid())
-  listingId String
-  listing   Listing       @relation(fields: [listingId], references: [id], onDelete: Cascade)
-  renterId  String
-  renter    User          @relation(fields: [renterId], references: [id], onDelete: Cascade)
+  id                      String        @id @default(cuid())
+  paymentReference        String?       @unique // 6-digit code for manual EFT payments
+  listingId               String
+  listing                 Listing       @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  renterId                String
+  renter                  User          @relation(fields: [renterId], references: [id], onDelete: Cascade)
 
   startDate DateTime
   endDate   DateTime
@@ -178,6 +179,7 @@ model Booking {
 
   @@index([listingId])
   @@index([renterId])
+  @@index([paymentReference])
   @@index([status])
 }
 

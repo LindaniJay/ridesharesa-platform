@@ -14,7 +14,7 @@ import {
   badgeVariantForVerificationStatus,
 } from "@/app/lib/badgeVariants";
 import { prisma } from "@/app/lib/prisma";
-import { requireRoleWithProfile } from "@/app/lib/require";
+import { requireRole } from "@/app/lib/require";
 import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
 
 function iso(d: Date) {
@@ -68,7 +68,7 @@ export default async function RenterDashboardPage({
 }: {
   searchParams?: Promise<{ section?: string }>;
 }) {
-  const { dbUser, supabaseUser } = await requireRoleWithProfile("RENTER");
+  const { dbUser, supabaseUser } = await requireRole("RENTER");
   const renterId = dbUser.id;
 
   const resolved = searchParams ? await searchParams : undefined;
@@ -154,7 +154,7 @@ export default async function RenterDashboardPage({
   async function createSupportTicket(formData: FormData) {
     "use server";
 
-    const { dbUser } = await requireRoleWithProfile("RENTER");
+    const { dbUser } = await requireRole("RENTER");
     const subject = String(formData.get("subject") ?? "").trim();
     const message = String(formData.get("message") ?? "").trim();
 
