@@ -37,14 +37,14 @@ const nextConfig: NextConfig = {
       ...(supabaseHost
         ? [
             {
-              protocol: "https",
+              protocol: "https" as const,
               hostname: supabaseHost,
               pathname: "/storage/v1/object/public/**",
             },
           ]
         : []),
       {
-        protocol: "https",
+        protocol: "https" as const,
         hostname: "images.unsplash.com",
       },
     ],

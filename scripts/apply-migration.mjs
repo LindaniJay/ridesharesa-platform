@@ -1,4 +1,8 @@
+import { loadEnvFiles } from './load-env.mjs';
 import { PrismaClient } from '@prisma/client';
+
+// Load environment variables
+loadEnvFiles();
 
 const prisma = new PrismaClient();
 
