@@ -6,21 +6,22 @@ export default function BackgroundVideo() {
   const videoRef = useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
-    const video = videoRef.current;
-    if (!video) return;
+    const videoEl = videoRef.current;
+    if (!videoEl) return;
+    const stableVideo: HTMLVideoElement = videoEl;
 
     function freezeFrame() {
-      video.pause();
-      video.currentTime = 0;
+      stableVideo.pause();
+      stableVideo.currentTime = 0;
     }
 
-    video.addEventListener("loadeddata", freezeFrame);
-    void video.play().then(freezeFrame).catch(() => {
+    stableVideo.addEventListener("loadeddata", freezeFrame);
+    void stableVideo.play().then(freezeFrame).catch(() => {
       // Ignore autoplay restrictions; loadeddata handler still freezes when available.
     });
 
     return () => {
-      video.removeEventListener("loadeddata", freezeFrame);
+      stableVideo.removeEventListener("loadeddata", freezeFrame);
     };
   }, []);
 

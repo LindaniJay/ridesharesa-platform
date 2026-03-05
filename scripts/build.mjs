@@ -8,6 +8,21 @@ loadEnvFiles();
 const workspaceRoot = process.cwd();
 const env = { ...process.env };
 
+function hasNodeOptionFlag(options, flagName) {
+  if (!options) return false;
+  const pattern = new RegExp(`(^|\\s)--${flagName}(=|\\s|$)`);
+  return pattern.test(options);
+}
+
+function ensureNodeMemoryOption(targetEnv) {
+  const existing = targetEnv.NODE_OPTIONS ?? "";
+  if (hasNodeOptionFlag(existing, "max-old-space-size")) return;
+
+  const defaultHeapMb = process.platform === "win32" ? 4096 : 3072;
+  targetEnv.NODE_OPTIONS = `${existing} --max-old-space-size=${defaultHeapMb}`.trim();
+  console.log(`[build] NODE_OPTIONS includes --max-old-space-size=${defaultHeapMb}`);
+}
+
 function run(command, args, options = {}) {
   return new Promise((resolve) => {
     const child = spawn(command, args, {
@@ -97,6 +112,9 @@ if (process.platform === "win32" && env.NEXT_DISABLE_TURBOPACK == null) {
 
 const nextBin = path.resolve(workspaceRoot, "node_modules", "next", "dist", "bin", "next");
 const args = process.argv.slice(2);
+
+// Prevent OOM/array-buffer allocation failures during next build on constrained runners.
+ensureNodeMemoryOption(env);
 
 // Keep Prisma Client types in sync for TS builds (e.g. enums like BookingStatus)
 const prismaCli = path.resolve(workspaceRoot, "node_modules", "prisma", "build", "index.js");
