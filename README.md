@@ -20,6 +20,10 @@ Copy `.env.example` to `.env` and fill in:
 
 - `DATABASE_URL` (Supabase Postgres connection string; pooled is fine for runtime)
 - `DIRECT_URL` (Supabase direct connection string; recommended for migrations)
+- For Supabase pooler setup:
+	- Use transaction pooler (`:6543`) for `DATABASE_URL` where possible.
+	- Keep direct DB (`:5432`) in `DIRECT_URL` for migrations.
+- Optional runtime tuning (helps avoid `MaxClientsInSessionMode`): `PG_POOL_MAX`, `PG_CONNECT_TIMEOUT_MS`, `PG_IDLE_TIMEOUT_MS`
 - `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_STORAGE_BUCKET`
 - `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`
 - `RESEND_API_KEY`, `RESEND_FROM`
