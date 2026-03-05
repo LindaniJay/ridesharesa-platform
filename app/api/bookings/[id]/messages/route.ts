@@ -3,6 +3,8 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/app/lib/prisma";
 import { requireUser } from "@/app/lib/require";
 
+type RecipientRole = "HOST" | "ADMIN";
+
 function badRequest(message: string) {
   return NextResponse.json({ error: message }, { status: 400 });
 }
@@ -45,11 +47,21 @@ export async function GET(_req: Request, context: { params: Promise<{ id: string
   }
 
   const messages = await prisma.bookingMessage.findMany({
-    where: { bookingId },
+    where:
+      dbUser.role === "HOST"
+        ? {
+            bookingId,
+            NOT: {
+              recipientRole: "ADMIN",
+              sender: { role: "RENTER" },
+            },
+          }
+        : { bookingId },
     orderBy: { createdAt: "asc" },
     select: {
       id: true,
       body: true,
+      recipientRole: true,
       createdAt: true,
       sender: {
         select: {
@@ -80,7 +92,7 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
     return NextResponse.json({ error: access.status === 404 ? "Booking not found" : "Forbidden" }, { status: access.status });
   }
 
-  const json = (await req.json().catch(() => null)) as null | { body?: unknown };
+  const json = (await req.json().catch(() => null)) as null | { body?: unknown; recipientRole?: unknown };
   if (!json) return badRequest("Expected JSON body");
 
   const bodyRaw = typeof json.body === "string" ? json.body : String(json.body ?? "");
@@ -88,15 +100,26 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
   if (!body) return badRequest("Message cannot be empty");
   if (body.length > 2000) return badRequest("Message too long (max 2000 characters)");
 
+  let recipientRole: RecipientRole | null = null;
+  if (dbUser.role === "RENTER") {
+    const requestedRole = typeof json.recipientRole === "string" ? json.recipientRole.toUpperCase() : "HOST";
+    if (requestedRole !== "HOST" && requestedRole !== "ADMIN") {
+      return badRequest("recipientRole must be HOST or ADMIN");
+    }
+    recipientRole = requestedRole;
+  }
+
   const message = await prisma.bookingMessage.create({
     data: {
       bookingId,
       senderId: dbUser.id,
       body,
+      recipientRole,
     },
     select: {
       id: true,
       body: true,
+      recipientRole: true,
       createdAt: true,
       sender: { select: { id: true, email: true, name: true, role: true } },
     },

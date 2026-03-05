@@ -9,6 +9,7 @@ import Textarea from "@/app/components/ui/Textarea";
 type Message = {
   id: string;
   body: string;
+  recipientRole: "HOST" | "ADMIN" | null;
   createdAt: string;
   sender: { id: string; email: string; name: string | null; role: "ADMIN" | "HOST" | "RENTER" };
 };
@@ -16,11 +17,13 @@ type Message = {
 export default function BookingChat(props: {
   bookingId: string;
   viewerId: string;
+  viewerRole: "ADMIN" | "HOST" | "RENTER";
 }) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
+  const [recipientRole, setRecipientRole] = useState<"HOST" | "ADMIN">("HOST");
   const [sending, setSending] = useState(false);
 
   const endpoint = useMemo(() => `/api/bookings/${encodeURIComponent(props.bookingId)}/messages`, [props.bookingId]);
@@ -49,7 +52,10 @@ export default function BookingChat(props: {
       const res = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ body }),
+        body: JSON.stringify({
+          body,
+          recipientRole: props.viewerRole === "RENTER" ? recipientRole : undefined,
+        }),
       });
       const json = (await res.json().catch(() => null)) as null | { message?: Message; error?: string };
       if (!res.ok) throw new Error(json?.error || "Failed to send message");
@@ -102,6 +108,11 @@ export default function BookingChat(props: {
                   <div className="text-xs text-foreground/60">
                     {you ? "You" : name} • {m.sender.role} • {new Date(m.createdAt).toLocaleString()}
                   </div>
+                  {m.recipientRole ? (
+                    <div className="mt-1 text-xs text-foreground/60">
+                      To {m.recipientRole === "ADMIN" ? "admin" : "host"}
+                    </div>
+                  ) : null}
                   <div
                     className={
                       "mt-1 inline-block max-w-[90%] rounded-xl border border-border bg-muted px-3 py-2 text-sm text-foreground"
@@ -116,6 +127,22 @@ export default function BookingChat(props: {
         </div>
 
         <div className="space-y-2">
+          {props.viewerRole === "RENTER" ? (
+            <div className="space-y-1">
+              <label htmlFor="recipientRole" className="text-sm text-foreground/80">
+                Send to
+              </label>
+              <select
+                id="recipientRole"
+                value={recipientRole}
+                onChange={(e) => setRecipientRole(e.target.value === "ADMIN" ? "ADMIN" : "HOST")}
+                className="w-full rounded-lg border border-border bg-card px-3 py-2 text-sm"
+              >
+                <option value="HOST">Host</option>
+                <option value="ADMIN">Admin</option>
+              </select>
+            </div>
+          ) : null}
           <Textarea
             value={draft}
             onChange={(e) => setDraft(e.target.value)}

@@ -229,7 +229,7 @@ export default async function BookingPage({
         <BookingActions bookingId={booking.id} currentEndDateISO={booking.endDate.toISOString()} />
       ) : null}
 
-      <BookingChat bookingId={booking.id} viewerId={viewerId} />
+      <BookingChat bookingId={booking.id} viewerId={viewerId} viewerRole={viewerRole} />
 
       {isAdmin || isRenter ? (
         <div className="flex flex-wrap items-center gap-2">

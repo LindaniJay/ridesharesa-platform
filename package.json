@@ -13,6 +13,7 @@
     "start": "next start",
     "lint": "eslint",
     "db:migrate": "node scripts/prisma.mjs migrate dev",
+    "db:migrate:fallback": "node scripts/migrate-with-fallback.mjs",
     "db:generate": "node scripts/prisma.mjs generate",
     "db:studio": "node scripts/prisma.mjs studio",
     "db:seed": "tsx prisma/seed.ts"

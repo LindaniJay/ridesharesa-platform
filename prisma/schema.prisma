@@ -48,6 +48,11 @@ enum SupportTicketStatus {
   CLOSED
 }
 
+enum MessageRecipientRole {
+  HOST
+  ADMIN
+}
+
 enum IncidentType {
   DAMAGE
   ACCIDENT
@@ -189,12 +194,14 @@ model BookingMessage {
   booking   Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
   senderId  String
   sender    User     @relation(fields: [senderId], references: [id], onDelete: Cascade)
+  recipientRole MessageRecipientRole?
 
   body      String
 
   createdAt DateTime @default(now())
 
   @@index([bookingId])
+  @@index([recipientRole])
   @@index([senderId])
   @@index([createdAt])
 }
