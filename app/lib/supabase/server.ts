@@ -13,8 +13,13 @@ export async function supabaseServer() {
         return cookieStore.getAll();
       },
       setAll(cookiesToSet) {
-        for (const { name, value, options } of cookiesToSet) {
-          cookieStore.set(name, value, options);
+        try {
+          for (const { name, value, options } of cookiesToSet) {
+            cookieStore.set(name, value, options);
+          }
+        } catch {
+          // Cookies can only be modified in Server Actions or Route Handlers
+          // Silently fail in read-only contexts (e.g., page components)
         }
       },
     },

@@ -210,65 +210,116 @@ export default async function HostDashboardPage() {
   }
 
   return (
-    <main className="space-y-8">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div className="space-y-1">
-          <h1 className="text-2xl font-semibold tracking-tight">Host dashboard</h1>
-          <p className="text-sm text-foreground/60">Your vehicles, bookings, messages, and payouts in one place.</p>
+    <main className="min-h-screen space-y-8 pb-12">
+      {/* Hero Header */}
+      <div className="relative overflow-hidden rounded-2xl border border-border bg-gradient-to-br from-accent/10 via-accent/5 to-transparent p-8">
+        <div className="relative z-10 flex flex-wrap items-end justify-between gap-4">
+          <div className="space-y-2">
+            <h1 className="text-3xl font-bold tracking-tight">Welcome back, Host! 👋</h1>
+            <p className="text-base text-foreground/70">Manage your vehicles, bookings, and earnings in one place.</p>
+          </div>
+          <Link href="/host/listings/new">
+            <Button className="bg-accent text-accent-foreground shadow-lg hover:shadow-xl transition-shadow">
+              <svg className="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              </svg>
+              Add New Vehicle
+            </Button>
+          </Link>
         </div>
-        <Link href="/host/listings/new">
-          <Button>New vehicle</Button>
-        </Link>
       </div>
 
-      <section className="space-y-3">
-        <h2 className="text-lg font-semibold">Business overview</h2>
+      {/* Key Metrics */}
+      <section className="space-y-4">
+        <div className="flex items-center gap-2">
+          <svg className="h-5 w-5 text-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+          </svg>
+          <h2 className="text-xl font-semibold">Business Overview</h2>
+        </div>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
-          <Card>
-            <CardHeader>
-              <CardTitle>Total earnings</CardTitle>
-              <CardDescription>Confirmed bookings total.</CardDescription>
+          <Card className="border-accent/20 bg-gradient-to-br from-green-50/50 to-transparent dark:from-green-950/20 hover:shadow-lg transition-shadow">
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-sm font-medium text-foreground/70">Total Earnings</CardTitle>
+                <div className="rounded-full bg-green-500/10 p-2">
+                  <svg className="h-4 w-4 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
+              </div>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-semibold">{(totalEarningsCents / 100).toFixed(0)} ZAR</div>
+              <div className="text-3xl font-bold text-green-600 dark:text-green-400">R {(totalEarningsCents / 100).toLocaleString()}</div>
+              <p className="mt-1 text-xs text-foreground/60">From {confirmedTrips} confirmed bookings</p>
             </CardContent>
           </Card>
-          <Card>
-            <CardHeader>
-              <CardTitle>Upcoming payouts</CardTitle>
-              <CardDescription>Recorded payout items (if used).</CardDescription>
+          
+          <Card className="border-amber-500/20 bg-gradient-to-br from-amber-50/50 to-transparent dark:from-amber-950/20 hover:shadow-lg transition-shadow">
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-sm font-medium text-foreground/70">Pending Payouts</CardTitle>
+                <div className="rounded-full bg-amber-500/10 p-2">
+                  <svg className="h-4 w-4 text-amber-600 dark:text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
+              </div>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-semibold">{(pendingPayoutCents / 100).toFixed(0)} ZAR</div>
-              <div className="mt-1 text-sm text-foreground/60">{pendingPayoutCount} pending</div>
+              <div className="text-3xl font-bold text-amber-600 dark:text-amber-400">R {(pendingPayoutCents / 100).toLocaleString()}</div>
+              <p className="mt-1 text-xs text-foreground/60">{pendingPayoutCount} payment{pendingPayoutCount !== 1 ? 's' : ''} pending</p>
             </CardContent>
           </Card>
-          <Card>
-            <CardHeader>
-              <CardTitle>Paid out</CardTitle>
-              <CardDescription>Total payouts marked paid.</CardDescription>
+          
+          <Card className="border-blue-500/20 bg-gradient-to-br from-blue-50/50 to-transparent dark:from-blue-950/20 hover:shadow-lg transition-shadow">
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-sm font-medium text-foreground/70">Paid Out</CardTitle>
+                <div className="rounded-full bg-blue-500/10 p-2">
+                  <svg className="h-4 w-4 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
+              </div>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-semibold">{(paidPayoutCents / 100).toFixed(0)} ZAR</div>
-              <div className="mt-1 text-sm text-foreground/60">{paidPayoutCount} paid</div>
+              <div className="text-3xl font-bold text-blue-600 dark:text-blue-400">R {(paidPayoutCents / 100).toLocaleString()}</div>
+              <p className="mt-1 text-xs text-foreground/60">{paidPayoutCount} payment{paidPayoutCount !== 1 ? 's' : ''} completed</p>
             </CardContent>
           </Card>
-          <Card>
-            <CardHeader>
-              <CardTitle>Bookings in progress</CardTitle>
-              <CardDescription>Active rentals right now.</CardDescription>
+          
+          <Card className="border-purple-500/20 bg-gradient-to-br from-purple-50/50 to-transparent dark:from-purple-950/20 hover:shadow-lg transition-shadow">
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-sm font-medium text-foreground/70">Active Bookings</CardTitle>
+                <div className="rounded-full bg-purple-500/10 p-2">
+                  <svg className="h-4 w-4 text-purple-600 dark:text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                  </svg>
+                </div>
+              </div>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-semibold">{activeBookings.length}</div>
+              <div className="text-3xl font-bold text-purple-600 dark:text-purple-400">{activeBookings.length}</div>
+              <p className="mt-1 text-xs text-foreground/60">Currently in progress</p>
             </CardContent>
           </Card>
-          <Card>
-            <CardHeader>
-              <CardTitle>Booking history</CardTitle>
-              <CardDescription>Confirmed bookings completed.</CardDescription>
+          
+          <Card className="border-cyan-500/20 bg-gradient-to-br from-cyan-50/50 to-transparent dark:from-cyan-950/20 hover:shadow-lg transition-shadow">
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-sm font-medium text-foreground/70">Total Bookings</CardTitle>
+                <div className="rounded-full bg-cyan-500/10 p-2">
+                  <svg className="h-4 w-4 text-cyan-600 dark:text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                  </svg>
+                </div>
+              </div>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-semibold">{confirmedTrips}</div>
+              <div className="text-3xl font-bold text-cyan-600 dark:text-cyan-400">{confirmedTrips}</div>
+              <p className="mt-1 text-xs text-foreground/60">All-time confirmed</p>
             </CardContent>
           </Card>
         </div>
