@@ -143,7 +143,6 @@ export default function ChatWidget() {
     } catch {
       // ignore
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Persist chat state.

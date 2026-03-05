@@ -846,6 +846,7 @@ export default async function AdminDashboardPage({
           <CardContent className="space-y-3">
             <div className="flex items-center gap-3">
               {viewerProfileImageSignedUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element -- signed URL with predictable dimensions
                 <img
                   src={viewerProfileImageSignedUrl}
                   alt="Profile"
@@ -1068,6 +1069,7 @@ export default async function AdminDashboardPage({
               <CardContent className="space-y-3">
                 {viewerProfileImageSignedUrl ? (
                   <div className="flex items-center gap-3">
+                    {/* eslint-disable-next-line @next/next/no-img-element -- signed URL with predictable dimensions */}
                     <img
                       src={viewerProfileImageSignedUrl}
                       alt="Profile"

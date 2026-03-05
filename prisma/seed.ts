@@ -23,6 +23,7 @@ function normalizeEmail(email: string) {
 async function ensureSupabaseAuthUser(params: {
   // Supabase client is a generic factory; avoid `ReturnType<typeof createClient>`
   // because it can collapse generics to `never` during TS builds (e.g. Vercel).
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   supabase: SupabaseClient<any, any, any, any, any>;
   email: string;
   password: string;
@@ -93,7 +94,7 @@ async function main() {
   const renterPassword = process.env.SEED_RENTER_PASSWORD ?? "Renter123!";
   const renterName = (process.env.SEED_RENTER_NAME ?? "Test Renter").trim() || "Test Renter";
 
-  const adminUser = await prisma.user.upsert({
+  await prisma.user.upsert({
     where: { email: adminEmail },
     create: { email: adminEmail, name: adminName, role: "ADMIN" },
     update: { role: "ADMIN", name: adminName },

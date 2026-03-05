@@ -85,13 +85,7 @@ const prisma = new PrismaClient({ adapter: new PrismaPg(pool) });
 
 try {
   // 1) Compute keep set from DB + Supabase + explicit keep list
-  const prismaAdmins = await prisma.user.findMany({ where: { role: "ADMIN" }, select: { email: true } });
-  const prismaAdminEmails = new Set(prismaAdmins.map((u) => u.email.toLowerCase().trim()).filter(Boolean));
-
   const authUsers = await listAllAuthUsers();
-  const authAdminEmails = new Set(authUsers.filter(isAuthAdminUser).map(safeEmail).filter(Boolean));
-
-  const keep = new Set([...explicitKeep, ...prismaAdminEmails, ...authAdminEmails]);
 
   // 2) Ensure explicit keep emails are admins (without resetting password)
   if (explicitKeep.size > 0) {

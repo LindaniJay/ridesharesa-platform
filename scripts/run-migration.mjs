@@ -26,7 +26,8 @@ try {
   });
 
   console.log('\n✅ Migration executed successfully!');
-} catch (error: any) {
-  console.error('❌ Migration failed:', error.message);
+} catch (error: unknown) {
+  const errorMessage = error instanceof Error ? error.message : String(error);
+  console.error('❌ Migration failed:', errorMessage);
   process.exit(1);
 }

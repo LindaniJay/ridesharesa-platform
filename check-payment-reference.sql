@@ -1,0 +1,1 @@
+SELECT "paymentReference" FROM "Booking" LIMIT 1;

@@ -60,7 +60,7 @@ async function uploadWithRetry(params: {
 
 type RoleLiteral = "ADMIN" | "HOST" | "RENTER";
 
-function roleFromSupabaseUser(user: { app_metadata?: any; user_metadata?: any }): RoleLiteral {
+function roleFromSupabaseUser(user: { app_metadata?: Record<string, unknown>; user_metadata?: Record<string, unknown> }): RoleLiteral {
   const appRole = user?.app_metadata?.role;
   if (appRole === "ADMIN") return "ADMIN";
 

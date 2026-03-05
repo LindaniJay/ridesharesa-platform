@@ -93,7 +93,6 @@ export default function SignInClient() {
 
       // Ensure DB user exists / is hydrated with timeout (30s for first compile)
       let bootstrapOk = false;
-      let bootstrapError = "";
       try {
         const bootstrapRes = await Promise.race([
           fetch("/api/account/bootstrap", {
@@ -108,11 +107,10 @@ export default function SignInClient() {
         const json = (await bootstrapRes.json().catch(() => null)) as null | { ok?: boolean; error?: string; message?: string };
         bootstrapOk = Boolean(json?.ok);
         if (!bootstrapOk && json) {
-          bootstrapError = json.error || json.message || "Unknown error";
+          // Error is already captured in bootstrapOk state
         }
-      } catch (e) {
+      } catch {
         bootstrapOk = false;
-        bootstrapError = e instanceof Error ? e.message : "Unknown error";
       }
 
       if (!bootstrapOk) {
@@ -132,7 +130,7 @@ export default function SignInClient() {
             setTimeout(() => reject(new Error("Profile fetch timeout")), 15000)
           ),
         ]);
-      } catch (e) {
+      } catch {
         me = { user: null };
       }
 

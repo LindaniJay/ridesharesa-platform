@@ -188,13 +188,6 @@ function uid() {
   return `${Date.now()}_${Math.random().toString(16).slice(2)}`;
 }
 
-function ensureContext(resp: ChatbotResponse): ChatbotResponse {
-  return {
-    ...resp,
-    context: typeof resp.context === "undefined" ? null : resp.context,
-  };
-}
-
 function slugifyCity(city: string) {
   return city
     .trim()
