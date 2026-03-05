@@ -2,8 +2,6 @@
 
 import { useEffect, useState } from "react";
 
-import Button from "@/app/components/ui/Button";
-
 type State = "idle" | "loading" | "enabled" | "unsupported" | "denied" | "error";
 
 function urlBase64ToUint8Array(base64String: string) {
@@ -72,6 +70,13 @@ export default function PushEnableButton() {
         ? "Could not enable notifications"
         : undefined;
 
+  const toneClass =
+    state === "enabled"
+      ? "border-emerald-300/60 bg-emerald-500/25 text-white"
+      : state === "denied" || state === "error"
+        ? "border-red-300/60 bg-red-500/20 text-white"
+        : "border-white/40 bg-slate-950/35 text-white hover:bg-slate-950/55";
+
   async function onEnable() {
     if (state === "loading" || state === "enabled") return;
 
@@ -129,8 +134,28 @@ export default function PushEnableButton() {
   }
 
   return (
-    <Button variant="secondary" onClick={onEnable} disabled={state === "loading" || state === "enabled"} title={title}>
-      {label}
-    </Button>
+    <button
+      type="button"
+      onClick={onEnable}
+      disabled={state === "loading" || state === "enabled"}
+      title={title}
+      aria-label={label}
+      className={`group relative inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border shadow-sm transition ${toneClass} disabled:cursor-not-allowed disabled:opacity-70`}
+    >
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        className="h-5 w-5"
+      >
+        <path d="M15 17h5l-1.4-1.4A2 2 0 0 1 18 14.2V11a6 6 0 1 0-12 0v3.2a2 2 0 0 1-.6 1.4L4 17h5" />
+        <path d="M9 17a3 3 0 0 0 6 0" />
+      </svg>
+      <span className="pointer-events-none absolute -bottom-9 left-1/2 -translate-x-1/2 whitespace-nowrap rounded bg-black px-2 py-1 text-xs text-white opacity-0 transition-opacity group-hover:opacity-100">
+        Enable notification
+      </span>
+    </button>
   );
 }

@@ -27,19 +27,22 @@ function NavLink({
   href,
   children,
   active,
+  onClick,
 }: {
   href: string;
   children: React.ReactNode;
   active?: boolean;
+  onClick?: () => void;
 }) {
   return (
     <Link
       href={href}
       aria-current={active ? "page" : undefined}
+      onClick={onClick}
       className={
         active
-          ? "rounded-lg bg-muted px-3 py-2 text-sm font-medium text-foreground"
-          : "rounded-lg px-3 py-2 text-sm font-medium text-foreground/70 hover:bg-muted hover:text-foreground"
+          ? "rounded-lg bg-muted px-3 py-2 text-sm font-medium text-foreground block"
+          : "rounded-lg px-3 py-2 text-sm font-medium text-foreground/70 hover:bg-muted hover:text-foreground block"
       }
     >
       {children}
@@ -53,6 +56,7 @@ export default function NavbarClient() {
 
   const [email, setEmail] = useState<string | null>(null);
   const [role, setRole] = useState<"ADMIN" | "HOST" | "RENTER" | null>(null);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -112,47 +116,61 @@ export default function NavbarClient() {
   }
 
   return (
-    <header className="sticky top-0 z-40 border-b border-border bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-3 px-4 py-3">
-        <div className="flex items-center gap-3">
-          <Logo />
-        </div>
+    <header className="sticky top-0 z-40">
+      {/* Pear-shaped nav container */}
+      <div className="mx-auto w-full max-w-6xl px-2 sm:px-4 py-2 sm:py-3">
+        <div className="relative rounded-[1.5rem_1.5rem_1rem_1rem] sm:rounded-[2rem_2rem_1.5rem_1.5rem] bg-gradient-to-br from-gray-300/40 via-gray-400/35 to-gray-500/30 backdrop-blur-lg border border-gray-400/30 px-2 sm:px-4 py-2 sm:py-4 shadow-lg">
+          <div className="flex items-center justify-between gap-2 sm:gap-3">
+            <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
+              <Logo />
+            </div>
 
-        <nav className="hidden items-center gap-1 sm:flex">
-          <NavLink href="/how-it-works" active={isActivePath(pathname, "/how-it-works")}>
-            How it works
-          </NavLink>
-          <NavLink href="/listings" active={isActivePath(pathname, "/listings")}>
-            Listings
-          </NavLink>
-          <NavLink href="/assist" active={isActivePath(pathname, "/assist")}>
-            Assist
-          </NavLink>
-          {role === "RENTER" && (
-            <NavLink href="/renter" active={isActivePath(pathname, "/renter")}>
-              Bookings
-            </NavLink>
-          )}
-          {role === "HOST" && (
-            <NavLink href="/host" active={isActivePath(pathname, "/host")}>
-              Host
-            </NavLink>
-          )}
-          {role === "ADMIN" && (
-            <NavLink href="/admin" active={isActivePath(pathname, "/admin")}>
-              Admin
-            </NavLink>
-          )}
-        </nav>
+            <nav className="hidden items-center gap-0.5 sm:gap-1 sm:flex">
+              <NavLink href="/how-it-works" active={isActivePath(pathname, "/how-it-works")}>
+                How it works
+              </NavLink>
+              <NavLink href="/listings" active={isActivePath(pathname, "/listings")}>
+                Listings
+              </NavLink>
+              <NavLink href="/assist" active={isActivePath(pathname, "/assist")}>
+                Assist
+              </NavLink>
+              {role === "RENTER" && (
+                <NavLink href="/renter" active={isActivePath(pathname, "/renter")}>
+                  Bookings
+                </NavLink>
+              )}
+              {role === "HOST" && (
+                <NavLink href="/host" active={isActivePath(pathname, "/host")}>
+                  Host
+                </NavLink>
+              )}
+              {role === "ADMIN" && (
+                <NavLink href="/admin" active={isActivePath(pathname, "/admin")}>
+                  Admin
+                </NavLink>
+              )}
+            </nav>
 
-        <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
+              {/* Hamburger menu for mobile */}
+              <button
+                onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+                className="sm:hidden inline-flex items-center justify-center rounded-lg p-2 text-foreground hover:bg-muted"
+                aria-label="Toggle menu"
+              >
+                <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                </svg>
+              </button>
+
           {email ? (
             <>
               <PushEnableButton />
-              <span className="hidden text-sm text-foreground/60 sm:inline">
+              <span className="hidden text-xs sm:text-sm text-foreground/60 sm:inline truncate max-w-[150px]">
                 {email}
               </span>
-              <Button variant="secondary" onClick={onSignOut}>
+              <Button variant="secondary" className="text-xs sm:text-sm px-2 sm:px-3 py-1 sm:py-2" onClick={onSignOut}>
                 Sign out
               </Button>
             </>
@@ -160,52 +178,59 @@ export default function NavbarClient() {
             <>
               <Link
                 href="/sign-in"
-                className="hidden rounded-lg border border-border bg-card px-3 py-2 text-sm shadow-sm hover:bg-muted sm:inline-flex"
+                className="hidden rounded-lg border border-border bg-card px-2 sm:px-3 py-1 sm:py-2 text-xs sm:text-sm shadow-sm hover:bg-muted sm:inline-flex"
               >
                 Sign in
               </Link>
               <Link
                 href="/sign-up"
-                className="inline-flex rounded-lg bg-accent px-3 py-2 text-sm font-medium text-accent-foreground shadow-sm hover:opacity-90"
+                className="inline-flex rounded-lg bg-accent px-2 sm:px-3 py-1 sm:py-2 text-xs sm:text-sm font-medium text-accent-foreground shadow-sm hover:opacity-90"
               >
                 Sign up
               </Link>
             </>
           )}
+            </div>
+          </div>
         </div>
       </div>
 
-      <div className="mx-auto flex w-full max-w-6xl items-center gap-1 px-4 pb-3 sm:hidden">
-        <NavLink href="/how-it-works" active={isActivePath(pathname, "/how-it-works")}>
-          How it works
-        </NavLink>
-        <NavLink href="/listings" active={isActivePath(pathname, "/listings")}>
-          Listings
-        </NavLink>
-        <NavLink href="/assist" active={isActivePath(pathname, "/assist")}>
-          Assist
-        </NavLink>
-        {role === "RENTER" && (
-          <NavLink href="/renter" active={isActivePath(pathname, "/renter")}>
-            Bookings
-          </NavLink>
-        )}
-        {role === "HOST" && (
-          <NavLink href="/host" active={isActivePath(pathname, "/host")}>
-            Host
-          </NavLink>
-        )}
-        {role === "ADMIN" && (
-          <NavLink href="/admin" active={isActivePath(pathname, "/admin")}>
-            Admin
-          </NavLink>
-        )}
-        {!email ? (
-          <NavLink href="/sign-in" active={isActivePath(pathname, "/sign-in")}>
-            Sign in
-          </NavLink>
-        ) : null}
-      </div>
+      {/* Mobile navigation dropdown */}
+      {mobileMenuOpen && (
+        <div className="mx-auto w-full max-w-6xl px-2 sm:hidden">
+          <div className="rounded-lg bg-gradient-to-br from-gray-300/40 via-gray-400/35 to-gray-500/30 backdrop-blur-lg border border-gray-400/30 p-3 space-y-2 mb-3">
+            <NavLink href="/how-it-works" active={isActivePath(pathname, "/how-it-works")}>
+              How it works
+            </NavLink>
+            <NavLink href="/listings" active={isActivePath(pathname, "/listings")}>
+              Listings
+            </NavLink>
+            <NavLink href="/assist" active={isActivePath(pathname, "/assist")}>
+              Assist
+            </NavLink>
+            {role === "RENTER" && (
+              <NavLink href="/renter" active={isActivePath(pathname, "/renter")}>
+                Bookings
+              </NavLink>
+            )}
+            {role === "HOST" && (
+              <NavLink href="/host" active={isActivePath(pathname, "/host")}>
+                Host
+              </NavLink>
+            )}
+            {role === "ADMIN" && (
+              <NavLink href="/admin" active={isActivePath(pathname, "/admin")}>
+                Admin
+              </NavLink>
+            )}
+            {!email ? (
+              <NavLink href="/sign-in" active={isActivePath(pathname, "/sign-in")}>
+                Sign in
+              </NavLink>
+            ) : null}
+          </div>
+        </div>
+      )}
     </header>
   );
 }

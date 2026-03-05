@@ -163,7 +163,23 @@ function TopListingsRow({ title, listings }: { title: string; listings: TopListi
                 <div className="absolute -bottom-24 -left-24 h-64 w-64 rounded-full bg-foreground/8 blur-3xl" />
               </div>
 
-              <CardContent className="relative space-y-3 p-5">
+              <CardContent className="relative space-y-3 p-0">
+                <div className="h-40 w-full overflow-hidden border-b border-border bg-background/30">
+                  {l.imageUrl ? (
+                    <img
+                      src={l.imageUrl}
+                      alt={l.title}
+                      className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+                      loading="lazy"
+                    />
+                  ) : (
+                    <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-foreground/10 via-foreground/5 to-transparent text-foreground/70">
+                      <Icon name="car" className="h-8 w-8" />
+                    </div>
+                  )}
+                </div>
+
+                <div className="space-y-3 p-5">
                 <div className="rounded-2xl border border-border bg-background/40 p-3">
                   <div className="flex items-start justify-between gap-3">
                     <div>
@@ -200,6 +216,7 @@ function TopListingsRow({ title, listings }: { title: string; listings: TopListi
                   <Link className="text-xs font-medium text-foreground/70 underline underline-offset-4 hover:text-foreground" href="/listings">
                     Browse more
                   </Link>
+                </div>
                 </div>
               </CardContent>
             </Card>
@@ -289,31 +306,31 @@ export default async function Home() {
         </div>
       </div>
 
-      <section className="grid gap-8 pb-10 pt-6 lg:grid-cols-2 lg:items-center lg:gap-10 lg:pb-14">
-        <div className="space-y-5">
+      <section className="grid gap-6 sm:gap-8 pb-8 sm:pb-10 pt-4 sm:pt-6 lg:grid-cols-2 lg:items-center lg:gap-10 lg:pb-14">
+        <div className="space-y-4 sm:space-y-5">
           <div className="inline-flex items-center gap-2 rounded-full border border-border bg-card/60 px-3 py-1 text-xs text-foreground/70 backdrop-blur">
             <span className="inline-flex h-2 w-2 rounded-full bg-accent/70" />
             Clean, secure car rentals
           </div>
 
-            <h1 className="max-w-2xl text-4xl font-semibold tracking-tight text-foreground sm:text-6xl sm:leading-[1.02]">
+            <h1 className="max-w-2xl text-3xl sm:text-4xl lg:text-6xl font-semibold tracking-tight text-foreground lg:leading-[1.02]">
               Rent cars from trusted local owners. Fast, affordable, secure.
             </h1>
-          <p className="max-w-xl text-base leading-relaxed text-foreground/70">
+          <p className="max-w-xl text-sm sm:text-base leading-relaxed text-foreground/70">
             Book in minutes. Host with confidence.
           </p>
 
           <div className="flex flex-wrap items-center gap-2">
             <Link href="/listings">
-              <Button className="h-11 px-5 text-base">Find a car</Button>
+              <Button className="h-9 sm:h-11 px-3 sm:px-5 text-sm sm:text-base">Find a car</Button>
             </Link>
             <Link href="/host">
-              <Button variant="secondary" className="h-11 px-5 text-base">Become a host</Button>
+              <Button variant="secondary" className="h-9 sm:h-11 px-3 sm:px-5 text-sm sm:text-base">Become a host</Button>
             </Link>
-            <Link className="text-sm font-medium text-foreground/70 underline underline-offset-4 hover:text-foreground" href="/listings">
+            <Link className="text-xs sm:text-sm font-medium text-foreground/70 underline underline-offset-4 hover:text-foreground" href="/listings">
               Browse listings
             </Link>
-            <Link className="text-sm font-medium text-foreground/70 underline underline-offset-4 hover:text-foreground" href="/how-it-works">
+            <Link className="text-xs sm:text-sm font-medium text-foreground/70 underline underline-offset-4 hover:text-foreground" href="/how-it-works">
               How it works
             </Link>
           </div>
@@ -327,22 +344,22 @@ export default async function Home() {
               <CardTitle className="text-base">Search</CardTitle>
               <CardDescription>Location, pickup date, return date.</CardDescription>
             </CardHeader>
-            <CardContent className="relative pt-4">
-              <form action="/listings" method="GET" className="grid gap-3 sm:grid-cols-6 sm:items-end">
+            <CardContent className="relative pt-3 sm:pt-4">
+              <form action="/listings" method="GET" className="grid gap-2 sm:gap-3 sm:grid-cols-6 sm:items-end">
                 <label className="block sm:col-span-3">
-                  <div className="mb-1 text-sm text-foreground/70">Location</div>
-                  <Input name="q" placeholder="e.g. Cape Town" />
+                  <div className="mb-1 text-xs sm:text-sm text-foreground/70">Location</div>
+                  <Input name="q" placeholder="e.g. Cape Town" className="text-sm" />
                 </label>
                 <label className="block sm:col-span-1">
-                  <div className="mb-1 text-sm text-foreground/70">Pickup date</div>
-                  <Input name="start" type="date" />
+                  <div className="mb-1 text-xs sm:text-sm text-foreground/70">Pickup date</div>
+                  <Input name="start" type="date" className="text-sm" />
                 </label>
                 <label className="block sm:col-span-1">
-                  <div className="mb-1 text-sm text-foreground/70">Return date</div>
-                  <Input name="end" type="date" />
+                  <div className="mb-1 text-xs sm:text-sm text-foreground/70">Return date</div>
+                  <Input name="end" type="date" className="text-sm" />
                 </label>
                 <div className="sm:col-span-1">
-                  <Button type="submit" className="w-full">Search</Button>
+                  <Button type="submit" className="w-full text-sm">Search</Button>
                 </div>
               </form>
             </CardContent>

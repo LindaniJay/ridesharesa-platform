@@ -5,6 +5,7 @@ import Providers from "@/app/providers";
 import Footer from "@/app/components/Footer";
 import ChatWidget from "@/app/components/ChatWidget.client";
 import PwaInit from "@/app/components/PwaInit.client";
+import BackgroundVideo from "@/app/components/BackgroundVideo.client";
 
 export const metadata: Metadata = {
   title: "RideShare Platform",
@@ -30,16 +31,18 @@ export default function RootLayout({
       <body className="antialiased">
         <Providers>
           <PwaInit />
-          <div className="relative min-h-dvh bg-background text-foreground">
-            <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden">
-              <div className="absolute -top-40 left-1/2 h-[520px] w-[520px] -translate-x-1/2 rounded-full bg-accent/15 blur-3xl" />
-              <div className="absolute -bottom-48 right-[-160px] h-[640px] w-[640px] rounded-full bg-foreground/10 blur-3xl" />
-              <div className="absolute -bottom-40 left-[-160px] h-[560px] w-[560px] rounded-full bg-foreground/5 blur-3xl" />
-            </div>
+          <div className="relative min-h-dvh text-foreground">
+            <BackgroundVideo />
 
-            <div className="relative">
+            {/* Background overlay for legibility over video */}
+            <div className="fixed inset-0 z-10 bg-black/30 backdrop-blur-sm" />
+            
+            {/* Additional dark overlay for more contrast */}
+            <div className="fixed inset-0 z-10 bg-gradient-to-br from-black/20 via-black/25 to-black/30" />
+
+            <div className="relative z-20">
               <Navbar />
-              <div className="mx-auto w-full max-w-6xl px-4 py-8">{children}</div>
+              <div className="mx-auto w-full max-w-6xl px-2 sm:px-4 py-6 sm:py-8">{children}</div>
               <Footer />
               <ChatWidget />
             </div>

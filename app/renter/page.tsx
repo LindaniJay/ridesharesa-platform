@@ -170,36 +170,36 @@ export default async function RenterDashboardPage({
   }
 
   return (
-    <main className="grid gap-6 lg:grid-cols-[280px_1fr]">
-      <aside className="space-y-4 lg:sticky lg:top-6 lg:self-start">
+    <main className="grid gap-4 sm:gap-6 lg:grid-cols-[250px_1fr]">
+      <aside className="space-y-3 sm:space-y-4 lg:sticky lg:top-6 lg:self-start">
         {/* Profile Card */}
-        <Card className="border-accent/30 bg-gradient-to-br from-accent/5 to-transparent">
-          <CardHeader className="pb-3">
+        <Card>
+          <CardContent className="p-4">
             <div className="flex items-center gap-3">
               {profileImageSignedUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element -- signed URL
                 <img
                   src={profileImageSignedUrl}
                   alt="Profile"
-                  className="h-14 w-14 rounded-full border-2 border-accent/30 object-cover ring-2 ring-accent/10"
+                  className="h-16 w-16 rounded-full object-cover"
                 />
               ) : (
-                <div className="flex h-14 w-14 items-center justify-center rounded-full border-2 border-accent/30 bg-accent/20 ring-2 ring-accent/10">
-                  <svg className="h-7 w-7 text-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <div className="flex h-16 w-16 items-center justify-center rounded-full bg-muted">
+                  <svg className="h-8 w-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                   </svg>
                 </div>
               )}
               <div className="min-w-0 flex-1">
-                <h1 className="text-lg font-semibold tracking-tight">{dbUser.name || 'Renter'}</h1>
-                <p className="text-xs text-foreground/60 truncate">{dbUser.email}</p>
+                <h1 className="text-lg font-bold">{dbUser.name || 'Renter'}</h1>
+                <p className="text-xs text-muted-foreground truncate">{dbUser.email}</p>
               </div>
             </div>
-          </CardHeader>
+          </CardContent>
         </Card>
 
         {/* Navigation */}
-        <Card className="overflow-hidden">
+        <Card>
           <CardHeader>
             <CardTitle className="text-base">Dashboard</CardTitle>
             <CardDescription>Navigate your account</CardDescription>
@@ -220,8 +220,8 @@ export default async function RenterDashboardPage({
                   href={renterHref({ section: s.key })}
                   className={
                     section === s.key
-                      ? "flex items-center gap-3 rounded-lg bg-accent px-3 py-2.5 text-sm font-medium text-accent-foreground shadow-sm transition-all"
-                      : "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-foreground/70 hover:bg-muted hover:text-foreground transition-all"
+                      ? "flex items-center gap-3 rounded-lg bg-accent px-3 py-2 text-sm font-medium"
+                      : "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
                   }
                 >
                   <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -235,33 +235,33 @@ export default async function RenterDashboardPage({
         </Card>
 
         {/* Quick Stats */}
-        <Card className="border-blue-500/20 bg-gradient-to-br from-blue-50/50 to-transparent dark:from-blue-950/20">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm">Quick Stats</CardTitle>
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Quick Stats</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
             <div className="flex items-center justify-between">
-              <span className="text-sm text-foreground/60">Upcoming</span>
-              <span className="text-lg font-bold text-blue-600 dark:text-blue-400">{upcoming.length}</span>
+              <span className="text-sm text-muted-foreground">Upcoming</span>
+              <span className="text-lg font-bold">{upcoming.length}</span>
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-sm text-foreground/60">Active</span>
-              <span className="text-lg font-bold text-green-600 dark:text-green-400">{ongoing.length}</span>
+              <span className="text-sm text-muted-foreground">Active</span>
+              <span className="text-lg font-bold">{ongoing.length}</span>
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-sm text-foreground/60">Completed</span>
-              <span className="text-lg font-bold text-foreground/40">{past.length}</span>
+              <span className="text-sm text-muted-foreground">Completed</span>
+              <span className="text-lg font-bold">{past.length}</span>
             </div>
           </CardContent>
         </Card>
       </aside>
 
-      <div className="space-y-8">
+      <div className="space-y-6 sm:space-y-8">
         {section === "bookings" ? (
-          <section className="space-y-3">
-            <h2 className="text-lg font-semibold">Bookings overview</h2>
+          <section className="space-y-2 sm:space-y-3">
+            <h2 className="text-lg sm:text-xl font-semibold">Bookings overview</h2>
 
-            <div className="grid gap-4 lg:grid-cols-3">
+            <div className="grid gap-3 sm:gap-4 lg:grid-cols-3">
           <Card>
             <CardHeader>
               <CardTitle>Upcoming</CardTitle>

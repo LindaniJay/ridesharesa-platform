@@ -48,6 +48,10 @@ body {
   font-family: var(--font-sans);
 }
 
+::backdrop {
+  backdrop-filter: blur(0.5px);
+}
+
 @layer base {
   :focus-visible {
     outline: none;
@@ -75,4 +79,36 @@ body {
     color: var(--foreground);
     background: var(--background);
   }
+}
+
+@keyframes animateOverlay {
+  0% {
+    opacity: 0.4;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.5;
+    transform: scale(1.05);
+  }
+  100% {
+    opacity: 0.4;
+    transform: scale(1);
+  }
+}
+
+@keyframes floatBg {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-20px);
+  }
+}
+
+.animate-bg-overlay {
+  animation: animateOverlay 8s ease-in-out infinite;
+}
+
+.animate-bg-float {
+  animation: floatBg 15s ease-in-out infinite;
 }
