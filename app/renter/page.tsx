@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { revalidatePath } from "next/cache";
 
 export const dynamic = "force-dynamic";
 
@@ -167,11 +168,44 @@ export default async function RenterDashboardPage({
         message,
       },
     });
+
+    revalidatePath("/renter");
+  }
+
+  async function cancelUpcomingBooking(formData: FormData) {
+    "use server";
+
+    const { dbUser } = await requireRole("RENTER");
+    const bookingId = String(formData.get("bookingId") ?? "").trim();
+    if (!bookingId) return;
+
+    const booking = await prisma.booking.findUnique({
+      where: { id: bookingId },
+      select: {
+        id: true,
+        renterId: true,
+        status: true,
+        startDate: true,
+      },
+    });
+
+    if (!booking) return;
+    if (booking.renterId !== dbUser.id) return;
+    if (booking.status !== "PENDING_PAYMENT") return;
+    if (booking.startDate <= new Date()) return;
+
+    await prisma.booking.update({
+      where: { id: booking.id },
+      data: { status: "CANCELLED" },
+    });
+
+    revalidatePath("/renter");
+    revalidatePath(`/bookings/${booking.id}`);
   }
 
   return (
-    <main className="grid gap-4 sm:gap-6 lg:grid-cols-[250px_1fr]">
-      <aside className="space-y-3 sm:space-y-4 lg:sticky lg:top-6 lg:self-start">
+    <main className="grid gap-6 lg:grid-cols-[280px_1fr]">
+      <aside className="space-y-4 lg:sticky lg:top-6 lg:self-start">
         {/* Profile Card */}
         <Card>
           <CardContent className="p-4">
@@ -256,12 +290,12 @@ export default async function RenterDashboardPage({
         </Card>
       </aside>
 
-      <div className="space-y-6 sm:space-y-8">
+      <div className="space-y-8">
         {section === "bookings" ? (
-          <section className="space-y-2 sm:space-y-3">
-            <h2 className="text-lg sm:text-xl font-semibold">Bookings overview</h2>
+          <section className="space-y-3">
+            <h2 className="text-lg font-semibold">Bookings overview</h2>
 
-            <div className="grid gap-3 sm:gap-4 lg:grid-cols-3">
+            <div className="grid gap-4 lg:grid-cols-3">
           <Card>
             <CardHeader>
               <CardTitle>Upcoming</CardTitle>
@@ -273,20 +307,34 @@ export default async function RenterDashboardPage({
               ) : (
                 <div className="space-y-2">
                   {upcoming.map((b) => (
-                    <div key={b.id} className="rounded-xl border border-border bg-background p-3 text-sm">
-                      <div className="flex items-start justify-between gap-2">
-                        <div>
-                          <div className="font-medium">
-                            <Link className="underline" href={`/bookings/${b.id}`}>
-                              {b.listing.title}
-                            </Link>
+                    <div key={b.id} className="rounded-xl border border-border bg-background p-3 text-sm transition-colors hover:bg-muted/40">
+                      <Link href={`/bookings/${b.id}`} className="block">
+                        <div className="flex items-start justify-between gap-2">
+                          <div>
+                            <div className="font-medium underline decoration-dotted underline-offset-4">{b.listing.title}</div>
+                            <div className="text-foreground/60">{b.listing.city}</div>
                           </div>
-                          <div className="text-foreground/60">{b.listing.city}</div>
+                          <Badge variant={badgeVariantForBookingStatus(b.status)}>{b.status}</Badge>
                         </div>
-                        <Badge variant={badgeVariantForBookingStatus(b.status)}>{b.status}</Badge>
-                      </div>
-                      <div className="mt-2 text-foreground/70">
-                        {iso(b.startDate)} → {iso(b.endDate)}
+                        <div className="mt-2 text-foreground/70">
+                          {iso(b.startDate)} → {iso(b.endDate)}
+                        </div>
+                      </Link>
+                      <div className="mt-3 space-y-2">
+                        <div className="text-xs text-foreground/70">Workflow: open booking details, complete payment if pending, then chat with host/admin for updates.</div>
+                        <div className="flex flex-wrap gap-2">
+                          <Link className="inline-flex rounded-md border border-border px-2.5 py-1.5 text-xs hover:bg-muted" href={`/bookings/${b.id}`}>
+                            Open booking
+                          </Link>
+                          {b.status === "PENDING_PAYMENT" ? (
+                            <form action={cancelUpcomingBooking}>
+                              <input type="hidden" name="bookingId" value={b.id} />
+                              <Button type="submit" variant="secondary" className="h-7 px-2.5 text-xs">
+                                Cancel booking
+                              </Button>
+                            </form>
+                          ) : null}
+                        </div>
                       </div>
                     </div>
                   ))}
@@ -306,20 +354,26 @@ export default async function RenterDashboardPage({
               ) : (
                 <div className="space-y-2">
                   {ongoing.map((b) => (
-                    <div key={b.id} className="rounded-xl border border-border bg-background p-3 text-sm">
-                      <div className="flex items-start justify-between gap-2">
-                        <div>
-                          <div className="font-medium">
-                            <Link className="underline" href={`/bookings/${b.id}`}>
-                              {b.listing.title}
-                            </Link>
+                    <div key={b.id} className="rounded-xl border border-border bg-background p-3 text-sm transition-colors hover:bg-muted/40">
+                      <Link href={`/bookings/${b.id}`} className="block">
+                        <div className="flex items-start justify-between gap-2">
+                          <div>
+                            <div className="font-medium underline decoration-dotted underline-offset-4">{b.listing.title}</div>
+                            <div className="text-foreground/60">{b.listing.city}</div>
                           </div>
-                          <div className="text-foreground/60">{b.listing.city}</div>
+                          <Badge variant={badgeVariantForBookingStatus(b.status)}>{b.status}</Badge>
                         </div>
-                        <Badge variant={badgeVariantForBookingStatus(b.status)}>{b.status}</Badge>
-                      </div>
-                      <div className="mt-2 text-foreground/70">
-                        {iso(b.startDate)} → {iso(b.endDate)}
+                        <div className="mt-2 text-foreground/70">
+                          {iso(b.startDate)} → {iso(b.endDate)}
+                        </div>
+                      </Link>
+                      <div className="mt-3 space-y-2">
+                        <div className="text-xs text-foreground/70">Workflow: open booking, upload handover/return photos, request extension or return, and keep messaging in chat.</div>
+                        <div className="flex flex-wrap gap-2">
+                          <Link className="inline-flex rounded-md border border-border px-2.5 py-1.5 text-xs hover:bg-muted" href={`/bookings/${b.id}`}>
+                            Manage trip
+                          </Link>
+                        </div>
                       </div>
                     </div>
                   ))}
@@ -339,20 +393,29 @@ export default async function RenterDashboardPage({
               ) : (
                 <div className="space-y-2">
                   {past.map((b) => (
-                    <div key={b.id} className="rounded-xl border border-border bg-background p-3 text-sm">
-                      <div className="flex items-start justify-between gap-2">
-                        <div>
-                          <div className="font-medium">
-                            <Link className="underline" href={`/bookings/${b.id}`}>
-                              {b.listing.title}
-                            </Link>
+                    <div key={b.id} className="rounded-xl border border-border bg-background p-3 text-sm transition-colors hover:bg-muted/40">
+                      <Link href={`/bookings/${b.id}`} className="block">
+                        <div className="flex items-start justify-between gap-2">
+                          <div>
+                            <div className="font-medium underline decoration-dotted underline-offset-4">{b.listing.title}</div>
+                            <div className="text-foreground/60">{b.listing.city}</div>
                           </div>
-                          <div className="text-foreground/60">{b.listing.city}</div>
+                          <Badge variant={badgeVariantForBookingStatus(b.status)}>{b.status}</Badge>
                         </div>
-                        <Badge variant={badgeVariantForBookingStatus(b.status)}>{b.status}</Badge>
-                      </div>
-                      <div className="mt-2 text-foreground/70">
-                        {iso(b.startDate)} → {iso(b.endDate)}
+                        <div className="mt-2 text-foreground/70">
+                          {iso(b.startDate)} → {iso(b.endDate)}
+                        </div>
+                      </Link>
+                      <div className="mt-3 space-y-2">
+                        <div className="text-xs text-foreground/70">Workflow: view receipt/history, review trip evidence, and open support ticket if there is a dispute.</div>
+                        <div className="flex flex-wrap gap-2">
+                          <Link className="inline-flex rounded-md border border-border px-2.5 py-1.5 text-xs hover:bg-muted" href={`/bookings/${b.id}`}>
+                            View summary
+                          </Link>
+                          <Link className="inline-flex rounded-md border border-border px-2.5 py-1.5 text-xs hover:bg-muted" href={renterHref({ section: "support" })}>
+                            Open support
+                          </Link>
+                        </div>
                       </div>
                     </div>
                   ))}
