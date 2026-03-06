@@ -5,6 +5,7 @@ export const dynamic = "force-dynamic";
 import Badge from "@/app/components/ui/Badge";
 import Button from "@/app/components/ui/Button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/app/components/ui/Card";
+import DocumentsUploadForm from "@/app/components/DocumentsUploadForm.client";
 import Input from "@/app/components/ui/Input";
 import Textarea from "@/app/components/ui/Textarea";
 import {
@@ -31,6 +32,19 @@ export default async function HostDashboardPage() {
     typeof supabaseUser.user_metadata?.profileImagePath === "string"
       ? supabaseUser.user_metadata.profileImagePath
       : null;
+  const proofOfResidencePath =
+    typeof supabaseUser.user_metadata?.proofOfResidenceImagePath === "string"
+      ? supabaseUser.user_metadata.proofOfResidenceImagePath.trim()
+      : "";
+  const proofOfResidenceIssuedAtRaw =
+    typeof supabaseUser.user_metadata?.proofOfResidenceIssuedAt === "string"
+      ? supabaseUser.user_metadata.proofOfResidenceIssuedAt
+      : null;
+  const proofOfResidenceIssuedAt =
+    proofOfResidenceIssuedAtRaw && !Number.isNaN(new Date(proofOfResidenceIssuedAtRaw).getTime())
+      ? iso(new Date(proofOfResidenceIssuedAtRaw))
+      : null;
+  const hasProofOfResidence = proofOfResidencePath.length > 0;
   let profileImageSignedUrl: string | null = null;
   if (profileImagePath) {
     const { data } = await supabaseAdmin().storage.from(userDocsBucket).createSignedUrl(profileImagePath, 60 * 10);
@@ -210,17 +224,17 @@ export default async function HostDashboardPage() {
   }
 
   return (
-    <main className="min-h-screen space-y-6 sm:space-y-8 pb-8 sm:pb-12">
+    <main className="min-h-screen space-y-8 pb-12">
       {/* Hero Header */}
-      <Card className="rounded-2xl sm:rounded-3xl p-4 sm:p-8">
-        <div className="flex flex-col gap-4 sm:flex-wrap sm:items-end sm:justify-between sm:gap-4">
-          <div className="space-y-1 sm:space-y-2">
-            <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold tracking-tight">Welcome back, Host!</h1>
-            <p className="text-sm sm:text-base lg:text-lg text-muted-foreground">Manage your vehicles, bookings, and earnings in one place.</p>
+      <Card className="rounded-3xl p-8">
+        <div className="flex flex-wrap items-end justify-between gap-4">
+          <div className="space-y-2">
+            <h1 className="text-4xl font-bold tracking-tight">Welcome back, Host!</h1>
+            <p className="text-lg text-muted-foreground">Manage your vehicles, bookings, and earnings in one place.</p>
           </div>
-          <Link href="/host/listings/new" className="w-full sm:w-auto">
-            <Button className="w-full sm:w-auto">
-              <svg className="mr-2 h-4 w-4 sm:h-5 sm:w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <Link href="/host/listings/new">
+            <Button>
+              <svg className="mr-2 h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
               </svg>
               Add New Vehicle
@@ -230,9 +244,9 @@ export default async function HostDashboardPage() {
       </Card>
 
       {/* Key Metrics */}
-      <section className="space-y-4 sm:space-y-6">
-        <h2 className="text-xl sm:text-2xl font-bold">Business Overview</h2>
-        <div className="grid gap-4 sm:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-5">
+      <section className="space-y-6">
+        <h2 className="text-2xl font-bold">Business Overview</h2>
+        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-5">
           <Card>
             <CardHeader>
               <CardTitle className="text-sm font-medium text-muted-foreground">Total Earnings</CardTitle>
@@ -287,48 +301,14 @@ export default async function HostDashboardPage() {
 
       <section className="space-y-3">
         <h2 className="text-lg font-semibold">Profile & verification</h2>
-        <div className="grid gap-4 sm:grid-cols-3">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <Card>
             <CardHeader>
               <CardTitle>Host profile</CardTitle>
               <CardDescription>Business details and verification images.</CardDescription>
             </CardHeader>
             <CardContent>
-              <form action="/api/account/documents" method="post" encType="multipart/form-data" className="space-y-3">
-                <label className="block">
-                  <div className="mb-1 text-sm">Full name</div>
-                  <Input name="name" defaultValue={dbUser.name || ""} required />
-                </label>
-                <label className="block">
-                  <div className="mb-1 text-sm">Phone number</div>
-                  <Input name="phone" type="tel" required placeholder="+27 123 456 7890" />
-                </label>
-                <label className="block">
-                  <div className="mb-1 text-sm">Date of birth</div>
-                  <Input name="dob" type="date" required />
-                </label>
-                <label className="block">
-                  <div className="mb-1 text-sm">Address</div>
-                  <Input name="address" required placeholder="Street, City, Country" />
-                </label>
-                <label className="block">
-                  <div className="mb-1 text-sm">ID number</div>
-                  <Input name="idNumber" required placeholder="ID or passport number" />
-                </label>
-                <label className="block">
-                  <div className="mb-1 text-sm">Profile photo</div>
-                  <Input name="profilePhoto" type="file" accept="image/*" required />
-                </label>
-                <label className="block">
-                  <div className="mb-1 text-sm">ID document</div>
-                  <Input name="idDocument" type="file" accept="image/*" required />
-                </label>
-                <label className="block">
-                  <div className="mb-1 text-sm">Drivers license</div>
-                  <Input name="driversLicense" type="file" accept="image/*" required />
-                </label>
-                <Button type="submit" className="w-full">Save profile</Button>
-              </form>
+              <DocumentsUploadForm successHref="/host" nextHref="/host" />
               {profileImageSignedUrl ? (
                 <>
                   {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -345,7 +325,7 @@ export default async function HostDashboardPage() {
           </Card>
           <Card>
             <CardHeader>
-              <CardTitle>Drivers license</CardTitle>
+              <CardTitle>Driver&apos;s license</CardTitle>
               <CardDescription>Verification status stored in your profile.</CardDescription>
             </CardHeader>
             <CardContent>
@@ -359,6 +339,22 @@ export default async function HostDashboardPage() {
             </CardHeader>
             <CardContent>
               <Badge variant={badgeVariantForVerificationStatus(dbUser.idVerificationStatus)}>{dbUser.idVerificationStatus}</Badge>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle>Proof of residence</CardTitle>
+              <CardDescription>Required document not older than 3 months.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              <Badge variant={hasProofOfResidence ? "success" : "warning"}>
+                {hasProofOfResidence ? "UPLOADED" : "MISSING"}
+              </Badge>
+              <div className="text-xs text-foreground/60">
+                {proofOfResidenceIssuedAt
+                  ? `Issue date: ${proofOfResidenceIssuedAt}`
+                  : "Issue date not submitted yet."}
+              </div>
             </CardContent>
           </Card>
         </div>

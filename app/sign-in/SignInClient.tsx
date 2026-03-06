@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import Button from "@/app/components/ui/Button";
@@ -45,11 +45,49 @@ export default function SignInClient() {
   const searchParams = useSearchParams();
   const callbackUrl = sanitizeCallbackUrl(searchParams.get("callbackUrl"));
   const checkEmail = searchParams.get("checkEmail") === "1";
+  const checkEmailAddress = searchParams.get("email");
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [resending, setResending] = useState(false);
+  const [resendMsg, setResendMsg] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!checkEmailAddress) return;
+    setEmail(checkEmailAddress.trim().toLowerCase());
+  }, [checkEmailAddress]);
+
+  async function resendConfirmationEmail() {
+    const normalizedEmail = email.trim().toLowerCase();
+    if (!normalizedEmail) {
+      setResendMsg("Enter your email first, then resend confirmation.");
+      return;
+    }
+
+    setResending(true);
+    setResendMsg(null);
+    try {
+      const { error: resendError } = await supabaseBrowser().auth.resend({
+        type: "signup",
+        email: normalizedEmail,
+        options: {
+          emailRedirectTo: `${window.location.origin}/sign-in`,
+        },
+      });
+
+      if (resendError) {
+        setResendMsg(resendError.message);
+      } else {
+        setResendMsg("Confirmation email sent. Check inbox/spam and wait a minute.");
+      }
+    } catch {
+      setResendMsg("Could not resend confirmation email right now. Please try again.");
+    } finally {
+      setResending(false);
+    }
+  }
 
   async function clearSupabaseDevDisable() {
     try {
@@ -168,8 +206,14 @@ export default function SignInClient() {
         </CardHeader>
         <CardContent>
           {checkEmail ? (
-            <div className="mb-3 rounded-md border border-foreground/10 bg-foreground/5 p-3 text-sm text-foreground/70">
-              Check your email to confirm your account, then come back and sign in.
+            <div className="mb-3 space-y-2 rounded-md border border-foreground/10 bg-foreground/5 p-3 text-sm text-foreground/70">
+              <div>Check your email to confirm your account, then come back and sign in.</div>
+              <div className="flex flex-wrap items-center gap-2">
+                <Button type="button" variant="secondary" className="h-8 px-3 text-xs" onClick={resendConfirmationEmail} disabled={resending}>
+                  {resending ? "Resending..." : "Resend confirmation email"}
+                </Button>
+                {resendMsg ? <span className="text-xs text-foreground/70">{resendMsg}</span> : null}
+              </div>
             </div>
           ) : null}
       <form onSubmit={onSubmit} className="space-y-3">

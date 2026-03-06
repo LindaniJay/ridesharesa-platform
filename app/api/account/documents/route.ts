@@ -21,6 +21,30 @@ function safeExtFromFileName(name: string) {
   return ext || "jpg";
 }
 
+function parseIssueDateWithinThreeMonths(value: FormDataEntryValue | null) {
+  if (typeof value !== "string") return { ok: false as const, error: "Missing proofOfResidenceIssuedAt" };
+  const trimmed = value.trim();
+  if (!trimmed) return { ok: false as const, error: "Missing proofOfResidenceIssuedAt" };
+
+  const parsed = new Date(trimmed);
+  if (Number.isNaN(parsed.getTime())) {
+    return { ok: false as const, error: "Invalid proofOfResidenceIssuedAt date" };
+  }
+
+  const now = new Date();
+  if (parsed > now) {
+    return { ok: false as const, error: "Proof of residence issue date cannot be in the future" };
+  }
+
+  const threeMonthsAgo = new Date(now);
+  threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
+  if (parsed < threeMonthsAgo) {
+    return { ok: false as const, error: "Proof of residence must be issued within the last 3 months" };
+  }
+
+  return { ok: true as const, iso: parsed.toISOString() };
+}
+
 async function ensureBucketExists(bucket: string) {
   const client = supabaseAdmin();
   try {
@@ -71,14 +95,17 @@ function roleFromSupabaseUser(user: { app_metadata?: Record<string, unknown>; us
   return "RENTER";
 }
 
-async function uploadImage(params: {
+async function uploadDocument(params: {
   bucket: string;
   userId: string;
-  key: "profile" | "id" | "license";
+  key: "profile" | "id" | "license" | "proof_residence";
   file: File;
+  allowPdf?: boolean;
 }) {
-  if (!params.file.type.startsWith("image/")) {
-    throw new Error("Only image uploads are supported");
+  const isImage = params.file.type.startsWith("image/");
+  const isPdf = params.file.type === "application/pdf";
+  if (!isImage && !(params.allowPdf && isPdf)) {
+    throw new Error(params.allowPdf ? "Only images or PDF uploads are supported" : "Only image uploads are supported");
   }
 
   const maxBytes = 8 * 1024 * 1024;
@@ -119,10 +146,14 @@ export async function POST(req: Request) {
   const profilePhoto = form.get("profilePhoto");
   const idDocument = form.get("idDocument");
   const driversLicense = form.get("driversLicense");
+  const proofOfResidence = form.get("proofOfResidence");
+  const proofIssueDate = parseIssueDateWithinThreeMonths(form.get("proofOfResidenceIssuedAt"));
 
   if (!(profilePhoto instanceof File)) return badRequest("Missing profilePhoto");
   if (!(idDocument instanceof File)) return badRequest("Missing idDocument");
   if (!(driversLicense instanceof File)) return badRequest("Missing driversLicense");
+  if (!(proofOfResidence instanceof File)) return badRequest("Missing proofOfResidence");
+  if (!proofIssueDate.ok) return badRequest(proofIssueDate.error);
 
   const dbUser = await prisma.user.upsert({
     where: { email },
@@ -147,10 +178,11 @@ export async function POST(req: Request) {
   await ensureBucketExists(bucket);
 
   try {
-    const [profile, idDoc, license] = await Promise.all([
-      uploadImage({ bucket, userId: dbUser.id, key: "profile", file: profilePhoto }),
-      uploadImage({ bucket, userId: dbUser.id, key: "id", file: idDocument }),
-      uploadImage({ bucket, userId: dbUser.id, key: "license", file: driversLicense }),
+    const [profile, idDoc, license, residenceProof] = await Promise.all([
+      uploadDocument({ bucket, userId: dbUser.id, key: "profile", file: profilePhoto }),
+      uploadDocument({ bucket, userId: dbUser.id, key: "id", file: idDocument }),
+      uploadDocument({ bucket, userId: dbUser.id, key: "license", file: driversLicense }),
+      uploadDocument({ bucket, userId: dbUser.id, key: "proof_residence", file: proofOfResidence, allowPdf: true }),
     ]);
 
     // Store paths in Supabase Auth metadata (keeps Prisma schema unchanged)
@@ -160,6 +192,8 @@ export async function POST(req: Request) {
         profileImagePath: profile.path,
         idDocumentImagePath: idDoc.path,
         driversLicenseImagePath: license.path,
+        proofOfResidenceImagePath: residenceProof.path,
+        proofOfResidenceIssuedAt: proofIssueDate.iso,
         documentsUploadedAt: new Date().toISOString(),
       },
     });

@@ -111,11 +111,11 @@ type AdminSection =
   | "risk"
   | "support";
 
-type UserDocKind = "profile" | "id" | "license";
+type UserDocKind = "profile" | "id" | "license" | "proof_residence";
 
 function parseUserDocKind(value: unknown): UserDocKind | null {
   const v = String(value ?? "").trim();
-  return v === "profile" || v === "id" || v === "license" ? v : null;
+  return v === "profile" || v === "id" || v === "license" || v === "proof_residence" ? v : null;
 }
 
 async function getUserDocSignedUrl(params: { userId: string; kind: UserDocKind }) {
@@ -1457,6 +1457,18 @@ export default async function AdminDashboardPage({
                           >
                             <Button variant={active && selectedDocKind === "license" ? "primary" : "secondary"}>
                               DL
+                            </Button>
+                          </Link>
+                          <Link
+                            href={adminHref({
+                              section: "users",
+                              q: q || null,
+                              userId: u.id,
+                              doc: "proof_residence",
+                            })}
+                          >
+                            <Button variant={active && selectedDocKind === "proof_residence" ? "primary" : "secondary"}>
+                              POR
                             </Button>
                           </Link>
                         </div>

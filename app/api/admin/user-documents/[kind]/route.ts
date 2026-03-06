@@ -8,10 +8,10 @@ function normalizeEmail(value: string) {
   return value.trim().toLowerCase();
 }
 
-type Kind = "profile" | "id" | "license";
+type Kind = "profile" | "id" | "license" | "proof_residence";
 
 function isKind(value: string): value is Kind {
-  return value === "profile" || value === "id" || value === "license";
+  return value === "profile" || value === "id" || value === "license" || value === "proof_residence";
 }
 
 async function findSupabaseUserByEmail(email: string) {
@@ -91,7 +91,9 @@ export async function GET(
         ? (metadata.profileImagePath as string | undefined)
         : kindRaw === "id"
           ? (metadata.idDocumentImagePath as string | undefined)
-          : (metadata.driversLicenseImagePath as string | undefined);
+          : kindRaw === "license"
+            ? (metadata.driversLicenseImagePath as string | undefined)
+            : (metadata.proofOfResidenceImagePath as string | undefined);
 
     const candidatePaths: string[] = [];
     if (typeof metadataPath === "string" && metadataPath.trim()) {

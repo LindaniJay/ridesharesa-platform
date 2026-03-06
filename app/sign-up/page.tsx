@@ -23,17 +23,21 @@ export default function SignUpPage() {
     setLoading(true);
 
     try {
+      const client = supabaseBrowser();
+      const normalizedEmail = email.trim().toLowerCase();
+
       // Add timeout to prevent infinite loading
       const timeoutPromise = new Promise<never>((_, reject) =>
         setTimeout(() => reject(new Error("Request timeout - please try again")), 30000)
       );
 
       const { data, error: signUpError } = await Promise.race([
-        supabaseBrowser().auth.signUp({
-          email,
+        client.auth.signUp({
+          email: normalizedEmail,
           password,
           options: {
             data: { name: name || undefined, role },
+            emailRedirectTo: `${window.location.origin}/sign-in`,
           },
         }),
         timeoutPromise,
@@ -48,15 +52,31 @@ export default function SignUpPage() {
       // If email confirmation is enabled, the session may be null.
       if (!data.session) {
         setLoading(false);
-        router.push("/sign-in?checkEmail=1");
+        router.push(`/sign-in?checkEmail=1&email=${encodeURIComponent(normalizedEmail)}`);
         return;
       }
 
-      const bootstrapRes = await fetch("/api/account/bootstrap", {
+      let bootstrapRes = await fetch("/api/account/bootstrap", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ name: name || undefined, role }),
       });
+
+      if (bootstrapRes.status === 401 || bootstrapRes.status === 403) {
+        // In some environments cookie/session propagation can lag right after sign-up.
+        const { error: signInAfterSignUpError } = await client.auth.signInWithPassword({
+          email: normalizedEmail,
+          password,
+        });
+
+        if (!signInAfterSignUpError) {
+          bootstrapRes = await fetch("/api/account/bootstrap", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ name: name || undefined, role }),
+          });
+        }
+      }
 
       if (!bootstrapRes.ok) {
         const json = await bootstrapRes.json().catch(() => ({}));

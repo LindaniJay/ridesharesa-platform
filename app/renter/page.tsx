@@ -80,6 +80,19 @@ export default async function RenterDashboardPage({
     typeof supabaseUser.user_metadata?.profileImagePath === "string"
       ? supabaseUser.user_metadata.profileImagePath
       : null;
+  const proofOfResidencePath =
+    typeof supabaseUser.user_metadata?.proofOfResidenceImagePath === "string"
+      ? supabaseUser.user_metadata.proofOfResidenceImagePath.trim()
+      : "";
+  const proofOfResidenceIssuedAtRaw =
+    typeof supabaseUser.user_metadata?.proofOfResidenceIssuedAt === "string"
+      ? supabaseUser.user_metadata.proofOfResidenceIssuedAt
+      : null;
+  const proofOfResidenceIssuedAt =
+    proofOfResidenceIssuedAtRaw && !Number.isNaN(new Date(proofOfResidenceIssuedAtRaw).getTime())
+      ? iso(new Date(proofOfResidenceIssuedAtRaw))
+      : null;
+  const hasProofOfResidence = proofOfResidencePath.length > 0;
   let profileImageSignedUrl: string | null = null;
   if (profileImagePath) {
     const { data } = await supabaseAdmin().storage.from(userDocsBucket).createSignedUrl(profileImagePath, 60 * 10);
@@ -88,7 +101,7 @@ export default async function RenterDashboardPage({
 
   const now = new Date();
 
-  const [upcoming, ongoing, past, supportTickets] = await Promise.all([
+  const [upcoming, ongoing, past, supportTickets, authoredReviews] = await Promise.all([
     prisma.booking.findMany({
       where: {
         renterId,
@@ -142,6 +155,11 @@ export default async function RenterDashboardPage({
         totalCents: true,
         currency: true,
         listing: { select: { id: true, title: true, city: true } },
+        reviews: {
+          where: { authorId: renterId },
+          select: { id: true },
+          take: 1,
+        },
       },
     }),
     prisma.supportTicket.findMany({
@@ -149,6 +167,35 @@ export default async function RenterDashboardPage({
       orderBy: { createdAt: "desc" },
       take: 10,
       select: { id: true, subject: true, status: true, createdAt: true },
+    }),
+    prisma.review.findMany({
+      where: { authorId: renterId },
+      orderBy: { createdAt: "desc" },
+      take: 20,
+      select: {
+        id: true,
+        rating: true,
+        comment: true,
+        createdAt: true,
+        targetUser: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+        },
+        booking: {
+          select: {
+            id: true,
+            listing: {
+              select: {
+                title: true,
+                city: true,
+              },
+            },
+          },
+        },
+      },
     }),
   ]);
 
@@ -185,18 +232,27 @@ export default async function RenterDashboardPage({
         id: true,
         renterId: true,
         status: true,
-        startDate: true,
+        endDate: true,
       },
     });
 
     if (!booking) return;
     if (booking.renterId !== dbUser.id) return;
-    if (booking.status !== "PENDING_PAYMENT") return;
-    if (booking.startDate <= new Date()) return;
+    if (!["PENDING_PAYMENT", "PENDING_APPROVAL", "CONFIRMED"].includes(booking.status)) return;
+    if (booking.endDate <= new Date()) return;
 
     await prisma.booking.update({
       where: { id: booking.id },
       data: { status: "CANCELLED" },
+    });
+
+    await prisma.bookingMessage.create({
+      data: {
+        bookingId: booking.id,
+        senderId: dbUser.id,
+        recipientRole: "HOST",
+        body: "BOOKING UPDATE: Renter cancelled this booking.",
+      },
     });
 
     revalidatePath("/renter");
@@ -326,7 +382,7 @@ export default async function RenterDashboardPage({
                           <Link className="inline-flex rounded-md border border-border px-2.5 py-1.5 text-xs hover:bg-muted" href={`/bookings/${b.id}`}>
                             Open booking
                           </Link>
-                          {b.status === "PENDING_PAYMENT" ? (
+                          {["PENDING_PAYMENT", "PENDING_APPROVAL", "CONFIRMED"].includes(b.status) ? (
                             <form action={cancelUpcomingBooking}>
                               <input type="hidden" name="bookingId" value={b.id} />
                               <Button type="submit" variant="secondary" className="h-7 px-2.5 text-xs">
@@ -373,6 +429,14 @@ export default async function RenterDashboardPage({
                           <Link className="inline-flex rounded-md border border-border px-2.5 py-1.5 text-xs hover:bg-muted" href={`/bookings/${b.id}`}>
                             Manage trip
                           </Link>
+                          {["PENDING_PAYMENT", "PENDING_APPROVAL", "CONFIRMED"].includes(b.status) ? (
+                            <form action={cancelUpcomingBooking}>
+                              <input type="hidden" name="bookingId" value={b.id} />
+                              <Button type="submit" variant="secondary" className="h-7 px-2.5 text-xs">
+                                Cancel booking
+                              </Button>
+                            </form>
+                          ) : null}
                         </div>
                       </div>
                     </div>
@@ -412,6 +476,11 @@ export default async function RenterDashboardPage({
                           <Link className="inline-flex rounded-md border border-border px-2.5 py-1.5 text-xs hover:bg-muted" href={`/bookings/${b.id}`}>
                             View summary
                           </Link>
+                          {b.status === "CONFIRMED" && b.reviews.length === 0 ? (
+                            <Link className="inline-flex rounded-md border border-border px-2.5 py-1.5 text-xs hover:bg-muted" href={`/bookings/${b.id}`}>
+                              Leave review
+                            </Link>
+                          ) : null}
                           <Link className="inline-flex rounded-md border border-border px-2.5 py-1.5 text-xs hover:bg-muted" href={renterHref({ section: "support" })}>
                             Open support
                           </Link>
@@ -486,7 +555,7 @@ export default async function RenterDashboardPage({
         {section === "profile" ? (
           <section className="space-y-3">
             <h2 className="text-lg font-semibold">Profile & verification</h2>
-            <div className="grid gap-4 sm:grid-cols-3">
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
               <Card>
                 <CardHeader>
                   <CardTitle>Profile creation</CardTitle>
@@ -524,6 +593,22 @@ export default async function RenterDashboardPage({
                 </CardHeader>
                 <CardContent>
                   <Badge variant={badgeVariantForVerificationStatus(dbUser.idVerificationStatus)}>{dbUser.idVerificationStatus}</Badge>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader>
+                  <CardTitle>Proof of residence</CardTitle>
+                  <CardDescription>Required document not older than 3 months.</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  <Badge variant={hasProofOfResidence ? "success" : "warning"}>
+                    {hasProofOfResidence ? "UPLOADED" : "MISSING"}
+                  </Badge>
+                  <div className="text-xs text-foreground/60">
+                    {proofOfResidenceIssuedAt
+                      ? `Issue date: ${proofOfResidenceIssuedAt}`
+                      : "Issue date not submitted yet."}
+                  </div>
                 </CardContent>
               </Card>
             </div>
@@ -588,10 +673,62 @@ export default async function RenterDashboardPage({
             <Card>
               <CardHeader>
                 <CardTitle>Reviews</CardTitle>
-                <CardDescription>Review flows can be enabled per completed booking.</CardDescription>
+                <CardDescription>Reviews you have left after completed trips.</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="text-sm text-foreground/60">Reviews are not enabled yet in this build.</div>
+                {past.some((b) => b.status === "CONFIRMED" && b.reviews.length === 0) ? (
+                  <div className="mb-4 space-y-2">
+                    <div className="text-sm font-medium">Trips awaiting your review</div>
+                    <div className="space-y-2">
+                      {past
+                        .filter((b) => b.status === "CONFIRMED" && b.reviews.length === 0)
+                        .map((b) => (
+                          <div key={`pending-review-${b.id}`} className="rounded-xl border border-border bg-background p-3 text-sm">
+                            <div className="font-medium">{b.listing.title}</div>
+                            <div className="mt-1 text-xs text-foreground/60">{b.listing.city} · {iso(b.startDate)} → {iso(b.endDate)}</div>
+                            <div className="mt-2">
+                              <Link className="underline" href={`/bookings/${b.id}`}>
+                                Leave review
+                              </Link>
+                            </div>
+                          </div>
+                        ))}
+                    </div>
+                  </div>
+                ) : null}
+
+                {authoredReviews.length === 0 ? (
+                  <div className="space-y-2 text-sm text-foreground/60">
+                    <div>No reviews submitted yet.</div>
+                    <div>
+                      Open a completed booking from <Link className="underline" href={renterHref({ section: "bookings" })}>Bookings</Link> to leave a review.
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {authoredReviews.map((r) => (
+                      <div key={r.id} className="rounded-xl border border-border bg-background p-3 text-sm">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <div className="font-medium">{r.booking?.listing.title ?? "Booking review"}</div>
+                          <div className="text-xs text-foreground/70">Rating: {r.rating}/5</div>
+                        </div>
+                        <div className="mt-1 text-xs text-foreground/60">
+                          Host: {r.targetUser.name || r.targetUser.email}
+                          {r.booking?.listing.city ? ` · ${r.booking.listing.city}` : ""}
+                        </div>
+                        <div className="mt-1 text-xs text-foreground/60">Submitted {iso(r.createdAt)}</div>
+                        {r.comment ? <div className="mt-2 text-foreground/70">{r.comment}</div> : null}
+                        {r.booking?.id ? (
+                          <div className="mt-2">
+                            <Link className="underline" href={`/bookings/${r.booking.id}`}>
+                              Open booking
+                            </Link>
+                          </div>
+                        ) : null}
+                      </div>
+                    ))}
+                  </div>
+                )}
               </CardContent>
             </Card>
           </section>

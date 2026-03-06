@@ -130,11 +130,17 @@ export async function requireRole(requiredRole: Role): Promise<AuthedUser> {
  * Users must upload profile photo, ID document, and driver's license.
  */
 export function isProfileComplete(user: AuthedUser): boolean {
-  // Profile is complete if verification documents have been submitted
-  // (status is no longer UNVERIFIED)
+  const proofPath =
+    typeof user.supabaseUser.user_metadata?.proofOfResidenceImagePath === "string"
+      ? user.supabaseUser.user_metadata.proofOfResidenceImagePath.trim()
+      : "";
+
+  // Profile is complete if core verification documents are submitted
+  // and proof of residence has been uploaded.
   return (
     user.dbUser.idVerificationStatus !== "UNVERIFIED" &&
-    user.dbUser.driversLicenseStatus !== "UNVERIFIED"
+    user.dbUser.driversLicenseStatus !== "UNVERIFIED" &&
+    proofPath.length > 0
   );
 }
 

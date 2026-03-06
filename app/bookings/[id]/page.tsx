@@ -151,6 +151,19 @@ export default async function BookingPage({
   const isHost = viewerRole === "HOST" && booking.listing.hostId === viewerId;
   const isRenter = viewerRole === "RENTER" && booking.renterId === viewerId;
 
+  const existingRenterReview = isRenter
+    ? await prisma.review.findFirst({
+        where: {
+          bookingId: booking.id,
+          authorId: viewerId,
+        },
+        select: {
+          rating: true,
+          comment: true,
+        },
+      })
+    : null;
+
   const photosByKind = await Promise.all(
     PHOTO_KINDS.map(async ({ kind }) => ({
       kind,
@@ -225,8 +238,14 @@ export default async function BookingPage({
 
       <BookingStatusClient status={booking.status} method={isManualPayment ? "manual" : "stripe"} />
 
-      {isRenter && booking.status !== "CANCELLED" ? (
-        <BookingActions bookingId={booking.id} currentEndDateISO={booking.endDate.toISOString()} />
+      {isRenter ? (
+        <BookingActions
+          bookingId={booking.id}
+          currentEndDateISO={booking.endDate.toISOString()}
+          startDateISO={booking.startDate.toISOString()}
+          status={booking.status}
+          existingReview={existingRenterReview}
+        />
       ) : null}
 
       <BookingChat bookingId={booking.id} viewerId={viewerId} viewerRole={viewerRole} />
