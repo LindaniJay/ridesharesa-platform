@@ -304,23 +304,26 @@ export default async function HostDashboardPage() {
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <Card>
             <CardHeader>
-              <CardTitle>Host profile</CardTitle>
-              <CardDescription>Business details and verification images.</CardDescription>
+              <CardTitle>Host snapshot</CardTitle>
+              <CardDescription>Your current verification overview.</CardDescription>
             </CardHeader>
-            <CardContent>
-              <DocumentsUploadForm successHref="/host" nextHref="/host" />
+            <CardContent className="flex items-center gap-3">
               {profileImageSignedUrl ? (
                 <>
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={profileImageSignedUrl}
                     alt="Profile"
-                    className="w-24 h-24 rounded-full mt-4 object-cover border"
+                    className="h-14 w-14 rounded-full border object-cover"
                   />
                 </>
               ) : (
-                <div className="w-24 h-24 rounded-full bg-muted flex items-center justify-center mt-4">No photo</div>
+                <div className="flex h-14 w-14 items-center justify-center rounded-full border bg-muted text-xs text-foreground/60">No photo</div>
               )}
+              <div className="text-xs text-foreground/70">
+                <div>{dbUser.name || "Host"}</div>
+                <div>{dbUser.email}</div>
+              </div>
             </CardContent>
           </Card>
           <Card>
@@ -358,6 +361,16 @@ export default async function HostDashboardPage() {
             </CardContent>
           </Card>
         </div>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Upload or update documents</CardTitle>
+            <CardDescription>Keep your host verification pack current.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <DocumentsUploadForm successHref="/host" nextHref="/host" />
+          </CardContent>
+        </Card>
       </section>
 
       <section className="space-y-3">
