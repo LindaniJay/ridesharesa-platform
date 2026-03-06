@@ -1,0 +1,441 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>RideShare SA | Seed Fund Utilization</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Merriweather:wght@400;700;900&family=Source+Sans+3:wght@400;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --bg: #eef3f6;
+        --ink: #102027;
+        --ink-soft: #3a4d57;
+        --panel: #ffffff;
+        --line: #d4dde3;
+        --brand: #00a651;
+        --brand-deep: #087843;
+        --accent: #114a61;
+        --accent-soft: #e7f3f8;
+        --glow: rgba(0, 166, 81, 0.12);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        color: var(--ink);
+        font-family: "Source Sans 3", "Segoe UI", sans-serif;
+        background:
+          radial-gradient(circle at 15% 20%, var(--glow), transparent 35%),
+          radial-gradient(circle at 85% 80%, rgba(17, 74, 97, 0.08), transparent 32%),
+          linear-gradient(145deg, #eef3f6 0%, #f8fafb 52%, #ecf2f5 100%);
+      }
+
+      .page {
+        width: min(1080px, 92vw);
+        margin: 2.5rem auto;
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 24px;
+        box-shadow: 0 20px 56px rgba(16, 32, 39, 0.1);
+        overflow: hidden;
+      }
+
+      .hero {
+        display: grid;
+        gap: 1.1rem;
+        padding: 2.6rem 2.4rem 2rem;
+        background:
+          linear-gradient(110deg, rgba(0, 166, 81, 0.12), transparent 58%),
+          linear-gradient(180deg, #ffffff, #f8fcfb);
+        border-bottom: 1px solid var(--line);
+      }
+
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 0.9rem;
+      }
+
+      .brand img {
+        width: 58px;
+        height: 58px;
+        border-radius: 50%;
+        border: 2px solid #ffffff;
+        box-shadow: 0 8px 18px rgba(0, 0, 0, 0.12);
+      }
+
+      .brand-text {
+        line-height: 1.15;
+      }
+
+      .brand-text strong {
+        display: block;
+        font-size: 1.16rem;
+        letter-spacing: 0.02em;
+      }
+
+      .brand-text span {
+        color: var(--ink-soft);
+        font-size: 0.95rem;
+      }
+
+      h1 {
+        margin: 0;
+        font-family: "Merriweather", Georgia, serif;
+        font-size: clamp(1.45rem, 2.5vw, 2.15rem);
+        line-height: 1.35;
+      }
+
+      .hero p {
+        margin: 0;
+        color: var(--ink-soft);
+        font-size: 1.04rem;
+      }
+
+      .badge {
+        width: fit-content;
+        padding: 0.46rem 0.9rem;
+        border-radius: 999px;
+        background: rgba(0, 166, 81, 0.12);
+        color: var(--brand-deep);
+        border: 1px solid rgba(0, 166, 81, 0.28);
+        font-weight: 700;
+        letter-spacing: 0.03em;
+        text-transform: uppercase;
+        font-size: 0.84rem;
+      }
+
+      .hero-meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.6rem;
+      }
+
+      .hero-chip {
+        padding: 0.34rem 0.7rem;
+        border-radius: 999px;
+        border: 1px solid var(--line);
+        background: #ffffff;
+        color: #355061;
+        font-size: 0.84rem;
+        font-weight: 600;
+      }
+
+      .content {
+        padding: 1.9rem 2.4rem 2.3rem;
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 1.05rem;
+      }
+
+      .item {
+        position: relative;
+        border: 1px solid #d6dfe5;
+        border-radius: 16px;
+        padding: 1.05rem 1.05rem 1rem;
+        background: linear-gradient(180deg, #ffffff, #fdfefe);
+        box-shadow: 0 10px 20px rgba(16, 32, 39, 0.05);
+        transition: transform 260ms ease, box-shadow 260ms ease, border-color 260ms ease;
+      }
+
+      .item::before {
+        content: "";
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 5px;
+        border-radius: 16px 16px 0 0;
+        background: linear-gradient(90deg, var(--brand), var(--accent));
+      }
+
+      .item:hover {
+        transform: translateY(-2px);
+        border-color: #c2d2dc;
+        box-shadow: 0 16px 28px rgba(16, 32, 39, 0.08);
+      }
+
+      .row {
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+        gap: 0.75rem;
+      }
+
+      .id {
+        width: 2rem;
+        height: 2rem;
+        border-radius: 999px;
+        display: inline-grid;
+        place-items: center;
+        background: var(--accent-soft);
+        color: #1a546e;
+        font-size: 0.86rem;
+        font-weight: 800;
+        border: 1px solid #c8dbe4;
+        flex-shrink: 0;
+      }
+
+      .heading {
+        display: flex;
+        align-items: center;
+        gap: 0.6rem;
+      }
+
+      .title {
+        margin: 0;
+        font-size: 1.01rem;
+        font-weight: 700;
+        line-height: 1.25;
+      }
+
+      .amount {
+        margin: 0;
+        font-weight: 700;
+        color: var(--brand-deep);
+        white-space: nowrap;
+        font-size: 0.96rem;
+        background: rgba(0, 166, 81, 0.09);
+        border: 1px solid rgba(0, 166, 81, 0.21);
+        border-radius: 999px;
+        padding: 0.23rem 0.58rem;
+      }
+
+      .item p {
+        margin: 0.66rem 0 0;
+        color: var(--ink-soft);
+      }
+
+      .impact {
+        margin-top: 0.7rem;
+        padding-top: 0.66rem;
+        border-top: 1px dashed #d4dde3;
+        font-size: 0.93rem;
+      }
+
+      .impact strong {
+        color: #1a546e;
+        font-weight: 700;
+      }
+
+      .summary {
+        margin-top: 1.45rem;
+        padding: 1.1rem 1.2rem;
+        border: 1px solid var(--line);
+        border-left: 5px solid var(--brand);
+        border-radius: 12px;
+        background: #fbfefd;
+      }
+
+      .summary h2 {
+        margin: 0 0 0.45rem;
+        font-family: "Merriweather", Georgia, serif;
+        font-size: 1.05rem;
+      }
+
+      .summary p {
+        margin: 0;
+        color: var(--ink-soft);
+      }
+
+      .footer {
+        margin-top: 1.35rem;
+        display: flex;
+        justify-content: space-between;
+        gap: 1rem;
+        flex-wrap: wrap;
+        color: #516773;
+        font-size: 0.95rem;
+      }
+
+      @media (max-width: 820px) {
+        .page {
+          margin: 1rem auto;
+          border-radius: 16px;
+        }
+
+        .hero,
+        .content {
+          padding: 1.2rem;
+        }
+
+        .grid {
+          grid-template-columns: 1fr;
+        }
+
+        .brand img {
+          width: 50px;
+          height: 50px;
+        }
+
+        .amount {
+          font-size: 0.9rem;
+        }
+      }
+
+      @media print {
+        body {
+          background: #ffffff;
+        }
+
+        .page {
+          width: 100%;
+          margin: 0;
+          box-shadow: none;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="page">
+      <section class="hero">
+        <div class="brand">
+          <img src="../public/rideshare-logo.png" alt="RideShare SA logo" />
+          <div class="brand-text">
+            <strong>RideShare SA</strong>
+            <span>Peer-to-peer car rentals platform</span>
+          </div>
+        </div>
+
+        <span class="badge">Seed Fund Plan | R100,000</span>
+
+        <div class="hero-meta" aria-label="proposal highlights">
+          <span class="hero-chip">Trust and Safety Focus</span>
+          <span class="hero-chip">Scalable Infrastructure</span>
+          <span class="hero-chip">Measured Growth</span>
+        </div>
+
+        <h1>Strategic Allocation Proposal for Competition Seed Funding</h1>
+        <p>
+          This funding plan is designed to strengthen trust and safety, improve product capability,
+          support infrastructure resilience, and accelerate measurable market growth.
+        </p>
+      </section>
+
+      <section class="content">
+        <div class="grid">
+          <article class="item">
+            <div class="row">
+              <div class="heading">
+                <span class="id">01</span>
+                <h2 class="title">Payments and Transaction Infrastructure</h2>
+              </div>
+              <p class="amount">R16,000</p>
+            </div>
+            <p>Payment rails setup, payout automation, and reconciliation to reduce failed transactions.</p>
+            <p class="impact"><strong>Outcome:</strong> Faster, more reliable payouts and stronger platform trust.</p>
+          </article>
+
+          <article class="item">
+            <div class="row">
+              <div class="heading">
+                <span class="id">02</span>
+                <h2 class="title">API Subscriptions and Core SaaS</h2>
+              </div>
+              <p class="amount">R13,000</p>
+            </div>
+            <p>Maps, messaging, email, analytics, and operational integrations required for scale.</p>
+            <p class="impact"><strong>Outcome:</strong> Stable communications and smoother day-to-day operations.</p>
+          </article>
+
+          <article class="item">
+            <div class="row">
+              <div class="heading">
+                <span class="id">03</span>
+                <h2 class="title">Trust and Safety Operations</h2>
+              </div>
+              <p class="amount">R15,000</p>
+            </div>
+            <p>Identity verification, document checks, and fraud mitigation to protect hosts and renters.</p>
+            <p class="impact"><strong>Outcome:</strong> Lower fraud risk and higher booking confidence.</p>
+          </article>
+
+          <article class="item">
+            <div class="row">
+              <div class="heading">
+                <span class="id">04</span>
+                <h2 class="title">Cloud Hosting and Performance</h2>
+              </div>
+              <p class="amount">R13,000</p>
+            </div>
+            <p>Server and database usage, uptime monitoring, backups, and production reliability.</p>
+            <p class="impact"><strong>Outcome:</strong> Reliable service availability as user demand grows.</p>
+          </article>
+
+          <article class="item">
+            <div class="row">
+              <div class="heading">
+                <span class="id">05</span>
+                <h2 class="title">Security and Compliance</h2>
+              </div>
+              <p class="amount">R10,000</p>
+            </div>
+            <p>Security audit, policy hardening, and POPIA-aligned controls for data protection.</p>
+            <p class="impact"><strong>Outcome:</strong> Reduced legal and data security exposure.</p>
+          </article>
+
+          <article class="item">
+            <div class="row">
+              <div class="heading">
+                <span class="id">06</span>
+                <h2 class="title">Mobile App Development</h2>
+              </div>
+              <p class="amount">R14,000</p>
+            </div>
+            <p>Core mobile feature delivery for booking, messaging, alerts, and daily user convenience.</p>
+            <p class="impact"><strong>Outcome:</strong> Better retention and stronger repeat usage.</p>
+          </article>
+
+          <article class="item">
+            <div class="row">
+              <div class="heading">
+                <span class="id">07</span>
+                <h2 class="title">Customer Acquisition Experiments</h2>
+              </div>
+              <p class="amount">R11,000</p>
+            </div>
+            <p>Performance campaigns, referral pilots, and channel validation with measurable CAC.</p>
+            <p class="impact"><strong>Outcome:</strong> Data-backed growth channels and improved conversion.</p>
+          </article>
+
+          <article class="item">
+            <div class="row">
+              <div class="heading">
+                <span class="id">08</span>
+                <h2 class="title">Contingency and Risk Buffer</h2>
+              </div>
+              <p class="amount">R8,000</p>
+            </div>
+            <p>Reserved for critical response, unexpected infrastructure spikes, and urgent fixes.</p>
+            <p class="impact"><strong>Outcome:</strong> Business continuity during unforeseen events.</p>
+          </article>
+        </div>
+
+        <section class="summary">
+          <h2>Total Proposed Use of Funds: R100,000</h2>
+          <p>
+            The allocation balances operational reliability and growth readiness, enabling RideShare SA
+            to convert early traction into a scalable and investor-ready business.
+          </p>
+        </section>
+
+        <div class="footer">
+          <span>Prepared for competition presentation</span>
+          <span>Date: 06 March 2026</span>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>
