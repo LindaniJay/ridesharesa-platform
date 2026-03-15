@@ -112,10 +112,21 @@ type AdminSection =
   | "support";
 
 type UserDocKind = "profile" | "id" | "license" | "proof_residence";
+type ListingDocKind = "licenseDisk" | "registration" | "licenseCard";
 
 function parseUserDocKind(value: unknown): UserDocKind | null {
   const v = String(value ?? "").trim();
   return v === "profile" || v === "id" || v === "license" || v === "proof_residence" ? v : null;
+}
+
+function parseListingDocKind(value: unknown): ListingDocKind | null {
+  const v = String(value ?? "").trim();
+  return v === "licenseDisk" || v === "registration" || v === "licenseCard" ? v : null;
+}
+
+function isPdfPath(value: string | null | undefined) {
+  if (!value) return false;
+  return value.toLowerCase().split("?")[0].endsWith(".pdf");
 }
 
 async function getUserDocSignedUrl(params: { userId: string; kind: UserDocKind }) {
@@ -162,6 +173,69 @@ async function getUserDocSignedUrl(params: { userId: string; kind: UserDocKind }
   };
 }
 
+async function getListingDocSignedUrl(params: { listingId: string; kind: ListingDocKind }) {
+  const listing = await prisma.listing.findUnique({
+    where: { id: params.listingId },
+    select: {
+      licenseDiskImageUrl: true,
+      registrationImageUrl: true,
+      licenseCardImageUrl: true,
+    },
+  });
+
+  if (!listing) {
+    return {
+      ok: false as const,
+      error: "Listing not found",
+    };
+  }
+
+  const stored =
+    params.kind === "licenseDisk"
+      ? listing.licenseDiskImageUrl
+      : params.kind === "registration"
+        ? listing.registrationImageUrl
+        : listing.licenseCardImageUrl;
+
+  if (!stored) {
+    return {
+      ok: false as const,
+      error: "Document not uploaded yet",
+    };
+  }
+
+  if (stored.startsWith("http://") || stored.startsWith("https://")) {
+    return {
+      ok: true as const,
+      bucket: "public-url",
+      path: stored,
+      signedUrl: stored,
+    };
+  }
+
+  const bucket = process.env.SUPABASE_LISTING_DOCS_BUCKET || "listing-documents";
+  const admin = supabaseAdmin();
+  const { data, error } = await admin.storage.from(bucket).createSignedUrl(stored, 60 * 5);
+
+  if (error || !data?.signedUrl) {
+    return {
+      ok: false as const,
+      error:
+        error?.message ||
+        `Could not create signed URL (ensure bucket "${bucket}" exists and SUPABASE_SERVICE_ROLE_KEY is set).`,
+      bucket,
+      path: stored,
+    };
+  }
+
+  return {
+    ok: true as const,
+    bucket,
+    path: stored,
+    signedUrl: data.signedUrl,
+  };
+}
+
 function parseSection(value: unknown): AdminSection | null {
   const v = String(value ?? "").trim();
   const allowed: readonly AdminSection[] = [
@@ -200,6 +274,8 @@ export default async function AdminDashboardPage({
     incidentStatus?: string;
     userId?: string;
     doc?: string;
+    listingId?: string;
+    listingDoc?: string;
   }>;
 }) {
   const { dbUser: viewerDbUser, supabaseUser: viewerSupabaseUser } = await requireRole("ADMIN");
@@ -209,6 +285,8 @@ export default async function AdminDashboardPage({
   const section = parseSection(resolved?.section) ?? "overview";
   const selectedUserId = (resolved?.userId ?? "").trim() || null;
   const selectedDocKind = parseUserDocKind(resolved?.doc);
+  const selectedListingId = (resolved?.listingId ?? "").trim() || null;
+  const selectedListingDocKind = parseListingDocKind(resolved?.listingDoc);
   const bookingStatus = parseStatus<BookingStatus>(resolved?.bookingStatus, [
     "PENDING_PAYMENT",
     "PENDING_APPROVAL",
@@ -554,6 +632,37 @@ export default async function AdminDashboardPage({
       selectedDocPreview = {
         ok: false,
         error: e instanceof Error ? e.message : "Failed to load document",
+      };
+    }
+  }
+
+  const selectedListing = selectedListingId ? listingsAll.find((l) => l.id === selectedListingId) ?? null : null;
+
+  let selectedListingDocPreview:
+    | {
+        ok: true;
+        signedUrl: string;
+        bucket: string;
+        path: string;
+      }
+    | {
+        ok: false;
+        error: string;
+        bucket?: string;
+        path?: string;
+      }
+    | null = null;
+
+  if (selectedListingId && selectedListingDocKind) {
+    try {
+      selectedListingDocPreview = await getListingDocSignedUrl({
+        listingId: selectedListingId,
+        kind: selectedListingDocKind,
+      });
+    } catch (e) {
+      selectedListingDocPreview = {
+        ok: false,
+        error: e instanceof Error ? e.message : "Failed to load listing document",
       };
     }
   }
@@ -1339,30 +1448,39 @@ export default async function AdminDashboardPage({
                       </td>
                       <td className="px-3 py-2">
                         <div className="flex flex-wrap items-center gap-2 text-xs">
-                          <a
-                            href={`/api/admin/listing-documents/licenseDisk?listingId=${encodeURIComponent(l.id)}`}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="underline decoration-border text-foreground/80 hover:text-foreground"
+                          <Link
+                            href={adminHref({ section: "vehicles", listingId: l.id, listingDoc: "licenseDisk" })}
+                            className={cn(
+                              "underline decoration-border hover:text-foreground",
+                              selectedListingId === l.id && selectedListingDocKind === "licenseDisk"
+                                ? "text-foreground"
+                                : "text-foreground/80",
+                            )}
                           >
                             Disk
-                          </a>
-                          <a
-                            href={`/api/admin/listing-documents/registration?listingId=${encodeURIComponent(l.id)}`}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="underline decoration-border text-foreground/80 hover:text-foreground"
+                          </Link>
+                          <Link
+                            href={adminHref({ section: "vehicles", listingId: l.id, listingDoc: "registration" })}
+                            className={cn(
+                              "underline decoration-border hover:text-foreground",
+                              selectedListingId === l.id && selectedListingDocKind === "registration"
+                                ? "text-foreground"
+                                : "text-foreground/80",
+                            )}
                           >
                             Reg
-                          </a>
-                          <a
-                            href={`/api/admin/listing-documents/licenseCard?listingId=${encodeURIComponent(l.id)}`}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="underline decoration-border text-foreground/80 hover:text-foreground"
+                          </Link>
+                          <Link
+                            href={adminHref({ section: "vehicles", listingId: l.id, listingDoc: "licenseCard" })}
+                            className={cn(
+                              "underline decoration-border hover:text-foreground",
+                              selectedListingId === l.id && selectedListingDocKind === "licenseCard"
+                                ? "text-foreground"
+                                : "text-foreground/80",
+                            )}
                           >
                             Card
-                          </a>
+                          </Link>
                         </div>
                       </td>
                       <td className="px-3 py-2">{iso(l.createdAt)}</td>
@@ -1371,6 +1489,67 @@ export default async function AdminDashboardPage({
                 </tbody>
               </table>
             </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Listing document preview</CardTitle>
+            <CardDescription>
+              {selectedListing && selectedListingDocKind
+                ? `${selectedListing.title} • ${selectedListingDocKind}`
+                : "Select Disk, Reg, or Card in the table to preview"}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {!selectedListing ? (
+              <div className="text-sm text-foreground/60">Pick a listing document from the table above.</div>
+            ) : !selectedListingDocKind ? (
+              <div className="text-sm text-foreground/60">Choose which listing document to preview.</div>
+            ) : !selectedListingDocPreview ? (
+              <div className="text-sm text-foreground/60">Loading…</div>
+            ) : selectedListingDocPreview.ok ? (
+              <div className="space-y-3">
+                <div className="overflow-hidden rounded-xl border border-border bg-card">
+                  {isPdfPath(selectedListingDocPreview.path) ? (
+                    <iframe
+                      src={selectedListingDocPreview.signedUrl}
+                      title="Listing document preview"
+                      className="h-[70vh] w-full"
+                    />
+                  ) : (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={selectedListingDocPreview.signedUrl}
+                      alt="Listing document"
+                      className="max-h-[70vh] w-full object-contain"
+                    />
+                  )}
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <a
+                    href={`/api/admin/listing-documents/${selectedListingDocKind}?listingId=${encodeURIComponent(selectedListing.id)}`}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    <Button>Open full</Button>
+                  </a>
+                  <a
+                    href={selectedListingDocPreview.signedUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    <Button variant="secondary">Open signed URL</Button>
+                  </a>
+                  <div className="text-xs text-foreground/60">Signed URL (5 min) • {selectedListingDocPreview.bucket}</div>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-1">
+                <div className="text-sm font-medium text-foreground">Could not load listing document</div>
+                <div className="text-sm text-foreground/60">{selectedListingDocPreview.error}</div>
+              </div>
+            )}
           </CardContent>
         </Card>
       </section>
@@ -1599,12 +1778,20 @@ export default async function AdminDashboardPage({
                 ) : selectedDocPreview.ok ? (
                   <div className="space-y-3">
                     <div className="overflow-hidden rounded-xl border border-border bg-card">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={selectedDocPreview.signedUrl}
-                        alt={`${selectedDocKind} document`}
-                        className="max-h-[70vh] w-full object-contain"
-                      />
+                      {isPdfPath(selectedDocPreview.path) ? (
+                        <iframe
+                          src={selectedDocPreview.signedUrl}
+                          title={`${selectedDocKind} document`}
+                          className="h-[70vh] w-full"
+                        />
+                      ) : (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={selectedDocPreview.signedUrl}
+                          alt={`${selectedDocKind} document`}
+                          className="max-h-[70vh] w-full object-contain"
+                        />
+                      )}
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
                       <a href={selectedDocPreview.signedUrl} target="_blank" rel="noreferrer">

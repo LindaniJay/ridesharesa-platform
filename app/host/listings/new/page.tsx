@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 export const dynamic = "force-dynamic";
 
 import LocationPicker from "@/app/components/LocationPicker";
+import FileDropInput from "@/app/components/FileDropInput.client";
 import Button from "@/app/components/ui/Button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/app/components/ui/Card";
 import Input from "@/app/components/ui/Input";
@@ -117,7 +118,7 @@ export default async function NewListingPage({
         const bucket = process.env.SUPABASE_LISTING_DOCS_BUCKET || "listing-documents";
         const ext = safeExtFromFileName(file.name);
         const path = `${listing.id}/${key}-${crypto.randomUUID()}.${ext}`;
-        await uploadPrivateImage({ bucket, path, file, upsert: false });
+        await uploadPrivateImage({ bucket, path, file, upsert: false, allowPdf: true });
         return path;
       };
 
@@ -172,110 +173,170 @@ export default async function NewListingPage({
   }
 
   return (
-    <main className="mx-auto max-w-2xl space-y-4">
-      <Card>
-        <CardHeader>
-          <CardTitle>Create a new listing</CardTitle>
-          <CardDescription>Provide details, set a location, and add pricing.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          {err ? (
-            <div className="mb-4 rounded-lg border border-red-500/20 bg-red-500/10 p-3 text-sm text-red-700 dark:text-red-300">
-              {err}
-            </div>
-          ) : null}
-      <form action={createListing} className="space-y-4" encType="multipart/form-data">
-        <div className="text-sm font-medium text-black/70 dark:text-white/70">Basics</div>
-
-        <label className="block">
-          <div className="mb-1 text-sm">Title</div>
-          <Input
-            name="title"
-            required
-            placeholder="e.g. Toyota Corolla (Automatic)"
-          />
-        </label>
-
-        <div className="text-sm font-medium text-black/70 dark:text-white/70">Vehicle documents</div>
-        <label className="block">
-          <div className="mb-1 text-sm">License disk photo</div>
-          <Input name="licenseDiskPhoto" type="file" accept="image/*" required />
-        </label>
-        <label className="block">
-          <div className="mb-1 text-sm">Registration document</div>
-          <Input name="registrationDoc" type="file" accept="image/*" required />
-        </label>
-        <label className="block">
-          <div className="mb-1 text-sm">License card</div>
-          <Input name="licenseCardPhoto" type="file" accept="image/*" required />
-        </label>
-
-        <label className="block">
-          <div className="mb-1 text-sm">Description</div>
-          <Textarea
-            name="description"
-            required
-            rows={5}
-            placeholder="Tell renters about the car, rules, pickup notes, etc."
-          />
-        </label>
-
-        <label className="block">
-          <div className="mb-1 text-sm">City</div>
-          <Input
-            name="city"
-            required
-            placeholder="Cape Town"
-          />
-        </label>
-
-        <div className="text-sm font-medium text-black/70 dark:text-white/70">Photos</div>
-        <label className="block">
-          <div className="mb-1 text-sm">Left side</div>
-          <Input name="leftPhoto" type="file" accept="image/*" required />
-        </label>
-        <label className="block">
-          <div className="mb-1 text-sm">Right side</div>
-          <Input name="rightPhoto" type="file" accept="image/*" required />
-        </label>
-        <label className="block">
-          <div className="mb-1 text-sm">Interior</div>
-          <Input name="interiorPhoto" type="file" accept="image/*" required />
-        </label>
-        <label className="block">
-          <div className="mb-1 text-sm">Exterior</div>
-          <Input name="exteriorPhoto" type="file" accept="image/*" required />
-        </label>
-        <label className="block">
-          <div className="mb-1 text-sm">Damage (optional)</div>
-          <Input name="damagePhoto" type="file" accept="image/*" />
-          <div className="mt-1 text-xs text-black/50 dark:text-white/50">Upload only if there is visible damage.</div>
-        </label>
-
-        <div className="text-sm font-medium text-black/70 dark:text-white/70">Location</div>
-        <LocationPicker latitudeName="latitude" longitudeName="longitude" />
-
-        <div className="text-sm font-medium text-black/70 dark:text-white/70">Pricing</div>
-        <label className="block">
-          <div className="mb-1 text-sm">Daily rate (ZAR)</div>
-          <Input
-            name="dailyRate"
-            type="number"
-            step="0.01"
-            min="1"
-            required
-            placeholder="450"
-          />
-        </label>
-
-        <Button className="w-full">Create listing</Button>
-
-        <div className="text-xs text-black/50 dark:text-white/50">
-          New listings require admin approval before showing in public search.
+    <main className="mx-auto max-w-5xl space-y-4">
+      <section className="relative overflow-hidden rounded-3xl border border-border bg-card/60 p-5 backdrop-blur supports-[backdrop-filter]:bg-card/40 sm:p-6">
+        <div aria-hidden className="pointer-events-none absolute inset-0">
+          <div className="absolute -left-24 -top-28 h-72 w-72 rounded-full bg-accent/16 blur-3xl" />
+          <div className="absolute -right-24 -bottom-28 h-72 w-72 rounded-full bg-foreground/8 blur-3xl" />
         </div>
-      </form>
-        </CardContent>
-      </Card>
+
+        <div className="relative grid gap-5 lg:grid-cols-[0.9fr_1.1fr]">
+          <div className="space-y-4">
+            <div className="inline-flex items-center gap-2 rounded-full border border-border bg-background/35 px-3 py-1 text-xs text-foreground/70">
+              <span className="inline-flex h-2 w-2 rounded-full bg-accent/80" />
+              Host listing wizard
+            </div>
+            <div className="space-y-1">
+              <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">Create a premium listing that converts</h1>
+              <p className="text-sm text-foreground/60">Add complete vehicle details, upload photos and docs, then send for approval in one flow.</p>
+            </div>
+
+            <Card className="border-border bg-background/35">
+              <CardHeader>
+                <CardTitle>Before you submit</CardTitle>
+                <CardDescription>These details help approval happen faster.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-2 text-sm text-foreground/70">
+                <div className="rounded-lg border border-border bg-card/70 px-3 py-2">1. Required car photos: left, right, interior, exterior.</div>
+                <div className="rounded-lg border border-border bg-card/70 px-3 py-2">2. Required docs: license disk, registration, license card.</div>
+                <div className="rounded-lg border border-border bg-card/70 px-3 py-2">3. Vehicle docs accept images or PDF (max 8MB each).</div>
+                <div className="rounded-lg border border-border bg-card/70 px-3 py-2">4. Set the map pickup location precisely for better bookings.</div>
+              </CardContent>
+            </Card>
+          </div>
+
+          <Card className="border-border bg-background/30">
+            <CardHeader>
+              <CardTitle>Create new listing</CardTitle>
+              <CardDescription>Complete all sections to publish for admin review.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {err ? (
+                <div className="mb-4 rounded-lg border border-red-500/20 bg-red-500/10 p-3 text-sm text-red-700 dark:text-red-300">
+                  {err}
+                </div>
+              ) : null}
+
+              <form action={createListing} className="space-y-4" encType="multipart/form-data">
+                <div className="rounded-xl border border-border bg-card/65 p-4">
+                  <div className="mb-3 text-sm font-semibold text-foreground/85">Step 1: Listing basics</div>
+                  <div className="space-y-3">
+                    <label className="block">
+                      <div className="mb-1 text-sm">Title</div>
+                      <Input name="title" required placeholder="e.g. Toyota Corolla (Automatic)" />
+                    </label>
+
+                    <label className="block">
+                      <div className="mb-1 text-sm">Description</div>
+                      <Textarea
+                        name="description"
+                        required
+                        rows={4}
+                        placeholder="Tell renters about the car condition, rules, pickup process, and features."
+                      />
+                    </label>
+
+                    <label className="block">
+                      <div className="mb-1 text-sm">City</div>
+                      <Input name="city" required placeholder="Cape Town" />
+                    </label>
+                  </div>
+                </div>
+
+                <div className="rounded-xl border border-border bg-card/65 p-4">
+                  <div className="mb-3 text-sm font-semibold text-foreground/85">Step 2: Vehicle compliance docs</div>
+                  <div className="mb-2 text-xs text-foreground/60">Accepted formats: images or PDF. Each file max 8MB.</div>
+                  <div className="grid gap-3 sm:grid-cols-3">
+                    <FileDropInput
+                      name="licenseDiskPhoto"
+                      label="License disk"
+                      accept="image/*,application/pdf"
+                      required
+                    />
+                    <FileDropInput
+                      name="registrationDoc"
+                      label="Registration"
+                      accept="image/*,application/pdf"
+                      required
+                    />
+                    <FileDropInput
+                      name="licenseCardPhoto"
+                      label="License card"
+                      accept="image/*,application/pdf"
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div className="rounded-xl border border-border bg-card/65 p-4">
+                  <div className="mb-3 text-sm font-semibold text-foreground/85">Step 3: Vehicle photos</div>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <FileDropInput
+                      name="leftPhoto"
+                      label="Left side"
+                      accept="image/*"
+                      required
+                    />
+                    <FileDropInput
+                      name="rightPhoto"
+                      label="Right side"
+                      accept="image/*"
+                      required
+                    />
+                    <FileDropInput
+                      name="interiorPhoto"
+                      label="Interior"
+                      accept="image/*"
+                      required
+                    />
+                    <FileDropInput
+                      name="exteriorPhoto"
+                      label="Exterior"
+                      accept="image/*"
+                      required
+                    />
+                    <div className="sm:col-span-2">
+                      <FileDropInput
+                        name="damagePhoto"
+                        label="Existing damage (optional)"
+                        accept="image/*"
+                        helper="Upload only if there is visible damage before trip start."
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="rounded-xl border border-border bg-card/65 p-4">
+                  <div className="mb-3 text-sm font-semibold text-foreground/85">Step 4: Location and pricing</div>
+                  <div className="space-y-3">
+                    <div>
+                      <div className="mb-1 text-sm">Pickup location</div>
+                      <LocationPicker latitudeName="latitude" longitudeName="longitude" />
+                    </div>
+                    <label className="block">
+                      <div className="mb-1 text-sm">Daily rate (ZAR)</div>
+                      <Input
+                        name="dailyRate"
+                        type="number"
+                        step="0.01"
+                        min="1"
+                        required
+                        placeholder="450"
+                      />
+                    </label>
+                  </div>
+                </div>
+
+                <Button className="h-11 w-full text-base">Create listing</Button>
+
+                <div className="text-center text-xs text-foreground/60">
+                  New listings require admin approval before showing in public search.
+                </div>
+              </form>
+            </CardContent>
+          </Card>
+        </div>
+      </section>
     </main>
   );
 }

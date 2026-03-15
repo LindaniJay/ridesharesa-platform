@@ -238,47 +238,82 @@ export default async function Home() {
     imageUrl: string | null;
     host: { reviewsReceived: Array<{ rating: number }> };
   }> = [];
+  let availableCarsNow = 0;
+  let activeHosts = 0;
+  let confirmedTrips = 0;
 
   const now = new Date();
   const reservedStatuses: Array<"PENDING_APPROVAL" | "CONFIRMED"> = ["PENDING_APPROVAL", "CONFIRMED"];
 
   try {
-    topListingsRaw = await prisma.listing.findMany({
-      where: {
-        status: "ACTIVE",
-        isApproved: true,
-        bookings: {
-          none: {
-            status: { in: reservedStatuses },
-            startDate: { lte: now },
-            endDate: { gte: now },
-          },
-        },
-      },
-      orderBy: { createdAt: "desc" },
-      take: 5,
-      select: {
-        id: true,
-        title: true,
-        city: true,
-        country: true,
-        dailyRateCents: true,
-        currency: true,
-        imageUrl: true,
-        host: {
-          select: {
-            reviewsReceived: {
-              select: { rating: true },
-              take: 50,
+    const [topListingsResult, availableCarsResult, activeHostsResult, confirmedTripsResult] = await prisma.$transaction([
+      prisma.listing.findMany({
+        where: {
+          status: "ACTIVE",
+          isApproved: true,
+          bookings: {
+            none: {
+              status: { in: reservedStatuses },
+              startDate: { lte: now },
+              endDate: { gte: now },
             },
           },
         },
-      },
-    });
+        orderBy: { createdAt: "desc" },
+        take: 5,
+        select: {
+          id: true,
+          title: true,
+          city: true,
+          country: true,
+          dailyRateCents: true,
+          currency: true,
+          imageUrl: true,
+          host: {
+            select: {
+              reviewsReceived: {
+                select: { rating: true },
+                take: 50,
+              },
+            },
+          },
+        },
+      }),
+      prisma.listing.count({
+        where: {
+          status: "ACTIVE",
+          isApproved: true,
+          bookings: {
+            none: {
+              status: { in: reservedStatuses },
+              startDate: { lte: now },
+              endDate: { gte: now },
+            },
+          },
+        },
+      }),
+      prisma.user.count({
+        where: {
+          role: "HOST",
+          status: "ACTIVE",
+        },
+      }),
+      prisma.booking.count({
+        where: { status: "CONFIRMED" },
+      }),
+    ]);
+
+    topListingsRaw = topListingsResult;
+    availableCarsNow = availableCarsResult;
+    activeHosts = activeHostsResult;
+    confirmedTrips = confirmedTripsResult;
   } catch {
     // If the DB isn't reachable (e.g. during build/prerender or temporary outage),
     // render the page without featured listings instead of failing the build.
     topListingsRaw = [];
+    availableCarsNow = 0;
+    activeHosts = 0;
+    confirmedTrips = 0;
   }
 
   const topListings: TopListing[] = topListingsRaw.map((l) => {
@@ -295,6 +330,10 @@ export default async function Home() {
       hostRating,
     };
   });
+
+  const featuredAverageRate = topListings.length
+    ? Math.round(topListings.reduce((sum, listing) => sum + listing.dailyRateCents, 0) / topListings.length)
+    : 0;
 
   return (
     <main className="relative">
@@ -427,56 +466,117 @@ export default async function Home() {
 
       <section className="space-y-4 pb-6">
         <div className="space-y-1">
-          <h2 className="text-lg font-semibold">Why choose us</h2>
-          <p className="text-sm text-foreground/60">High-trust marketplace, designed for speed and clarity.</p>
+          <h2 className="text-lg font-semibold">Marketplace pulse</h2>
+          <p className="text-sm text-foreground/60">Live platform signals that help renters and hosts make faster decisions.</p>
         </div>
 
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {[
             {
-              icon: "shield" as const,
-              title: "Trusted & secure",
-              desc: "Verified hosts, safe payments, optional insurance.",
+              icon: "car" as const,
+              label: "Cars available now",
+              value: availableCarsNow.toLocaleString(),
+              hint: "Ready for booking",
+            },
+            {
+              icon: "users" as const,
+              label: "Active hosts",
+              value: activeHosts.toLocaleString(),
+              hint: "Verified profiles",
             },
             {
               icon: "bolt" as const,
-              title: "Fast booking",
-              desc: "Reserve a car in seconds.",
-            },
-            {
-              icon: "car" as const,
-              title: "Made for renters & hosts",
-              desc: "Easy dashboard tools for both sides.",
+              label: "Confirmed trips",
+              value: confirmedTrips.toLocaleString(),
+              hint: "Completed on platform",
             },
             {
               icon: "sparkles" as const,
-              title: "Professional design",
-              desc: "Consistent UI, readable forms, clean components.",
+              label: "Featured average",
+              value: featuredAverageRate > 0 ? formatRate(featuredAverageRate, "ZAR") : "Live soon",
+              hint: "Per day rate",
             },
-          ].map((v) => (
+          ].map((metric) => (
             <Card
-              key={v.title}
+              key={metric.label}
               className="group relative overflow-hidden border-border bg-card/60 transition-transform duration-200 hover:-translate-y-0.5 hover:shadow-sm backdrop-blur supports-[backdrop-filter]:bg-card/40"
             >
               <div aria-hidden className="pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-300 group-hover:opacity-100">
                 <div className="absolute -right-24 -top-24 h-64 w-64 rounded-full bg-accent/18 blur-3xl" />
               </div>
-              <CardContent className="relative space-y-2 p-5">
+              <CardContent className="relative space-y-3 p-5">
                 <div className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-border bg-background/40 text-foreground/80">
-                  <Icon name={v.icon} />
+                  <Icon name={metric.icon} />
                 </div>
-                <div className="text-sm font-semibold">{v.title}</div>
-                <div className="text-sm text-foreground/60">{v.desc}</div>
+                <div className="space-y-1">
+                  <div className="text-2xl font-semibold tracking-tight">{metric.value}</div>
+                  <div className="text-sm font-medium text-foreground/80">{metric.label}</div>
+                </div>
+                <div className="text-xs text-foreground/60">{metric.hint}</div>
               </CardContent>
             </Card>
           ))}
         </div>
       </section>
 
+      <section className="grid gap-4 pb-6 lg:grid-cols-2">
+        <Card className="relative overflow-hidden border-border bg-card/60 backdrop-blur supports-[backdrop-filter]:bg-card/40">
+          <div aria-hidden className="pointer-events-none absolute inset-0">
+            <div className="absolute -left-24 -top-24 h-64 w-64 rounded-full bg-accent/15 blur-3xl" />
+          </div>
+          <CardContent className="relative p-5 sm:p-6">
+            <div className="mb-4 space-y-1">
+              <h3 className="text-base font-semibold">Popular pickup hotspots</h3>
+              <p className="text-sm text-foreground/60">Plan around areas with high availability and quick pickup windows.</p>
+            </div>
+            <div className="grid gap-3">
+              {[
+                { city: "Cape Town CBD", eta: "12 min avg pickup", tag: "High availability" },
+                { city: "Johannesburg North", eta: "15 min avg pickup", tag: "Best value" },
+                { city: "Durban Central", eta: "18 min avg pickup", tag: "Weekend demand" },
+              ].map((spot) => (
+                <div key={spot.city} className="flex items-center justify-between gap-3 rounded-2xl border border-border bg-background/35 p-3">
+                  <div>
+                    <div className="text-sm font-semibold">{spot.city}</div>
+                    <div className="text-xs text-foreground/60">{spot.eta}</div>
+                  </div>
+                  <div className="rounded-full border border-border bg-card/60 px-2.5 py-1 text-xs text-foreground/70">{spot.tag}</div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="relative overflow-hidden border-border bg-card/60 backdrop-blur supports-[backdrop-filter]:bg-card/40">
+          <div aria-hidden className="pointer-events-none absolute inset-0">
+            <div className="absolute -right-24 -bottom-24 h-64 w-64 rounded-full bg-foreground/10 blur-3xl" />
+          </div>
+          <CardContent className="relative p-5 sm:p-6">
+            <div className="mb-4 space-y-1">
+              <h3 className="text-base font-semibold">How booking works</h3>
+              <p className="text-sm text-foreground/60">Simple flow, built for speed from search to key handoff.</p>
+            </div>
+            <ol className="space-y-3">
+              {[
+                { title: "Find your match", desc: "Filter by city, date, and price in seconds." },
+                { title: "Book instantly", desc: "Secure checkout and verified hosts keep it smooth." },
+                { title: "Pick up and drive", desc: "Coordinate pickup details directly from your dashboard." },
+              ].map((step, index) => (
+                <li key={step.title} className="rounded-2xl border border-border bg-background/35 p-3">
+                  <div className="text-xs font-medium text-foreground/60">Step {index + 1}</div>
+                  <div className="mt-1 text-sm font-semibold">{step.title}</div>
+                  <div className="mt-0.5 text-xs text-foreground/60">{step.desc}</div>
+                </li>
+              ))}
+            </ol>
+          </CardContent>
+        </Card>
+      </section>
+
       <section className="space-y-4 pb-6">
         <div className="space-y-1">
           <h2 className="text-lg font-semibold">Choose your role</h2>
-          <p className="text-sm text-foreground/60">Interactive dashboards built for each workflow.</p>
+          <p className="text-sm text-foreground/60">Dedicated experiences for renters, hosts, and operations teams.</p>
         </div>
 
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -484,21 +584,21 @@ export default async function Home() {
             {
               icon: "car" as const,
               title: "Renter",
-              desc: "Discover and book cars instantly.",
+              desc: "Find and book a verified car in under a minute.",
               cta: "Browse cars",
               href: "/listings",
             },
             {
               icon: "key" as const,
               title: "Host",
-              desc: "List your car and manage bookings easily.",
+              desc: "List your car, accept bookings, and grow monthly earnings.",
               cta: "Open host dashboard",
               href: "/host",
             },
             {
               icon: "gear" as const,
               title: "Admin",
-              desc: "Approve listings, manage users, and control the platform.",
+              desc: "Review listings, monitor platform health, and manage payouts.",
               cta: "Admin console",
               href: "/admin",
             },

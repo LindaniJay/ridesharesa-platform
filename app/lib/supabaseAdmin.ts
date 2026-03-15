@@ -68,14 +68,17 @@ export async function uploadPrivateImage(params: {
   path: string;
   file: File;
   upsert?: boolean;
+  allowPdf?: boolean;
 }) {
-  if (!params.file.type.startsWith("image/")) {
-    throw new Error("Only image uploads are supported");
+  const isImage = params.file.type.startsWith("image/");
+  const isPdf = params.file.type === "application/pdf";
+  if (!isImage && !(params.allowPdf && isPdf)) {
+    throw new Error(params.allowPdf ? "Only image or PDF uploads are supported" : "Only image uploads are supported");
   }
 
   const maxBytes = 8 * 1024 * 1024;
   if (params.file.size > maxBytes) {
-    throw new Error("Image too large (max 8MB)");
+    throw new Error("File too large (max 8MB)");
   }
 
   const bytes = new Uint8Array(await params.file.arrayBuffer());

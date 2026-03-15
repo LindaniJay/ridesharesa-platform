@@ -25,6 +25,23 @@ const PHOTO_KINDS: Array<{ kind: BookingPhotoKind; label: string; helper: string
   { kind: "host_return", label: "Host return inspection", helper: "Host uploads inspection after return." },
 ];
 
+type BookingLifecycleStep = "BOOKED" | "PICKUP" | "ACTIVE" | "RETURN" | "REVIEWED";
+
+function deriveBookingLifecycleStep(params: {
+  status: "PENDING_PAYMENT" | "PENDING_APPROVAL" | "CONFIRMED" | "CANCELLED";
+  now: Date;
+  startDate: Date;
+  endDate: Date;
+  hasReview: boolean;
+}): BookingLifecycleStep {
+  if (params.status === "CANCELLED") return "BOOKED";
+  if (params.status !== "CONFIRMED") return "BOOKED";
+  if (params.now < params.startDate) return "PICKUP";
+  if (params.now <= params.endDate) return "ACTIVE";
+  if (params.hasReview) return "REVIEWED";
+  return "RETURN";
+}
+
 async function listSignedBookingPhotos(params: { bookingId: string; kind: BookingPhotoKind }) {
   const bucket = process.env.SUPABASE_BOOKING_PHOTOS_BUCKET || "booking-photos";
   const admin = supabaseAdmin();
@@ -164,6 +181,28 @@ export default async function BookingPage({
       })
     : null;
 
+  const totalReviewsForBooking = await prisma.review.count({
+    where: { bookingId: booking.id },
+  });
+
+  const lifecycleOrder: BookingLifecycleStep[] = ["BOOKED", "PICKUP", "ACTIVE", "RETURN", "REVIEWED"];
+  const lifecycleLabel: Record<BookingLifecycleStep, string> = {
+    BOOKED: "Booked",
+    PICKUP: "Pickup",
+    ACTIVE: "Active",
+    RETURN: "Return",
+    REVIEWED: "Reviewed",
+  };
+
+  const lifecycleCurrent = deriveBookingLifecycleStep({
+    status: booking.status,
+    now: new Date(),
+    startDate: booking.startDate,
+    endDate: booking.endDate,
+    hasReview: totalReviewsForBooking > 0,
+  });
+  const lifecycleCurrentIndex = lifecycleOrder.indexOf(lifecycleCurrent);
+
   const photosByKind = await Promise.all(
     PHOTO_KINDS.map(async ({ kind }) => ({
       kind,
@@ -237,6 +276,34 @@ export default async function BookingPage({
       </div>
 
       <BookingStatusClient status={booking.status} method={isManualPayment ? "manual" : "stripe"} />
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Trip progress</CardTitle>
+          <CardDescription>Track where this booking is in the trip lifecycle.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <ol className="grid gap-2 sm:grid-cols-5">
+            {lifecycleOrder.map((step, idx) => {
+              const completed = idx <= lifecycleCurrentIndex;
+              const active = idx === lifecycleCurrentIndex;
+              return (
+                <li
+                  key={step}
+                  className={[
+                    "rounded-xl border px-3 py-2 text-sm",
+                    completed ? "border-accent/40 bg-accent-soft text-foreground" : "border-border bg-card/60 text-foreground/60",
+                    active ? "ring-1 ring-accent/40" : "",
+                  ].join(" ")}
+                >
+                  <div className="text-[11px] uppercase tracking-wide text-foreground/55">Step {idx + 1}</div>
+                  <div className="mt-0.5 font-medium">{lifecycleLabel[step]}</div>
+                </li>
+              );
+            })}
+          </ol>
+        </CardContent>
+      </Card>
 
       {isRenter ? (
         <BookingActions

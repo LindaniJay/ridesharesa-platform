@@ -47,6 +47,11 @@ export default function CheckoutClient(props: {
   const [paymentMethod, setPaymentMethod] = useState<"card" | "eft">("card");
   const [chauffeurEnabled, setChauffeurEnabled] = useState(Boolean(props.initialChauffeurEnabled));
   const [chauffeurKm, setChauffeurKm] = useState<number>(props.initialChauffeurKm ?? 0);
+  const [checklist, setChecklist] = useState({
+    docsReady: false,
+    handoverTime: false,
+    policyRead: false,
+  });
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -128,52 +133,55 @@ export default function CheckoutClient(props: {
   }
 
   return (
-    <form onSubmit={onSubmit} className="space-y-3">
-      <div className="text-sm font-medium text-foreground/80">Dates</div>
+    <form onSubmit={onSubmit} className="space-y-4">
+      <div className="rounded-xl border border-border bg-card/70 p-4">
+        <div className="mb-3 flex items-center justify-between gap-2">
+          <div className="text-sm font-semibold text-foreground/85">1. Trip dates</div>
+          <div className="text-xs text-foreground/55">Max 30 days per booking</div>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <label className="block">
+            <div className="mb-1 text-sm">Start date</div>
+            <Input
+              name="startDate"
+              type="date"
+              required
+              value={startDate}
+              onChange={(e) => setStartDate(e.target.value)}
+            />
+          </label>
 
-      <label className="block">
-        <div className="mb-1 text-sm">Start date</div>
-        <Input
-          name="startDate"
-          type="date"
-          required
-          value={startDate}
-          onChange={(e) => setStartDate(e.target.value)}
-        />
-      </label>
+          <label className="block">
+            <div className="mb-1 text-sm">End date</div>
+            <Input
+              name="endDate"
+              type="date"
+              required
+              value={endDate}
+              onChange={(e) => setEndDate(e.target.value)}
+            />
+            <div className="mt-1 text-xs text-foreground/50">End date must be after start date.</div>
+          </label>
+        </div>
+      </div>
 
-      <label className="block">
-        <div className="mb-1 text-sm">End date</div>
-        <Input
-          name="endDate"
-          type="date"
-          required
-          value={endDate}
-          onChange={(e) => setEndDate(e.target.value)}
-        />
-        <div className="mt-1 text-xs text-foreground/50">End date must be after start date.</div>
-      </label>
+      <div className="rounded-xl border border-border bg-card/70 p-4 text-sm">
+        <div className="mb-3 flex items-center justify-between gap-2">
+          <div className="text-sm font-semibold text-foreground/85">2. Fare summary</div>
+          <div className="text-xs text-foreground/55">Live calculator</div>
+        </div>
 
-      <div className="pt-2 text-sm font-medium text-foreground/80">Booking calculator</div>
-      <div className="rounded-lg border border-border bg-card p-3 text-sm">
         <div className="flex items-center justify-between">
           <span className="text-foreground/60">Daily rate</span>
-          <span>
-            {formatMoney(props.dailyRateCents, props.currency)}
-          </span>
+          <span>{formatMoney(props.dailyRateCents, props.currency)}</span>
         </div>
         <div className="mt-2 flex items-center justify-between">
           <span className="text-foreground/60">Days</span>
-          <span>{pricing?.days && pricing.days > 0 ? pricing.days : "—"}</span>
+          <span>{pricing?.days && pricing.days > 0 ? pricing.days : "-"}</span>
         </div>
-
         <div className="mt-2 flex items-center justify-between">
           <span className="text-foreground/60">Rental total</span>
-          <span>
-            {pricing && pricing.days > 0
-              ? formatMoney(pricing.baseCents, props.currency)
-              : "—"}
-          </span>
+          <span>{pricing && pricing.days > 0 ? formatMoney(pricing.baseCents, props.currency) : "-"}</span>
         </div>
 
         <div className="mt-3 rounded-lg border border-border bg-background/40 p-3">
@@ -185,8 +193,8 @@ export default function CheckoutClient(props: {
               className="mt-1"
             />
             <span>
-              <span className="font-medium">Chauffeur</span>
-              <div className="text-xs text-foreground/60">Adds 10 {props.currency}/km (estimated distance).</div>
+              <span className="font-medium">Add chauffeur</span>
+              <div className="text-xs text-foreground/60">Adds 10 {props.currency}/km based on your estimated route distance.</div>
             </span>
           </label>
 
@@ -209,28 +217,23 @@ export default function CheckoutClient(props: {
                 <span>
                   {pricing && pricing.days > 0 && chauffeurEnabled
                     ? formatMoney(pricing.chauffeurCents, props.currency)
-                    : "—"}
+                    : "-"}
                 </span>
               </div>
-              <div className="mt-1 text-foreground/50">Calculated as km × 10.</div>
+              <div className="mt-1 text-foreground/50">Calculated as km x 10.</div>
             </div>
           </div>
         </div>
 
-        <div className="mt-3 flex items-center justify-between font-medium">
+        <div className="mt-3 flex items-center justify-between rounded-lg border border-border bg-background/45 px-3 py-2 font-medium">
           <span>Total</span>
-          <span>
-            {pricing && pricing.days > 0
-              ? formatMoney(pricing.totalCents, props.currency)
-              : "Select dates"}
-          </span>
+          <span>{pricing && pricing.days > 0 ? formatMoney(pricing.totalCents, props.currency) : "Select dates"}</span>
         </div>
-        <div className="mt-2 text-xs text-foreground/50">Final amount is confirmed on Stripe.</div>
       </div>
 
-      <div className="pt-2 text-sm font-medium text-foreground/80">Payment</div>
-      <div className="space-y-2 rounded-lg border border-border bg-card p-3 text-sm">
-        <label className="flex cursor-pointer items-start gap-2">
+      <div className="space-y-2 rounded-xl border border-border bg-card/70 p-4 text-sm">
+        <div className="text-sm font-semibold text-foreground/85">3. Payment method</div>
+        <label className="flex cursor-pointer items-start gap-2 rounded-lg border border-border bg-background/40 p-2.5">
           <input
             type="radio"
             name="paymentMethod"
@@ -241,11 +244,11 @@ export default function CheckoutClient(props: {
           />
           <span>
             <span className="font-medium">Card (Stripe)</span>
-            <div className="text-xs text-foreground/60">You’ll be redirected to Stripe to complete payment securely.</div>
+            <div className="text-xs text-foreground/60">Fast and secure checkout on Stripe.</div>
           </span>
         </label>
 
-        <label className="flex cursor-pointer items-start gap-2">
+        <label className="flex cursor-pointer items-start gap-2 rounded-lg border border-border bg-background/40 p-2.5">
           <input
             type="radio"
             name="paymentMethod"
@@ -256,7 +259,7 @@ export default function CheckoutClient(props: {
           />
           <span>
             <span className="font-medium">Instant EFT (manual)</span>
-            <div className="text-xs text-foreground/60">Create a booking and pay via EFT using the reference provided.</div>
+            <div className="text-xs text-foreground/60">Create booking first, then pay with your unique reference code.</div>
           </span>
         </label>
 
@@ -281,7 +284,7 @@ export default function CheckoutClient(props: {
                   <span className="text-foreground/60">Branch code</span>
                   <span>{props.eftDetails.branchCode}</span>
                 </div>
-                <div className="mt-1 text-foreground/50">You’ll get a payment reference after creating the booking.</div>
+                <div className="mt-1 text-foreground/50">You will get a payment reference after creating the booking.</div>
               </div>
             ) : (
               <div className="mt-2 text-foreground/60">Bank details are currently unavailable. Please contact support to complete payment.</div>
@@ -290,11 +293,55 @@ export default function CheckoutClient(props: {
         ) : null}
       </div>
 
-      {error ? <div className="text-sm text-red-600">{error}</div> : null}
+      <div className="rounded-xl border border-border bg-card/70 p-4 text-sm">
+        <div className="text-sm font-semibold text-foreground/85">4. Checkout checklist</div>
+        <div className="mt-1 text-xs text-foreground/60">Complete these checks before confirming payment.</div>
+        <div className="mt-3 space-y-2">
+          <label className="flex items-start gap-2 rounded-lg border border-border bg-background/40 px-3 py-2">
+            <input
+              type="checkbox"
+              checked={checklist.docsReady}
+              onChange={(e) => setChecklist((prev) => ({ ...prev, docsReady: e.target.checked }))}
+              className="mt-1"
+            />
+            <span className="text-xs text-foreground/80">I have my driver license and ID ready for pickup verification.</span>
+          </label>
+          <label className="flex items-start gap-2 rounded-lg border border-border bg-background/40 px-3 py-2">
+            <input
+              type="checkbox"
+              checked={checklist.handoverTime}
+              onChange={(e) => setChecklist((prev) => ({ ...prev, handoverTime: e.target.checked }))}
+              className="mt-1"
+            />
+            <span className="text-xs text-foreground/80">I confirmed pickup time/location with the host or will confirm right after booking.</span>
+          </label>
+          <label className="flex items-start gap-2 rounded-lg border border-border bg-background/40 px-3 py-2">
+            <input
+              type="checkbox"
+              checked={checklist.policyRead}
+              onChange={(e) => setChecklist((prev) => ({ ...prev, policyRead: e.target.checked }))}
+              className="mt-1"
+            />
+            <span className="text-xs text-foreground/80">I understand cancellation, payment, and return responsibilities for this trip.</span>
+          </label>
+        </div>
+      </div>
 
-      <Button className="w-full" disabled={loading} type="submit">
-        {loading ? "Redirecting…" : paymentMethod === "eft" ? "Confirm & Get EFT details" : "Confirm & Pay"}
+      {error ? <div className="rounded-lg border border-red-500/20 bg-red-500/10 px-3 py-2 text-sm text-red-600">{error}</div> : null}
+
+      <Button
+        className="h-11 w-full text-base"
+        disabled={
+          loading ||
+          !checklist.docsReady ||
+          !checklist.handoverTime ||
+          !checklist.policyRead
+        }
+        type="submit"
+      >
+        {loading ? "Redirecting..." : paymentMethod === "eft" ? "Confirm booking and get EFT reference" : "Continue to secure payment"}
       </Button>
+      <div className="text-center text-xs text-foreground/55">Your final payable amount is confirmed on the payment page.</div>
     </form>
   );
 }

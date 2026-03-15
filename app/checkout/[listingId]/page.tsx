@@ -135,7 +135,7 @@ export default async function CheckoutPage({
   );
 
   return (
-    <main className="mx-auto max-w-xl space-y-4">
+    <main className="mx-auto max-w-5xl space-y-4">
       <div className="text-sm text-foreground/60">
         <Link className="underline" href="/listings">
           Listings
@@ -148,54 +148,81 @@ export default async function CheckoutPage({
         <span className="text-foreground">Checkout</span>
       </div>
 
-      <div className="space-y-1">
-        <h1 className="text-2xl font-semibold tracking-tight">Checkout</h1>
-        <p className="text-sm text-foreground/60">Confirm dates and complete your booking.</p>
-      </div>
+      <section className="relative overflow-hidden rounded-3xl border border-border bg-card/60 p-5 backdrop-blur supports-[backdrop-filter]:bg-card/40 sm:p-6">
+        <div aria-hidden className="pointer-events-none absolute inset-0">
+          <div className="absolute -left-24 -top-24 h-64 w-64 rounded-full bg-accent/15 blur-3xl" />
+          <div className="absolute -right-28 -bottom-28 h-72 w-72 rounded-full bg-foreground/8 blur-3xl" />
+        </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>{listing.title}</CardTitle>
-          <CardDescription>{listing.city}</CardDescription>
-        </CardHeader>
-        <CardContent>
-          {listing.imageUrl ? (
-            <>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={listing.imageUrl}
-                alt={listing.title}
-                className="mb-3 h-40 w-full rounded-xl border border-border object-cover"
-                loading="lazy"
-              />
-            </>
-          ) : null}
-          <div className="text-sm">
-            {(listing.dailyRateCents / 100).toFixed(0)} {listing.currency}
-            <span className="text-foreground/50"> / day</span>
+        <div className="relative grid gap-5 lg:grid-cols-[1.05fr_1fr] lg:items-start">
+          <div className="space-y-4">
+            <div className="inline-flex items-center gap-2 rounded-full border border-border bg-background/35 px-3 py-1 text-xs text-foreground/70">
+              <span className="inline-flex h-2 w-2 rounded-full bg-accent/80" />
+              Secure booking flow
+            </div>
+            <div className="space-y-1">
+              <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">Reserve this car in under 2 minutes</h1>
+              <p className="text-sm text-foreground/60">Confirm your trip dates, choose payment method, and get instant booking status updates.</p>
+            </div>
+
+            <Card className="overflow-hidden border-border bg-background/35 p-0">
+              <CardContent className="mt-0">
+                {listing.imageUrl ? (
+                  <>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={listing.imageUrl}
+                      alt={listing.title}
+                      className="h-44 w-full border-b border-border object-cover"
+                      loading="lazy"
+                    />
+                  </>
+                ) : (
+                  <div className="flex h-44 items-center justify-center border-b border-border bg-gradient-to-br from-foreground/8 to-transparent text-sm text-foreground/60">
+                    No vehicle photo available
+                  </div>
+                )}
+
+                <div className="space-y-3 p-4">
+                  <div className="space-y-0.5">
+                    <CardTitle className="text-lg">{listing.title}</CardTitle>
+                    <CardDescription>{listing.city}</CardDescription>
+                  </div>
+                  <div className="text-sm font-semibold">
+                    {(listing.dailyRateCents / 100).toFixed(0)} {listing.currency}
+                    <span className="text-foreground/50"> / day</span>
+                  </div>
+                  <div className="grid gap-2 text-xs text-foreground/65 sm:grid-cols-3">
+                    <div className="rounded-lg border border-border bg-card/70 px-2.5 py-2">Step 1: Dates</div>
+                    <div className="rounded-lg border border-border bg-card/70 px-2.5 py-2">Step 2: Price check</div>
+                    <div className="rounded-lg border border-border bg-card/70 px-2.5 py-2">Step 3: Payment</div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
           </div>
-        </CardContent>
-      </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Booking details</CardTitle>
-          <CardDescription>Pick dates, then confirm payment.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <CheckoutClient
-            listingId={listingId}
-            dailyRateCents={dailyRateCents}
-            currency={currency}
-            eftDetails={eft}
-            hasEftDetails={hasEftDetails}
-            initialStartDate={initialStartDate}
-            initialEndDate={initialEndDate}
-            initialChauffeurEnabled={initialChauffeurEnabled}
-            initialChauffeurKm={initialChauffeurKm}
-          />
-        </CardContent>
-      </Card>
+          <Card className="border-border bg-background/30">
+            <CardHeader>
+              <CardTitle>Booking details</CardTitle>
+              <CardDescription>Pick dates, review total, and complete secure checkout.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <CheckoutClient
+                listingId={listingId}
+                dailyRateCents={dailyRateCents}
+                currency={currency}
+                eftDetails={eft}
+                hasEftDetails={hasEftDetails}
+                initialStartDate={initialStartDate}
+                initialEndDate={initialEndDate}
+                initialChauffeurEnabled={initialChauffeurEnabled}
+                initialChauffeurKm={initialChauffeurKm}
+              />
+            </CardContent>
+          </Card>
+        </div>
+      </section>
     </main>
   );
 }
