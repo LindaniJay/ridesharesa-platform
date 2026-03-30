@@ -100,8 +100,9 @@ export default async function RenterDashboardPage({
   }
 
   const now = new Date();
+  const monthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
 
-  const [upcoming, ongoing, past, supportTickets, authoredReviews] = await Promise.all([
+  const [upcoming, ongoing, past, supportTickets, authoredReviews, confirmedSpendAll, confirmedSpend30, pendingPaymentAgg] = await Promise.all([
     prisma.booking.findMany({
       where: {
         renterId,
@@ -197,7 +198,43 @@ export default async function RenterDashboardPage({
         },
       },
     }),
+    prisma.booking.aggregate({
+      where: { renterId, status: "CONFIRMED" },
+      _sum: { totalCents: true },
+      _count: { _all: true },
+    }),
+    prisma.booking.aggregate({
+      where: { renterId, status: "CONFIRMED", createdAt: { gte: monthAgo } },
+      _sum: { totalCents: true },
+      _count: { _all: true },
+    }),
+    prisma.booking.aggregate({
+      where: { renterId, status: "PENDING_PAYMENT", endDate: { gt: now } },
+      _sum: { totalCents: true },
+      _count: { _all: true },
+    }),
   ]);
+
+  const pendingPaymentCount = pendingPaymentAgg._count._all;
+  const pendingPaymentCents = pendingPaymentAgg._sum.totalCents ?? 0;
+  const confirmedSpendCents = confirmedSpendAll._sum.totalCents ?? 0;
+  const confirmedSpend30Cents = confirmedSpend30._sum.totalCents ?? 0;
+  const nextActions: string[] = [];
+  if (dbUser.idVerificationStatus !== "VERIFIED") {
+    nextActions.push(`Verify your ID (${dbUser.idVerificationStatus}) to reduce booking friction.`);
+  }
+  if (dbUser.driversLicenseStatus !== "VERIFIED") {
+    nextActions.push(`Verify your driver's license (${dbUser.driversLicenseStatus}) before your next trip.`);
+  }
+  if (!hasProofOfResidence) {
+    nextActions.push("Upload proof of residence to complete your profile pack.");
+  }
+  if (pendingPaymentCount > 0) {
+    nextActions.push(`Complete ${pendingPaymentCount} pending payment${pendingPaymentCount !== 1 ? "s" : ""}.`);
+  }
+  if (nextActions.length === 0) {
+    nextActions.push("You're fully set. Review upcoming trips and keep host chat active.");
+  }
 
   async function createSupportTicket(formData: FormData) {
     "use server";
@@ -338,6 +375,20 @@ export default async function RenterDashboardPage({
               <span className="text-sm text-muted-foreground">Completed</span>
               <span className="text-lg font-bold">{past.length}</span>
             </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Next actions</CardTitle>
+            <CardDescription>Recommended steps to keep trips smooth.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {nextActions.map((action) => (
+              <div key={action} className="rounded-lg border border-border bg-muted/30 px-3 py-2 text-xs text-foreground/80">
+                {action}
+              </div>
+            ))}
           </CardContent>
         </Card>
       </aside>
@@ -500,7 +551,49 @@ export default async function RenterDashboardPage({
 
         {section === "payments" ? (
           <section className="space-y-3">
-            <h2 className="text-lg font-semibold">Payments & wallet</h2>
+            <div className="flex flex-wrap items-end justify-between gap-2">
+              <h2 className="text-lg font-semibold">Payments & wallet</h2>
+              <a
+                href="/api/renter/exports/payments"
+                className="inline-flex items-center justify-center rounded-lg px-3.5 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/30 border border-border bg-card text-foreground shadow-sm hover:bg-muted"
+              >
+                Download my payments (CSV)
+              </a>
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-3">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Total confirmed spend</CardTitle>
+                  <CardDescription>All completed bookings.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-semibold">R{(confirmedSpendCents / 100).toLocaleString()}</div>
+                  <div className="text-xs text-foreground/60">{confirmedSpendAll._count._all} confirmed booking(s)</div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader>
+                  <CardTitle>Last 30 days</CardTitle>
+                  <CardDescription>Recent confirmed activity.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-semibold">R{(confirmedSpend30Cents / 100).toLocaleString()}</div>
+                  <div className="text-xs text-foreground/60">{confirmedSpend30._count._all} booking(s)</div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader>
+                  <CardTitle>Pending payment</CardTitle>
+                  <CardDescription>Trips still awaiting payment.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-semibold">R{(pendingPaymentCents / 100).toLocaleString()}</div>
+                  <div className="text-xs text-foreground/60">{pendingPaymentCount} booking(s)</div>
+                </CardContent>
+              </Card>
+            </div>
+
             <Card>
               <CardHeader>
                 <CardTitle>Payment history</CardTitle>

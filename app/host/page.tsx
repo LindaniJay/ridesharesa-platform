@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { revalidatePath } from "next/cache";
 
 export const dynamic = "force-dynamic";
 
@@ -52,6 +53,8 @@ export default async function HostDashboardPage() {
   }
 
   const now = new Date();
+  const monthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+  const twoDaysFromNow = new Date(now.getTime() + 48 * 60 * 60 * 1000);
 
   const [
     listings,
@@ -64,6 +67,9 @@ export default async function HostDashboardPage() {
     pendingPayouts,
     paidPayouts,
     recentPayouts,
+    pendingActionBookingsCount,
+    urgentUpcomingCount,
+    recentConfirmedForPerformance,
   ] = await Promise.all([
     prisma.listing.findMany({
       where: { hostId },
@@ -197,6 +203,34 @@ export default async function HostDashboardPage() {
         createdAt: true,
       },
     }),
+    prisma.booking.count({
+      where: {
+        listing: { hostId },
+        status: { in: ["PENDING_PAYMENT", "PENDING_APPROVAL"] },
+      },
+    }),
+    prisma.booking.count({
+      where: {
+        listing: { hostId },
+        status: "CONFIRMED",
+        startDate: { gte: now, lte: twoDaysFromNow },
+      },
+    }),
+    prisma.booking.findMany({
+      where: {
+        listing: { hostId },
+        status: "CONFIRMED",
+        createdAt: { gte: monthAgo },
+      },
+      select: {
+        id: true,
+        listingId: true,
+        totalCents: true,
+        startDate: true,
+        endDate: true,
+      },
+      take: 500,
+    }),
   ]);
 
   const totalEarningsCents = confirmedTotals._sum.totalCents ?? 0;
@@ -205,6 +239,33 @@ export default async function HostDashboardPage() {
   const pendingPayoutCount = pendingPayouts._count._all;
   const paidPayoutCents = paidPayouts._sum.amountCents ?? 0;
   const paidPayoutCount = paidPayouts._count._all;
+  const unapprovedListingsCount = listings.filter((l) => !l.isApproved).length;
+
+  const listingTitleById = new Map(listings.map((l) => [l.id, l.title] as const));
+  const listingPerformanceMap = new Map<string, { trips: number; revenueCents: number; bookedDays: number }>();
+  for (const booking of recentConfirmedForPerformance) {
+    const existing = listingPerformanceMap.get(booking.listingId) ?? { trips: 0, revenueCents: 0, bookedDays: 0 };
+    const durationDays = Math.max(
+      1,
+      Math.ceil((booking.endDate.getTime() - booking.startDate.getTime()) / (24 * 60 * 60 * 1000)),
+    );
+    listingPerformanceMap.set(booking.listingId, {
+      trips: existing.trips + 1,
+      revenueCents: existing.revenueCents + booking.totalCents,
+      bookedDays: existing.bookedDays + durationDays,
+    });
+  }
+
+  const listingPerformanceRows = Array.from(listingPerformanceMap.entries())
+    .map(([listingId, perf]) => ({
+      listingId,
+      title: listingTitleById.get(listingId) ?? "Unknown listing",
+      trips: perf.trips,
+      revenueCents: perf.revenueCents,
+      bookedDays: perf.bookedDays,
+    }))
+    .sort((a, b) => b.revenueCents - a.revenueCents)
+    .slice(0, 8);
 
   async function createSupportTicket(formData: FormData) {
     "use server";
@@ -221,6 +282,8 @@ export default async function HostDashboardPage() {
         message,
       },
     });
+
+    revalidatePath("/host");
   }
 
   return (
@@ -301,6 +364,48 @@ export default async function HostDashboardPage() {
             <CardContent>
               <div className="text-2xl font-bold">{confirmedTrips + pastBookings.length}</div>
               <p className="text-xs text-muted-foreground mt-1">All time</p>
+            </CardContent>
+          </Card>
+        </div>
+      </section>
+
+      <section className="space-y-3">
+        <h2 className="text-lg font-semibold">Operations & alerts</h2>
+        <div className="grid gap-4 lg:grid-cols-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Pending actions</CardTitle>
+              <CardDescription>Bookings waiting for payment or approval.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-semibold">{pendingActionBookingsCount}</div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle>Starts in 48h</CardTitle>
+              <CardDescription>Confirmed trips needing handover prep.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-semibold">{urgentUpcomingCount}</div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle>Listings under review</CardTitle>
+              <CardDescription>Vehicles not yet approved by admin.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-semibold">{unapprovedListingsCount}</div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle>Support tickets</CardTitle>
+              <CardDescription>Open and historical host requests.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-semibold">{supportTickets.length}</div>
             </CardContent>
           </Card>
         </div>
@@ -490,6 +595,14 @@ export default async function HostDashboardPage() {
 
       <section className="space-y-3">
         <h2 className="text-lg font-semibold">Booking management</h2>
+        <div className="flex flex-wrap items-center gap-2">
+          <a
+            href="/api/host/exports/bookings"
+            className="inline-flex items-center justify-center rounded-lg px-3.5 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/30 border border-border bg-card text-foreground shadow-sm hover:bg-muted"
+          >
+            Download my bookings (CSV)
+          </a>
+        </div>
         <div className="grid gap-4 lg:grid-cols-3">
           <Card>
             <CardHeader>
@@ -718,13 +831,36 @@ export default async function HostDashboardPage() {
         <h2 className="text-lg font-semibold">Optimization tools</h2>
         <Card>
           <CardHeader>
-            <CardTitle>Insights</CardTitle>
-            <CardDescription>Utilization and pricing recommendations.</CardDescription>
+            <CardTitle>Top listing performance (30 days)</CardTitle>
+            <CardDescription>Revenue and utilization by listing from confirmed trips.</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="text-sm text-foreground/60">
-              Dynamic pricing, utilization analytics, and tips aren’t enabled yet.
-            </div>
+            {listingPerformanceRows.length === 0 ? (
+              <div className="text-sm text-foreground/60">No confirmed bookings in the last 30 days.</div>
+            ) : (
+              <div className="overflow-hidden rounded-xl border border-border">
+                <table className="w-full text-left text-sm">
+                  <thead className="bg-muted">
+                    <tr>
+                      <th className="px-3 py-2">Listing</th>
+                      <th className="px-3 py-2">Trips</th>
+                      <th className="px-3 py-2">Booked days</th>
+                      <th className="px-3 py-2">Revenue</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {listingPerformanceRows.map((row) => (
+                      <tr key={row.listingId} className="border-t border-border">
+                        <td className="px-3 py-2">{row.title}</td>
+                        <td className="px-3 py-2">{row.trips}</td>
+                        <td className="px-3 py-2">{row.bookedDays}</td>
+                        <td className="px-3 py-2">R{(row.revenueCents / 100).toLocaleString()}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </CardContent>
         </Card>
       </section>
