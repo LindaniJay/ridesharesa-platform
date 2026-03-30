@@ -29,6 +29,7 @@ export default function AdminBulkSelector({
   const [pending, startTransition] = useTransition();
 
   const allSelected = selected.size === items.length && items.length > 0;
+  const selectedPreview = items.filter((item) => selected.has(item.id)).slice(0, 4);
 
   function toggleAll() {
     if (allSelected) {
@@ -63,6 +64,10 @@ export default function AdminBulkSelector({
         <div className="flex flex-wrap items-center gap-2 rounded-xl border border-accent/20 bg-accent/5 px-4 py-2">
           <span className="text-sm font-medium">
             {selected.size} {noun}{selected.size !== 1 ? "s" : ""} selected
+          </span>
+          <span className="text-xs text-foreground/70">
+            {selectedPreview.map((item) => item.label).join(", ")}
+            {selected.size > selectedPreview.length ? ` +${selected.size - selectedPreview.length} more` : ""}
           </span>
           <div className="flex flex-wrap items-center gap-2 ml-auto">
             {actions.map((a) => (

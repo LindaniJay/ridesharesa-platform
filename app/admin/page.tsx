@@ -118,6 +118,84 @@ function parseAuditSnapshot(value: string | null) {
     return null;
   }
 }
+
+function isSensitiveAuditKey(key: string) {
+  const normalized = key.toLowerCase();
+  return [
+    "password",
+    "token",
+    "secret",
+    "authorization",
+    "cookie",
+    "session",
+    "apiKey",
+    "serviceRole",
+    "signedurl",
+    "signed_url",
+  ].some((needle) => normalized.includes(needle.toLowerCase()));
+}
+
+function auditComparable(value: unknown): string {
+  if (value === null || value === undefined) return "__EMPTY__";
+  if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") return String(value);
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return String(value);
+  }
+}
+
+function formatAuditValue(value: unknown): string {
+  if (value === null || value === undefined) return "-";
+  if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") return String(value);
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return String(value);
+  }
+}
+
+function buildAuditDiffRows(
+  before: Record<string, unknown> | null,
+  after: Record<string, unknown> | null,
+): Array<{ key: string; before: string; after: string; changed: boolean }> {
+  const keys = new Set<string>([
+    ...Object.keys(before ?? {}),
+    ...Object.keys(after ?? {}),
+  ]);
+
+  return Array.from(keys)
+    .sort((a, b) => a.localeCompare(b))
+    .map((key) => {
+      const beforeRaw = before ? before[key] : undefined;
+      const afterRaw = after ? after[key] : undefined;
+      const changed = auditComparable(beforeRaw) !== auditComparable(afterRaw);
+
+      if (isSensitiveAuditKey(key)) {
+        return {
+          key,
+          before: beforeRaw === null || beforeRaw === undefined ? "-" : "[REDACTED]",
+          after: afterRaw === null || afterRaw === undefined ? "-" : "[REDACTED]",
+          changed,
+        };
+      }
+
+      return {
+        key,
+        before: formatAuditValue(beforeRaw),
+        after: formatAuditValue(afterRaw),
+        changed,
+      };
+    });
+}
+
+function summarizeRiskFlags(flags: string[], maxItems = 2): string {
+  if (!flags.length) return "No major risk flags";
+  const visible = flags.slice(0, maxItems);
+  const hiddenCount = Math.max(0, flags.length - visible.length);
+  return hiddenCount > 0 ? `${visible.join("; ")}; +${hiddenCount} more` : visible.join("; ");
+}
+
 function parseListingDocKind(value: unknown): ListingDocKind | null {
   const v = String(value ?? "").trim();
   return v === "licenseDisk" || v === "registration" || v === "licenseCard" ? v : null;
@@ -1426,6 +1504,8 @@ export default async function AdminDashboardPage({
             {adminAuditLogs.map((entry) => {
               const before = parseAuditSnapshot(entry.before);
               const after = parseAuditSnapshot(entry.after);
+              const diffRows = buildAuditDiffRows(before, after);
+              const changedCount = diffRows.filter((row) => row.changed).length;
               return (
                 <Card key={entry.id}>
                   <CardHeader>
@@ -1441,38 +1521,49 @@ export default async function AdminDashboardPage({
                       <div className="text-xs text-foreground/60">{entry.createdAt.toLocaleString("en-ZA")}</div>
                     </div>
                   </CardHeader>
-                  <CardContent className="grid gap-4 lg:grid-cols-2">
-                    <div className="space-y-2">
-                      <div className="text-xs font-medium uppercase tracking-wide text-foreground/50">Before</div>
-                      {before ? (
-                        <div className="space-y-1 rounded-xl border border-border bg-muted/40 p-3 text-sm">
-                          {Object.entries(before).map(([key, value]) => (
-                            <div key={key} className="flex items-start justify-between gap-3">
-                              <span className="text-foreground/60">{key}</span>
-                              <span className="break-all text-right">{String(value)}</span>
-                            </div>
-                          ))}
-                        </div>
-                      ) : (
-                        <div className="text-sm text-foreground/50">No previous snapshot.</div>
-                      )}
+                  <CardContent className="space-y-3">
+                    <div className="flex flex-wrap items-center gap-2 text-xs text-foreground/60">
+                      <span className="rounded-full border border-border bg-muted/60 px-2 py-1">
+                        {diffRows.length} field{diffRows.length === 1 ? "" : "s"}
+                      </span>
+                      <span className="rounded-full border border-border bg-muted/60 px-2 py-1">
+                        {changedCount} changed
+                      </span>
+                      <span className="rounded-full border border-border bg-muted/60 px-2 py-1">
+                        sensitive keys redacted
+                      </span>
                     </div>
 
-                    <div className="space-y-2">
-                      <div className="text-xs font-medium uppercase tracking-wide text-foreground/50">After</div>
-                      {after ? (
-                        <div className="space-y-1 rounded-xl border border-border bg-muted/40 p-3 text-sm">
-                          {Object.entries(after).map(([key, value]) => (
-                            <div key={key} className="flex items-start justify-between gap-3">
-                              <span className="text-foreground/60">{key}</span>
-                              <span className="break-all text-right">{String(value)}</span>
-                            </div>
-                          ))}
-                        </div>
-                      ) : (
-                        <div className="text-sm text-foreground/50">No new snapshot.</div>
-                      )}
-                    </div>
+                    {diffRows.length === 0 ? (
+                      <div className="text-sm text-foreground/50">No snapshot payload available for this action.</div>
+                    ) : (
+                      <div className="overflow-hidden rounded-xl border border-border">
+                        <table className="w-full text-left text-sm">
+                          <thead className="bg-muted">
+                            <tr>
+                              <th className="px-3 py-2">Field</th>
+                              <th className="px-3 py-2">Before</th>
+                              <th className="px-3 py-2">After</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {diffRows.map((row) => (
+                              <tr
+                                key={row.key}
+                                className={cn(
+                                  "border-t border-border align-top",
+                                  row.changed ? "bg-amber-500/10" : "bg-transparent",
+                                )}
+                              >
+                                <td className="px-3 py-2 text-foreground/60">{row.key}</td>
+                                <td className="px-3 py-2 break-all">{row.before}</td>
+                                <td className="px-3 py-2 break-all">{row.after}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
               );
@@ -2149,6 +2240,9 @@ export default async function AdminDashboardPage({
                           {u.driversLicenseStatus}
                         </Badge>
                       </div>
+                      <div className="mt-2 rounded-lg border border-border bg-muted/40 px-3 py-2 text-xs text-foreground/70">
+                        {summarizeRiskFlags(userRisk.flags)}
+                      </div>
 
                       <div className="mt-4 grid gap-2">
                         <form action={setUserRole} className="flex flex-wrap items-center gap-2">
@@ -2429,6 +2523,7 @@ export default async function AdminDashboardPage({
                              <span className={cn("inline-flex rounded-full px-2 py-1 text-xs font-medium", riskBadgeClass(bookingRisk.level))} title={bookingRisk.flags.join(" • ")}>
                                {riskLabel(bookingRisk.level)} {bookingRisk.score}
                              </span>
+                               <div className="mt-1 max-w-[220px] text-xs text-foreground/60">{summarizeRiskFlags(bookingRisk.flags, 1)}</div>
                            </td>
                            <td className="px-3 py-2">
                              <Badge variant={b.stripeCheckoutSessionId ? "info" : "warning"}>
@@ -2597,6 +2692,7 @@ export default async function AdminDashboardPage({
                           <span className={cn("inline-flex rounded-full px-2 py-1 text-xs font-medium", riskBadgeClass(bookingRisk.level))} title={bookingRisk.flags.join(" • ")}>
                             {riskLabel(bookingRisk.level)} {bookingRisk.score}
                           </span>
+                          <div className="mt-1 max-w-[220px] text-xs text-foreground/60">{summarizeRiskFlags(bookingRisk.flags, 1)}</div>
                         </td>
                         <td className="px-3 py-2">
                           {(b.totalCents / 100).toFixed(0)} {b.currency}
