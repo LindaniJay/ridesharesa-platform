@@ -43,6 +43,42 @@ export default function AssistPage() {
       </section>
 
       <div className="grid gap-4 lg:grid-cols-3">
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Emergency numbers</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2 text-sm">
+            <a href="tel:10111" className="flex items-center justify-between rounded-lg border border-border bg-background/40 px-3 py-2">
+              <span>Police</span>
+              <span className="font-semibold">10111</span>
+            </a>
+            <a href="tel:10177" className="flex items-center justify-between rounded-lg border border-border bg-background/40 px-3 py-2">
+              <span>Ambulance</span>
+              <span className="font-semibold">10177</span>
+            </a>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Service network</CardTitle>
+          </CardHeader>
+          <CardContent className="text-sm text-foreground/70">
+            Assist now includes towing, mechanics, fuel delivery, ambulance, and police contact references near major metros.
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Incident categories</CardTitle>
+          </CardHeader>
+          <CardContent className="text-sm text-foreground/70">
+            You can now submit more than tire and fuel requests: battery, breakdown, accident, lockout, medical, and security.
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="grid gap-4 lg:grid-cols-3">
         {[
           {
             title: "Pin your spot",
@@ -118,7 +154,7 @@ export default function AssistPage() {
           <CardTitle>Common assist scenarios</CardTitle>
           <CardDescription>Examples of what to include in notes for quicker help.</CardDescription>
         </CardHeader>
-        <CardContent className="grid gap-3 sm:grid-cols-2">
+        <CardContent className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <div className="rounded-xl border border-border bg-card p-3 text-sm text-foreground/70">
             <div className="font-medium text-foreground">Flat tyre</div>
             <div className="mt-1">Share whether the tyre is punctured or burst, and confirm if you are parked in a safe zone.</div>
@@ -127,8 +163,41 @@ export default function AssistPage() {
             <div className="font-medium text-foreground">Out of petrol</div>
             <div className="mt-1">Add nearest landmark and whether the vehicle can be pushed safely to a shoulder.</div>
           </div>
+          <div className="rounded-xl border border-border bg-card p-3 text-sm text-foreground/70">
+            <div className="font-medium text-foreground">Accident / collision</div>
+            <div className="mt-1">Include injuries, vehicle condition, and whether traffic lanes are blocked.</div>
+          </div>
+          <div className="rounded-xl border border-border bg-card p-3 text-sm text-foreground/70">
+            <div className="font-medium text-foreground">Security concern</div>
+            <div className="mt-1">Share visible threats and whether you already called emergency services.</div>
+          </div>
         </CardContent>
       </Card>
+
+      <div className="grid gap-4 lg:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <CardTitle>Response expectations</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2 text-sm text-foreground/70">
+            <p>Emergency calls should be made directly first if there is immediate danger.</p>
+            <p>Assist requests are logged for operations follow-up and trip context tracking.</p>
+            <p>Provider markers are guidance references and availability may vary by area and time.</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader>
+            <CardTitle>Tips for faster help</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ul className="list-disc space-y-2 pl-5 text-sm text-foreground/70">
+              <li>Enable GPS and keep your marker pinned accurately.</li>
+              <li>Add vehicle condition and visible hazards in notes.</li>
+              <li>Use the direct call links for urgent emergency escalation.</li>
+            </ul>
+          </CardContent>
+        </Card>
+      </div>
     </main>
   );
 }

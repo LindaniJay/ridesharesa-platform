@@ -8,13 +8,93 @@ import Button from "@/app/components/ui/Button";
 import Input from "@/app/components/ui/Input";
 import Textarea from "@/app/components/ui/Textarea";
 
-type AssistKind = "TIRE" | "FUEL";
+type AssistKind = "TIRE" | "FUEL" | "BATTERY" | "BREAKDOWN" | "ACCIDENT" | "LOCKOUT" | "MEDICAL" | "SECURITY";
 
 type AssistResult =
   | { ok: true; incidentId: string }
   | { ok: false; error: string; status?: number };
 
 const DEFAULT_CENTER: [number, number] = [-33.9249, 18.4241];
+
+type AssistProvider = {
+  id: string;
+  name: string;
+  type: "tow" | "mechanic" | "ambulance" | "police" | "fuel";
+  phone: string;
+  position: [number, number];
+};
+
+type AssistHub = {
+  city: string;
+  center: [number, number];
+  providers: AssistProvider[];
+};
+
+const ASSIST_HUBS: AssistHub[] = [
+  {
+    city: "Cape Town",
+    center: [-33.9249, 18.4241],
+    providers: [
+      { id: "ct-police", name: "Cape Town SAPS", type: "police", phone: "10111", position: [-33.9257, 18.4232] },
+      { id: "ct-ambulance", name: "Metro EMS Cape Town", type: "ambulance", phone: "10177", position: [-33.9188, 18.4256] },
+      { id: "ct-tow", name: "Atlantic Tow Response", type: "tow", phone: "+27 21 555 0142", position: [-33.9306, 18.4102] },
+      { id: "ct-mech", name: "CBD Quick Mechanics", type: "mechanic", phone: "+27 21 555 0168", position: [-33.9285, 18.4298] },
+      { id: "ct-fuel", name: "City Fuel Drop", type: "fuel", phone: "+27 21 555 0189", position: [-33.9321, 18.438] },
+    ],
+  },
+  {
+    city: "Johannesburg",
+    center: [-26.2041, 28.0473],
+    providers: [
+      { id: "jhb-police", name: "JHB Central SAPS", type: "police", phone: "10111", position: [-26.2022, 28.0431] },
+      { id: "jhb-ambulance", name: "Gauteng EMS", type: "ambulance", phone: "10177", position: [-26.2064, 28.0541] },
+      { id: "jhb-tow", name: "Jozi Towline", type: "tow", phone: "+27 11 555 0131", position: [-26.21, 28.06] },
+      { id: "jhb-mech", name: "City Core Auto Clinic", type: "mechanic", phone: "+27 11 555 0192", position: [-26.1985, 28.0417] },
+      { id: "jhb-fuel", name: "Rapid Fuel Assist", type: "fuel", phone: "+27 11 555 0174", position: [-26.1999, 28.0522] },
+    ],
+  },
+  {
+    city: "Durban",
+    center: [-29.8587, 31.0218],
+    providers: [
+      { id: "dbn-police", name: "Durban Central SAPS", type: "police", phone: "10111", position: [-29.857, 31.0244] },
+      { id: "dbn-ambulance", name: "KZN EMS", type: "ambulance", phone: "10177", position: [-29.862, 31.028] },
+      { id: "dbn-tow", name: "Coastal Tow Services", type: "tow", phone: "+27 31 555 0116", position: [-29.8647, 31.0181] },
+      { id: "dbn-mech", name: "Harbour Auto Rescue", type: "mechanic", phone: "+27 31 555 0128", position: [-29.8534, 31.017] },
+      { id: "dbn-fuel", name: "Durban Fuel Relay", type: "fuel", phone: "+27 31 555 0154", position: [-29.8663, 31.0333] },
+    ],
+  },
+];
+
+const ASSIST_KIND_OPTIONS: Array<{ kind: AssistKind; label: string; hint: string }> = [
+  { kind: "TIRE", label: "Flat tyre", hint: "Puncture, burst, unsafe wheel" },
+  { kind: "FUEL", label: "Out of fuel", hint: "Fuel delivery needed" },
+  { kind: "BATTERY", label: "Flat battery", hint: "Jump-start assistance" },
+  { kind: "BREAKDOWN", label: "Breakdown", hint: "Mechanical failure" },
+  { kind: "ACCIDENT", label: "Accident", hint: "Collision support and logging" },
+  { kind: "LOCKOUT", label: "Lockout", hint: "Keys locked inside vehicle" },
+  { kind: "MEDICAL", label: "Medical", hint: "Immediate health support" },
+  { kind: "SECURITY", label: "Security", hint: "Police/security assistance" },
+];
+
+function distanceKm(a: [number, number], b: [number, number]) {
+  const toRad = (deg: number) => (deg * Math.PI) / 180;
+  const R = 6371;
+  const dLat = toRad(b[0] - a[0]);
+  const dLon = toRad(b[1] - a[1]);
+  const lat1 = toRad(a[0]);
+  const lat2 = toRad(b[0]);
+
+  const x = Math.sin(dLat / 2) ** 2 + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLon / 2) ** 2;
+  const c = 2 * Math.atan2(Math.sqrt(x), Math.sqrt(1 - x));
+  return R * c;
+}
+
+function nearestAssistHub(point: [number, number]) {
+  return ASSIST_HUBS
+    .map((hub) => ({ hub, dist: distanceKm(point, hub.center) }))
+    .sort((a, b) => a.dist - b.dist)[0]?.hub ?? ASSIST_HUBS[0];
+}
 
 const AssistMap = dynamic(() => import("@/app/assist/AssistMap.client"), { ssr: false });
 
@@ -38,6 +118,9 @@ export default function AssistClient() {
     if (typeof lat === "number" && typeof lng === "number") return [lat, lng];
     return DEFAULT_CENTER;
   }, [lat, lng]);
+
+  const nearestHub = useMemo(() => nearestAssistHub(center), [center]);
+  const nearbyProviders = nearestHub.providers;
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -111,7 +194,8 @@ export default function AssistClient() {
     }
   }
 
-  const helpTitle = kind === "TIRE" ? "Flat tyre" : "Out of petrol";
+  const selectedOption = ASSIST_KIND_OPTIONS.find((item) => item.kind === kind);
+  const helpTitle = selectedOption?.label ?? "Roadside assistance";
   const marker: [number, number] | null =
     typeof lat === "number" && typeof lng === "number" ? [lat, lng] : null;
 
@@ -119,28 +203,36 @@ export default function AssistClient() {
     <div className="space-y-4">
       <div className="rounded-2xl border border-border bg-card/60 p-3 sm:p-4">
         <div className="mb-2 text-sm font-medium">What do you need help with?</div>
-        <div className="flex flex-wrap items-center gap-2">
-          <Button
-            type="button"
-            variant={kind === "TIRE" ? "primary" : "secondary"}
-            onClick={() => setKind("TIRE")}
-          >
-            Flat tyre
-          </Button>
-          <Button
-            type="button"
-            variant={kind === "FUEL" ? "primary" : "secondary"}
-            onClick={() => setKind("FUEL")}
-          >
-            Out of petrol
-          </Button>
-          <div className="text-sm text-foreground/60">Selected: {helpTitle}</div>
+        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+          {ASSIST_KIND_OPTIONS.map((option) => (
+            <button
+              key={option.kind}
+              type="button"
+              onClick={() => setKind(option.kind)}
+              className={[
+                "rounded-xl border px-3 py-2 text-left transition-colors",
+                kind === option.kind
+                  ? "border-accent/40 bg-accent-soft"
+                  : "border-border bg-card hover:bg-muted/50",
+              ].join(" ")}
+            >
+              <div className="text-sm font-medium">{option.label}</div>
+              <div className="text-xs text-foreground/60">{option.hint}</div>
+            </button>
+          ))}
         </div>
+        <div className="mt-2 text-sm text-foreground/60">Selected: {helpTitle}</div>
+      </div>
+
+      <div className="grid gap-3 sm:grid-cols-2">
+        <CardEmergencyContact title="Police" phone="10111" description="National emergency police line" />
+        <CardEmergencyContact title="Ambulance" phone="10177" description="National emergency medical line" />
       </div>
 
       <AssistMap
         center={center}
         marker={marker}
+        providers={nearbyProviders}
         onPick={(a, b) => {
           setLat(a);
           setLng(b);
@@ -150,7 +242,7 @@ export default function AssistClient() {
 
       <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border bg-card p-3 text-sm">
         <div className="space-y-0.5">
-          <div className="text-foreground/70">Current location</div>
+          <div className="text-foreground/70">Current location ({nearestHub.city} response zone)</div>
           <div className="font-medium">
             {typeof lat === "number" && typeof lng === "number" ? (
               <>
@@ -219,10 +311,35 @@ export default function AssistClient() {
         <Textarea
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
-          placeholder={kind === "TIRE" ? "Wheel damaged, unsafe location, etc." : "Empty tank, nearest landmark, etc."}
+          placeholder={
+            kind === "TIRE"
+              ? "Wheel damaged, unsafe location, etc."
+              : kind === "FUEL"
+                ? "Empty tank, nearest landmark, etc."
+                : kind === "ACCIDENT"
+                  ? "Vehicle condition, injuries, traffic obstruction, etc."
+                  : kind === "MEDICAL"
+                    ? "Symptoms and urgency (if safe to share)."
+                    : "Share details that can speed up assistance."
+          }
           rows={4}
         />
       </label>
+
+      <div className="rounded-2xl border border-border bg-card/60 p-3 sm:p-4">
+        <div className="mb-2 text-sm font-medium">Nearby service providers</div>
+        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+          {nearbyProviders.map((provider) => (
+            <div key={provider.id} className="rounded-lg border border-border bg-background/40 p-2 text-xs">
+              <div className="font-medium">{provider.name}</div>
+              <div className="text-foreground/60">{provider.type.toUpperCase()}</div>
+              <a className="mt-1 inline-block underline" href={`tel:${provider.phone.replace(/\s+/g, "")}`}>
+                {provider.phone}
+              </a>
+            </div>
+          ))}
+        </div>
+      </div>
 
       <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-border bg-card/50 p-3 sm:p-4">
         <Button type="button" onClick={submit} disabled={submitting}>
@@ -286,6 +403,18 @@ export default function AssistClient() {
           </div>
         )
       ) : null}
+    </div>
+  );
+}
+
+function CardEmergencyContact({ title, phone, description }: { title: string; phone: string; description: string }) {
+  return (
+    <div className="rounded-2xl border border-red-500/30 bg-red-500/10 p-3">
+      <div className="text-sm font-semibold">{title}</div>
+      <div className="text-xs text-foreground/70">{description}</div>
+      <a className="mt-2 inline-flex rounded-md border border-border bg-card px-2 py-1 text-xs font-medium underline" href={`tel:${phone}`}>
+        Call {phone}
+      </a>
     </div>
   );
 }

@@ -7,7 +7,7 @@ import { requireRole } from "@/app/lib/require";
 export const runtime = "nodejs";
 
 const BodySchema = z.object({
-  kind: z.enum(["TIRE", "FUEL"]),
+  kind: z.enum(["TIRE", "FUEL", "BATTERY", "BREAKDOWN", "ACCIDENT", "LOCKOUT", "MEDICAL", "SECURITY"]),
   latitude: z.number().finite(),
   longitude: z.number().finite(),
   accuracy: z.number().finite().optional().nullable(),
@@ -27,7 +27,18 @@ export async function POST(req: Request) {
 
   const { kind, latitude, longitude, accuracy, contact, notes } = parsed.data;
 
-  const title = kind === "TIRE" ? "Roadside assist: Flat tyre" : "Roadside assist: Out of fuel";
+  const kindLabel: Record<z.infer<typeof BodySchema>["kind"], string> = {
+    TIRE: "Flat tyre",
+    FUEL: "Out of fuel",
+    BATTERY: "Flat battery",
+    BREAKDOWN: "Mechanical breakdown",
+    ACCIDENT: "Accident / collision",
+    LOCKOUT: "Vehicle lockout",
+    MEDICAL: "Medical emergency support",
+    SECURITY: "Security / police support",
+  };
+
+  const title = `Roadside assist: ${kindLabel[kind]}`;
   const detailsLines = [
     `Type: ${kind}`,
     `Location: ${latitude}, ${longitude}${typeof accuracy === "number" ? ` (accuracy ~${Math.round(accuracy)}m)` : ""}`,
