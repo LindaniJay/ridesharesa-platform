@@ -208,7 +208,7 @@ function TopListingsRow({ title, listings }: { title: string; listings: TopListi
                 </div>
 
                 <div className="flex items-start justify-between gap-3">
-                  <div className="text-xs text-foreground/60">Secure payments • Instant booking</div>
+                  <div className="text-xs text-foreground/60">Secure payments and instant booking</div>
                 </div>
 
                 <div className="flex items-center gap-2">

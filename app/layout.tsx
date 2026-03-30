@@ -34,11 +34,9 @@ export default function RootLayout({
           <div className="relative min-h-dvh text-foreground">
             <BackgroundVideo />
 
-            {/* Background overlay for legibility over video */}
-            <div className="fixed inset-0 z-10 bg-black/30 backdrop-blur-sm" />
-            
-            {/* Additional dark overlay for more contrast */}
-            <div className="fixed inset-0 z-10 bg-gradient-to-br from-black/20 via-black/25 to-black/30" />
+            {/* Theme-aware overlays for legibility over video without fully hiding it. */}
+            <div className="fixed inset-0 z-10 bg-white/72 backdrop-blur-sm dark:bg-black/30" />
+            <div className="fixed inset-0 z-10 bg-gradient-to-br from-white/52 via-white/42 to-white/32 dark:from-black/20 dark:via-black/25 dark:to-black/30" />
 
             <div className="relative z-20">
               <Navbar />

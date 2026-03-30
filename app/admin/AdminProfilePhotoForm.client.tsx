@@ -69,7 +69,7 @@ export default function AdminProfilePhotoForm() {
       <FileDropInput
         name="profilePhoto"
         label="Profile image"
-        helper="Images only • Max 8MB"
+        helper="Images only, max 8MB"
         accept="image/*"
         required
         onFileSelected={setFile}

@@ -85,7 +85,7 @@ export default function HostProfilePhotoForm() {
       <Button type="submit" variant="secondary" disabled={loading} className="w-full">
         {loading ? "Uploading…" : "Update profile photo"}
       </Button>
-      <div className="text-xs text-foreground/60">Images only • Max 8MB</div>
+      <div className="text-xs text-foreground/60">Images only, max 8MB</div>
     </form>
   );
 }

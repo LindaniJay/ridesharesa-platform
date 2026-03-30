@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 type Props = {
   name: string;
@@ -26,6 +26,30 @@ function prettyBytes(bytes: number) {
 export default function FileDropInput({ name, label, helper, accept, required = false, onFileSelected }: Props) {
   const [dragOver, setDragOver] = useState(false);
   const [file, setFile] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+
+  const previewType = useMemo<"image" | "pdf" | null>(() => {
+    if (!file) return null;
+    if (file.type.startsWith("image/")) return "image";
+    if (file.type === "application/pdf") return "pdf";
+    return null;
+  }, [file]);
+
+  useEffect(() => {
+    if (!file || !previewType) {
+      setPreviewUrl(null);
+      return;
+    }
+
+    const objectUrl = URL.createObjectURL(file);
+    setPreviewUrl(objectUrl);
+    return () => URL.revokeObjectURL(objectUrl);
+  }, [file, previewType]);
+
+  function applyFile(next: File | null) {
+    setFile(next);
+    onFileSelected?.(next);
+  }
 
   const hint = useMemo(() => {
     if (!file) return "Drop file here or click to browse";
@@ -49,8 +73,7 @@ export default function FileDropInput({ name, label, helper, accept, required = 
           e.preventDefault();
           setDragOver(false);
           const next = e.dataTransfer.files?.[0] ?? null;
-          setFile(next);
-          onFileSelected?.(next);
+          applyFile(next);
         }}
       >
         <input
@@ -61,13 +84,22 @@ export default function FileDropInput({ name, label, helper, accept, required = 
           className="w-full text-sm"
           onChange={(e) => {
             const next = e.target.files?.[0] ?? null;
-            setFile(next);
-            onFileSelected?.(next);
+            applyFile(next);
           }}
         />
         <div className="mt-2 rounded-md border border-border bg-card/70 px-2.5 py-1.5 text-xs text-foreground/70">
           {hint}
         </div>
+        {previewType && previewUrl ? (
+          <div className="mt-2 overflow-hidden rounded-lg border border-border bg-card">
+            {previewType === "image" ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={previewUrl} alt={`${label} preview`} className="h-36 w-full object-contain bg-background/40" />
+            ) : (
+              <iframe src={previewUrl} title={`${label} preview`} className="h-40 w-full" />
+            )}
+          </div>
+        ) : null}
         {helper ? <div className="mt-1 text-xs text-foreground/55">{helper}</div> : null}
       </div>
     </label>

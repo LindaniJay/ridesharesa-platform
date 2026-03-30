@@ -1584,8 +1584,8 @@ export default async function AdminDashboardPage({
                         <CardTitle className="text-base">{entry.action}</CardTitle>
                         <CardDescription>
                           {entry.adminEmail}
-                          {entry.targetKind ? ` • ${entry.targetKind}` : ""}
-                          {entry.targetId ? ` • ${entry.targetId}` : ""}
+                          {entry.targetKind ? ` on ${entry.targetKind}` : ""}
+                          {entry.targetId ? ` (${entry.targetId})` : ""}
                         </CardDescription>
                       </div>
                       <div className="text-xs text-foreground/60">{entry.createdAt.toLocaleString("en-ZA")}</div>
@@ -1673,7 +1673,7 @@ export default async function AdminDashboardPage({
             <Card>
               <CardHeader>
                 <CardTitle>Profile photo</CardTitle>
-                <CardDescription>Images only • Max 8MB</CardDescription>
+                <CardDescription>Images only, max 8MB</CardDescription>
               </CardHeader>
               <CardContent className="space-y-3">
                 {viewerProfileImageSignedUrl ? (
@@ -1898,7 +1898,7 @@ export default async function AdminDashboardPage({
                 items={pendingListings.map((listing) => ({
                   id: listing.id,
                   label: listing.title,
-                  sub: `${listing.city} • ${listing.host.email}`,
+                  sub: `${listing.city}, host ${listing.host.email}`,
                 }))}
                 actions={[
                   {
@@ -1928,7 +1928,7 @@ export default async function AdminDashboardPage({
                     <div className="space-y-1">
                       <CardTitle>{l.title}</CardTitle>
                       <CardDescription>
-                        {l.city} • Host: {l.host.email}
+                        {l.city}, host: {l.host.email}
                       </CardDescription>
                       <div className="pt-1">
                         <Badge variant={badgeVariantForListingStatus(l.status)}>{l.status}</Badge>
@@ -2054,7 +2054,7 @@ export default async function AdminDashboardPage({
             <CardTitle>Listing document preview</CardTitle>
             <CardDescription>
               {selectedListing && selectedListingDocKind
-                ? `${selectedListing.title} • ${selectedListingDocKind}`
+                ? `${selectedListing.title}, ${selectedListingDocKind}`
                 : "Select Disk, Reg, or Card in the table to preview"}
             </CardDescription>
           </CardHeader>
@@ -2098,7 +2098,7 @@ export default async function AdminDashboardPage({
                   >
                     <Button variant="secondary">Open signed URL</Button>
                   </a>
-                  <div className="text-xs text-foreground/60">Signed URL (5 min) • {selectedListingDocPreview.bucket}</div>
+                  <div className="text-xs text-foreground/60">Signed URL (5 min), bucket: {selectedListingDocPreview.bucket}</div>
                 </div>
               </div>
             ) : (
@@ -2152,7 +2152,7 @@ export default async function AdminDashboardPage({
                 items={allUsers.map((user) => ({
                   id: user.id,
                   label: user.email,
-                  sub: `${user.role} • ${user.status}`,
+                  sub: `${user.role}, ${user.status}`,
                 }))}
                 actions={[
                   {
@@ -2210,12 +2210,12 @@ export default async function AdminDashboardPage({
                               {riskLabel(userRisk.level)} risk {userRisk.score}
                             </span>
                             {/* Document verification controls */}
-                            <form action={setUserVerification} className="flex items-center gap-2">
+                            <form action={setUserVerification} className="flex flex-wrap items-center gap-2 rounded-lg border border-border bg-card/60 px-2 py-1">
                               <input type="hidden" name="userId" value={u.id} />
                               <select
                                 name="field"
                                 defaultValue="idVerificationStatus"
-                                className="rounded-md border border-border bg-card px-2 py-1 text-xs text-foreground outline-none focus-visible:ring-2 focus-visible:ring-accent/30"
+                                className="h-9 rounded-lg border border-border bg-card px-2 py-1 text-xs text-foreground outline-none focus-visible:ring-2 focus-visible:ring-accent/30"
                               >
                                 <option value="idVerificationStatus">ID</option>
                                 <option value="driversLicenseStatus">License</option>
@@ -2223,27 +2223,17 @@ export default async function AdminDashboardPage({
                               <select
                                 name="status"
                                 defaultValue={u.idVerificationStatus}
-                                className="rounded-md border border-border bg-card px-2 py-1 text-xs text-foreground outline-none focus-visible:ring-2 focus-visible:ring-accent/30"
+                                className="h-9 rounded-lg border border-border bg-card px-2 py-1 text-xs text-foreground outline-none focus-visible:ring-2 focus-visible:ring-accent/30"
                               >
                                 <option value="UNVERIFIED">Unverified</option>
                                 <option value="PENDING">Pending</option>
                                 <option value="VERIFIED">Verified</option>
                                 <option value="REJECTED">Rejected</option>
                               </select>
-                              <Button type="submit" variant="secondary">Update</Button>
+                              <Button type="submit" variant="secondary" className="h-9 px-3">
+                                Update
+                              </Button>
                             </form>
-                            <Link
-                              href={adminHref({ section: "users", userId: u.id, doc: "id" })}
-                              className="underline text-xs decoration-border hover:text-foreground"
-                            >
-                              View ID
-                            </Link>
-                            <Link
-                              href={adminHref({ section: "users", userId: u.id, doc: "license" })}
-                              className="underline text-xs decoration-border hover:text-foreground"
-                            >
-                              View License
-                            </Link>
                           </div>
                           </div>
                         </div>
@@ -2257,8 +2247,11 @@ export default async function AdminDashboardPage({
                               doc: "profile",
                             })}
                           >
-                            <Button variant={active && selectedDocKind === "profile" ? "primary" : "secondary"}>
-                              Profile
+                            <Button
+                              variant={active && selectedDocKind === "profile" ? "primary" : "secondary"}
+                              className="h-10 px-3"
+                            >
+                              Profile photo
                             </Button>
                           </Link>
                           <Link
@@ -2269,8 +2262,11 @@ export default async function AdminDashboardPage({
                               doc: "id",
                             })}
                           >
-                            <Button variant={active && selectedDocKind === "id" ? "primary" : "secondary"}>
-                              ID
+                            <Button
+                              variant={active && selectedDocKind === "id" ? "primary" : "secondary"}
+                              className="h-10 px-3"
+                            >
+                              ID document
                             </Button>
                           </Link>
                           <Link
@@ -2281,8 +2277,11 @@ export default async function AdminDashboardPage({
                               doc: "license",
                             })}
                           >
-                            <Button variant={active && selectedDocKind === "license" ? "primary" : "secondary"}>
-                              DL
+                            <Button
+                              variant={active && selectedDocKind === "license" ? "primary" : "secondary"}
+                              className="h-10 px-3"
+                            >
+                              Driver license
                             </Button>
                           </Link>
                           <Link
@@ -2293,8 +2292,11 @@ export default async function AdminDashboardPage({
                               doc: "proof_residence",
                             })}
                           >
-                            <Button variant={active && selectedDocKind === "proof_residence" ? "primary" : "secondary"}>
-                              POR
+                            <Button
+                              variant={active && selectedDocKind === "proof_residence" ? "primary" : "secondary"}
+                              className="h-10 px-3"
+                            >
+                              Proof of residence
                             </Button>
                           </Link>
                         </div>
@@ -2312,6 +2314,18 @@ export default async function AdminDashboardPage({
                       </div>
                       <div className="mt-2 rounded-lg border border-border bg-muted/40 px-3 py-2 text-xs text-foreground/70">
                         {summarizeRiskFlags(userRisk.flags)}
+                      </div>
+
+                      <div className="mt-3 flex flex-wrap items-center gap-2">
+                        <Link href={adminHref({ section: "users", q: q || null, userId: u.id, doc: "id" })}>
+                          <Button variant="secondary" className="h-8 px-3 text-xs">Preview ID</Button>
+                        </Link>
+                        <Link href={adminHref({ section: "users", q: q || null, userId: u.id, doc: "license" })}>
+                          <Button variant="secondary" className="h-8 px-3 text-xs">Preview license</Button>
+                        </Link>
+                        <Link href={adminHref({ section: "users", q: q || null, userId: u.id, doc: "proof_residence" })}>
+                          <Button variant="secondary" className="h-8 px-3 text-xs">Preview residence proof</Button>
+                        </Link>
                       </div>
 
                       <div className="mt-4 grid gap-2">
@@ -2403,16 +2417,16 @@ export default async function AdminDashboardPage({
                   {selectedUser && !selectedUserAllowed
                     ? "Admins are hidden from verification"
                     : selectedUser && selectedDocKind
-                      ? `${selectedUser.email} • ${selectedDocKind.toUpperCase()}`
+                      ? `${selectedUser.email}, ${selectedDocKind.toUpperCase()}`
                       : selectedUser
-                        ? "Select a document type (Profile / ID / DL)"
+                        ? "Select a document type (Profile / ID / License / Residence proof)"
                         : "Select a user to preview documents"}
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 {!selectedUser ? (
                   <div className="text-sm text-foreground/60">
-                    Pick a user on the left, then choose Profile/ID/DL.
+                    Pick a user on the left, then choose Profile, ID document, Driver license, or Proof of residence.
                   </div>
                 ) : !selectedUserAllowed ? (
                   <div className="text-sm text-foreground/60">
@@ -2454,7 +2468,7 @@ export default async function AdminDashboardPage({
                         <Button variant="secondary">Open via API</Button>
                       </a>
                       <div className="text-xs text-foreground/60">
-                        Signed URL (5 min) • {selectedDocPreview.bucket}
+                        Signed URL (5 min), bucket: {selectedDocPreview.bucket}
                       </div>
                     </div>
                   </div>
@@ -2590,7 +2604,7 @@ export default async function AdminDashboardPage({
                              <Badge variant={badgeVariantForBookingStatus(b.status)}>{b.status}</Badge>
                            </td>
                            <td className="px-3 py-2">
-                             <span className={cn("inline-flex rounded-full px-2 py-1 text-xs font-medium", riskBadgeClass(bookingRisk.level))} title={bookingRisk.flags.join(" • ")}>
+                             <span className={cn("inline-flex rounded-full px-2 py-1 text-xs font-medium", riskBadgeClass(bookingRisk.level))} title={bookingRisk.flags.join(", ")}>
                                {riskLabel(bookingRisk.level)} {bookingRisk.score}
                              </span>
                                <div className="mt-1 max-w-[220px] text-xs text-foreground/60">{summarizeRiskFlags(bookingRisk.flags, 1)}</div>
@@ -2763,7 +2777,7 @@ export default async function AdminDashboardPage({
                           <Badge variant={badgeVariantForBookingStatus(b.status)}>{b.status}</Badge>
                         </td>
                         <td className="px-3 py-2">
-                          <span className={cn("inline-flex rounded-full px-2 py-1 text-xs font-medium", riskBadgeClass(bookingRisk.level))} title={bookingRisk.flags.join(" • ")}>
+                          <span className={cn("inline-flex rounded-full px-2 py-1 text-xs font-medium", riskBadgeClass(bookingRisk.level))} title={bookingRisk.flags.join(", ")}>
                             {riskLabel(bookingRisk.level)} {bookingRisk.score}
                           </span>
                           <div className="mt-1 max-w-[220px] text-xs text-foreground/60">{summarizeRiskFlags(bookingRisk.flags, 1)}</div>
@@ -2961,7 +2975,7 @@ export default async function AdminDashboardPage({
                       {last ? (
                         <div>
                           <div className="text-xs text-foreground/60">
-                            {last.sender.email} • {last.sender.role} • {last.createdAt.toISOString().slice(0, 16).replace("T", " ")}
+                            {last.sender.email}, {last.sender.role}, {last.createdAt.toISOString().slice(0, 16).replace("T", " ")}
                           </div>
                           <div className="line-clamp-2">{last.body}</div>
                         </div>

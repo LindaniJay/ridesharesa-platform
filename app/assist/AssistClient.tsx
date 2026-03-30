@@ -30,6 +30,14 @@ type AssistHub = {
   providers: AssistProvider[];
 };
 
+function providerTypeName(type: AssistProvider["type"]) {
+  if (type === "tow") return "Tow service";
+  if (type === "mechanic") return "Mechanic";
+  if (type === "hospital") return "Hospital";
+  if (type === "police") return "Police station";
+  return "Fuel station";
+}
+
 const ASSIST_HUBS: AssistHub[] = [
   {
     city: "Cape Town",
@@ -341,7 +349,7 @@ export default function AssistClient() {
           {nearbyProviders.map((provider) => (
             <div key={provider.id} className="rounded-lg border border-border bg-background/40 p-2 text-xs">
               <div className="font-medium">{provider.name}</div>
-              <div className="text-foreground/60">{provider.type.toUpperCase()}</div>
+              <div className="text-foreground/60">{providerTypeName(provider.type)}</div>
               <a className="mt-1 inline-block underline" href={`tel:${provider.phone.replace(/\s+/g, "")}`}>
                 {provider.phone}
               </a>
@@ -362,7 +370,7 @@ export default function AssistClient() {
 
       {result ? (
         result.ok ? (
-          <div className="rounded-xl border border-green-500/30 bg-green-500/10 p-3 text-sm">
+          <div className="rounded-xl border border-accent/35 bg-accent/10 p-3 text-sm">
             <div className="font-medium">Request sent successfully</div>
             <div className="mt-1 text-foreground/70">Incident ID: {result.incidentId}</div>
             <div className="mt-3 rounded-lg border border-border bg-card p-3">
@@ -375,12 +383,9 @@ export default function AssistClient() {
                   { label: "Resolved", active: false },
                 ].map((step) => (
                   <li key={step.label} className="flex items-center gap-2 text-xs">
-                    <span
-                      className={[
-                        "inline-flex h-2.5 w-2.5 rounded-full",
-                        step.active ? "bg-green-500" : "bg-foreground/25",
-                      ].join(" ")}
-                    />
+                    <span className={step.active ? "font-medium text-accent" : "text-foreground/60"}>
+                      {step.active ? "Current:" : "Next:"}
+                    </span>
                     <span className={step.active ? "font-medium text-foreground" : "text-foreground/60"}>{step.label}</span>
                   </li>
                 ))}
@@ -418,7 +423,7 @@ export default function AssistClient() {
 
 function CardEmergencyContact({ title, phone, description }: { title: string; phone: string; description: string }) {
   return (
-    <div className="rounded-2xl border border-red-500/30 bg-red-500/10 p-3">
+    <div className="rounded-2xl border border-accent/35 bg-accent/10 p-3">
       <div className="text-sm font-semibold">{title}</div>
       <div className="text-xs text-foreground/70">{description}</div>
       <a className="mt-2 inline-flex rounded-md border border-border bg-card px-2 py-1 text-xs font-medium underline" href={`tel:${phone}`}>

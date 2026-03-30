@@ -134,7 +134,7 @@ export default function BookingChat(props: {
               return (
                 <div key={m.id} className={you ? "text-right" : "text-left"}>
                   <div className="text-xs text-foreground/60">
-                    {you ? "You" : name} • {m.sender.role} • {new Date(m.createdAt).toLocaleString()}
+                    {you ? "You" : name}, {m.sender.role}, {new Date(m.createdAt).toLocaleString()}
                   </div>
                   {m.recipientRole ? (
                     <div className="mt-1 text-xs text-foreground/60">

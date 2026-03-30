@@ -747,7 +747,7 @@ export default async function HostDashboardPage() {
                   <CardHeader>
                     <CardTitle className="text-base">{m.booking.listing.title}</CardTitle>
                     <CardDescription>
-                      {senderName} ({m.sender.role}) • Renter: {renterName} • {new Date(m.createdAt).toLocaleString()}
+                      {senderName} ({m.sender.role}), renter: {renterName}, {new Date(m.createdAt).toLocaleString()}
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-2">

@@ -1,6 +1,6 @@
 "use client";
 
-import { CircleMarker, MapContainer, Marker, Popup, TileLayer, useMap, useMapEvents } from "react-leaflet";
+import { MapContainer, Marker, Popup, TileLayer, useMap, useMapEvents } from "react-leaflet";
 import L from "leaflet";
 
 // Fix default marker icon paths in bundlers
@@ -33,11 +33,11 @@ type AssistProvider = {
 };
 
 function providerColor(type: AssistProvider["type"]) {
-  if (type === "hospital") return "#dc2626";
-  if (type === "police") return "#1d4ed8";
-  if (type === "fuel") return "#f59e0b";
-  if (type === "mechanic") return "#7c3aed";
-  return "#0ea5e9";
+  if (type === "hospital") return "#0f9f5a";
+  if (type === "police") return "#078a4d";
+  if (type === "fuel") return "#12b86a";
+  if (type === "mechanic") return "#0c7a45";
+  return "#00a651";
 }
 
 function providerLabel(type: AssistProvider["type"]) {
@@ -54,6 +54,17 @@ function RecenterMap({ center }: { center: [number, number] }) {
   // Keep the map view synced with GPS/location updates from the parent.
   map.setView(center, Math.max(map.getZoom(), 13), { animate: true });
   return null;
+}
+
+function providerIcon(type: AssistProvider["type"]) {
+  const label = providerLabel(type).slice(0, 1).toUpperCase();
+  const color = providerColor(type);
+  return L.divIcon({
+    className: "",
+    html: `<div style="height:28px;width:28px;border-radius:9999px;background:${color};border:2px solid white;color:white;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;box-shadow:0 4px 10px rgba(0,0,0,.25)">${label}</div>`,
+    iconSize: [28, 28],
+    iconAnchor: [14, 14],
+  });
 }
 
 export default function AssistMap(props: {
@@ -76,17 +87,7 @@ export default function AssistMap(props: {
           <ClickToSetMarker onPick={onPick} />
           {marker ? <Marker position={marker} /> : null}
           {providers.map((provider) => (
-            <CircleMarker
-              key={provider.id}
-              center={provider.position}
-              radius={8}
-              pathOptions={{
-                color: providerColor(provider.type),
-                fillColor: providerColor(provider.type),
-                fillOpacity: 0.85,
-                weight: 2,
-              }}
-            >
+            <Marker key={provider.id} position={provider.position} icon={providerIcon(provider.type)}>
               <Popup>
                 <div className="space-y-1 text-sm">
                   <div className="font-medium">{provider.name}</div>
@@ -96,7 +97,7 @@ export default function AssistMap(props: {
                   </a>
                 </div>
               </Popup>
-            </CircleMarker>
+            </Marker>
           ))}
         </MapContainer>
       </div>

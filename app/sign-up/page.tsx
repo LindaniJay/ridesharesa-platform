@@ -134,7 +134,7 @@ export default function SignUpPage() {
                 onChange={(e) => setName(e.target.value)}
                 type="text"
                 autoComplete="name"
-                className="w-full rounded-md border border-black/10 bg-transparent px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-black/20 dark:border-white/10 dark:focus:ring-white/20"
+                className="w-full rounded-md border border-border bg-transparent px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-accent/30"
               />
             </label>
             <label className="block">
@@ -145,7 +145,7 @@ export default function SignUpPage() {
                 type="email"
                 autoComplete="email"
                 required
-                className="w-full rounded-md border border-black/10 bg-transparent px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-black/20 dark:border-white/10 dark:focus:ring-white/20"
+                className="w-full rounded-md border border-border bg-transparent px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-accent/30"
               />
             </label>
             <label className="block">
@@ -158,18 +158,18 @@ export default function SignUpPage() {
                   autoComplete="new-password"
                   required
                   minLength={8}
-                  className="w-full rounded-md border border-black/10 bg-transparent px-3 py-2 pr-10 text-sm outline-none focus:ring-2 focus:ring-black/20 dark:border-white/10 dark:focus:ring-white/20"
+                  className="w-full rounded-md border border-border bg-transparent px-3 py-2 pr-10 text-sm outline-none focus:ring-2 focus:ring-accent/30"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword((v) => !v)}
-                  className="absolute inset-y-0 right-2 inline-flex items-center text-black/60 hover:text-black dark:text-white/60 dark:hover:text-white"
+                  className="absolute inset-y-0 right-2 inline-flex items-center text-foreground/60 hover:text-foreground"
                   aria-label={showPassword ? "Hide password" : "Show password"}
                 >
                   {showPassword ? <EyeClosedIcon /> : <EyeOpenIcon />}
                 </button>
               </div>
-              <div className="mt-1 text-xs text-black/50 dark:text-white/50">Minimum 8 characters</div>
+              <div className="mt-1 text-xs text-foreground/50">Minimum 8 characters</div>
             </label>
             <label className="block">
               <div className="mb-1 text-sm">Account type</div>
@@ -181,7 +181,7 @@ export default function SignUpPage() {
                     setRole(value);
                   }
                 }}
-                className="w-full rounded-md border border-black/10 bg-transparent px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-black/20 dark:border-white/10 dark:focus:ring-white/20"
+                className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-accent/30"
               >
                 <option value="RENTER">Renter (book cars)</option>
                 <option value="HOST">Host (list cars)</option>
@@ -191,14 +191,14 @@ export default function SignUpPage() {
             <Button type="submit" disabled={loading} className="w-full">
               {loading ? "Creating…" : "Create account"}
             </Button>
-            <div className="text-sm text-black/60 dark:text-white/60">
+            <div className="text-sm text-foreground/60">
               Already have an account? <Link className="underline" href="/sign-in">Sign in</Link>
             </div>
           </form>
         </CardContent>
       </Card>
 
-      <div className="text-xs text-black/50 dark:text-white/50">
+      <div className="text-xs text-foreground/50">
         Accounts are managed via Supabase Auth. Use a strong password in production.
       </div>
     </main>

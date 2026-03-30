@@ -120,7 +120,7 @@ export default async function ListingDetailsPage({
     <main className="space-y-6">
       <div className="space-y-1">
         <h1 className="text-2xl font-semibold tracking-tight">{listing.title}</h1>
-        <div className="text-sm text-black/60 dark:text-white/60">
+        <div className="text-sm text-foreground/60">
           {listing.city}, {listing.country}
         </div>
       </div>
@@ -135,9 +135,9 @@ export default async function ListingDetailsPage({
             </CardHeader>
             <CardContent className="space-y-2 text-sm">
               <div className="flex flex-wrap items-center gap-2">
-                <span className="inline-block rounded-full bg-green-100 px-2 py-1 text-xs font-medium text-green-700">Verified Host</span>
-                <span className="inline-block rounded-full bg-blue-100 px-2 py-1 text-xs font-medium text-blue-700">Insurance Included</span>
-                <span className="inline-block rounded-full bg-yellow-100 px-2 py-1 text-xs font-medium text-yellow-700">Safe Payments</span>
+                <span className="inline-block rounded-full border border-accent/35 bg-accent/12 px-2 py-1 text-xs font-medium text-accent">Verified host</span>
+                <span className="inline-block rounded-full border border-accent/35 bg-accent/12 px-2 py-1 text-xs font-medium text-accent">Insurance included</span>
+                <span className="inline-block rounded-full border border-accent/35 bg-accent/12 px-2 py-1 text-xs font-medium text-accent">Secure payments</span>
               </div>
               <ul className="list-disc pl-5 mt-2">
                 <li>Host identity and vehicle documents verified</li>
@@ -154,7 +154,7 @@ export default async function ListingDetailsPage({
                 <CardDescription>Vehicle gallery</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="relative aspect-[16/9] w-full overflow-hidden rounded-lg border border-black/10 dark:border-white/10">
+                <div className="relative aspect-[16/9] w-full overflow-hidden rounded-lg border border-border">
                   <Image
                     src={heroUrl}
                     alt={listing.title}
@@ -173,7 +173,7 @@ export default async function ListingDetailsPage({
                         href={url}
                         target="_blank"
                         rel="noreferrer"
-                        className="relative aspect-[4/3] overflow-hidden rounded-md border border-black/10 dark:border-white/10"
+                        className="relative aspect-[4/3] overflow-hidden rounded-md border border-border"
                       >
                         <Image
                           src={url}
