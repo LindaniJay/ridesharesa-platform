@@ -154,7 +154,7 @@ export default function NavbarClient() {
   return (
     <header className="sticky top-0 z-40">
       {/* Pear-shaped nav container */}
-      <div className="mx-auto w-full max-w-6xl px-2 sm:px-4 py-2 sm:py-3">
+      <div className="mx-auto w-full max-w-6xl px-3 sm:px-4 py-2 sm:py-3">
         <div className="relative rounded-[1.5rem_1.5rem_1rem_1rem] sm:rounded-[2rem_2rem_1.5rem_1.5rem] bg-gradient-to-br from-gray-300/40 via-gray-400/35 to-gray-500/30 backdrop-blur-lg border border-gray-400/30 px-2 sm:px-4 py-2 sm:py-4 shadow-lg mobile-tight">
           <div className="flex items-center justify-between gap-2 sm:gap-3">
             <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
@@ -241,8 +241,8 @@ export default function NavbarClient() {
 
       {/* Mobile navigation dropdown */}
       {mobileMenuOpen && (
-        <div className="mx-auto w-full max-w-6xl px-2 sm:hidden">
-          <div className="slide-in-panel rounded-lg bg-gradient-to-br from-gray-300/40 via-gray-400/35 to-gray-500/30 backdrop-blur-lg border border-gray-400/30 p-3 space-y-2 mb-3 mobile-tight">
+        <div className="mx-auto w-full max-w-6xl px-3 sm:hidden">
+          <div className="slide-in-panel rounded-lg bg-gradient-to-br from-gray-300/40 via-gray-400/35 to-gray-500/30 backdrop-blur-lg border border-gray-400/30 p-3 space-y-2 mb-3">
             <NavLink href="/how-it-works" active={isActivePath(pathname, "/how-it-works")}>
               How it works
             </NavLink>

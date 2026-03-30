@@ -42,7 +42,7 @@ export default function RootLayout({
 
             <div className="relative z-20">
               <Navbar />
-              <div className="mx-auto w-full max-w-6xl px-2 sm:px-4 py-5 sm:py-8 mobile-tight">{children}</div>
+              <div className="mx-auto w-full max-w-6xl px-3 sm:px-4 py-4 sm:py-8 mobile-tight">{children}</div>
               <Footer />
               <ChatWidget />
             </div>

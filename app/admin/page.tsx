@@ -1,7 +1,7 @@
 import { revalidatePath } from "next/cache";
 import Link from "next/link";
 import AdminBulkSelector from "@/app/admin/AdminBulkSelector.client";
-import AdminCharts from "@/app/admin/AdminCharts.client";
+import { AdminAreaChart, AdminBarChart } from "@/app/admin/AdminCharts.client";
 import AdminCommandPalette from "@/app/admin/AdminCommandPalette.client";
 import AdminKeyboardShortcuts from "@/app/admin/AdminKeyboardShortcuts.client";
 import { writeAuditLog } from "@/app/lib/auditLog";
@@ -1744,7 +1744,7 @@ export default async function AdminDashboardPage({
                 </div>
               </div>
               <div className="mt-3">
-                <AdminCharts.Area
+                <AdminAreaChart
                   data={(Array.isArray(bookingsSeries) ? bookingsSeries : []).map((value, index) => {
                     const day = new Date(trendStart);
                     day.setDate(trendStart.getDate() + index);
@@ -1774,7 +1774,7 @@ export default async function AdminDashboardPage({
               {Array.isArray(topCitiesRows) && topCitiesRows.length === 0 ? (
                 <div className="text-sm text-foreground/60">No confirmed bookings in the last 30 days.</div>
               ) : Array.isArray(topCitiesRows) ? (
-                <AdminCharts.Bar
+                <AdminBarChart
                   data={topCitiesRows.map((row) => ({ name: row.city, value: row.bookings }))}
                   valueLabel="Bookings"
                   color="#22d3ee"
@@ -1814,7 +1814,7 @@ export default async function AdminDashboardPage({
                 </div>
               </div>
               <div className="mt-3">
-                <AdminCharts.Area
+                <AdminAreaChart
                   data={(Array.isArray(revenueSeries) ? revenueSeries : []).map((value, index) => {
                     const day = new Date(trendStart);
                     day.setDate(trendStart.getDate() + index);
@@ -1860,7 +1860,7 @@ export default async function AdminDashboardPage({
                 </div>
               </div>
               <div className="mt-3">
-                <AdminCharts.Area
+                <AdminAreaChart
                   data={(Array.isArray(signupsSeries) ? signupsSeries : []).map((value, index) => {
                     const day = new Date(trendStart);
                     day.setDate(trendStart.getDate() + index);
