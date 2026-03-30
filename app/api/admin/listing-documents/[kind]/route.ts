@@ -14,6 +14,18 @@ function isHttpUrl(value: string) {
   return value.startsWith("http://") || value.startsWith("https://");
 }
 
+function sanitizeStoragePath(path: string, bucket: string) {
+  const trimmed = path.trim();
+  if (!trimmed) return "";
+  if (isHttpUrl(trimmed)) return trimmed;
+
+  let normalized = trimmed.replace(/^\/+/, "");
+  if (normalized.startsWith(`${bucket}/`)) {
+    normalized = normalized.slice(bucket.length + 1);
+  }
+  return normalized;
+}
+
 export async function GET(
   req: Request,
   context: { params: Promise<{ kind: string }> },
@@ -61,8 +73,9 @@ export async function GET(
   }
 
   const bucket = process.env.SUPABASE_LISTING_DOCS_BUCKET || "listing-documents";
+  const normalizedStored = sanitizeStoragePath(stored, bucket);
   const admin = supabaseAdmin();
-  const { data, error } = await admin.storage.from(bucket).createSignedUrl(stored, 60 * 5);
+  const { data, error } = await admin.storage.from(bucket).createSignedUrl(normalizedStored, 60 * 5);
   if (error || !data?.signedUrl) {
     return NextResponse.json(
       {
@@ -70,7 +83,7 @@ export async function GET(
           error?.message ||
           `Could not create signed URL (ensure bucket "${bucket}" exists and SUPABASE_SERVICE_ROLE_KEY is set).`,
         bucket,
-        path: stored,
+        path: normalizedStored,
       },
       { status: 400 },
     );

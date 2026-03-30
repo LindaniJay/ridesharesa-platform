@@ -206,22 +206,75 @@ function isPdfPath(value: string | null | undefined) {
   return value.toLowerCase().split("?")[0].endsWith(".pdf");
 }
 
-async function getUserDocSignedUrl(params: { userId: string; kind: UserDocKind }) {
+function normalizeEmail(email: string) {
+  return email.trim().toLowerCase();
+}
+
+function sanitizeStoragePath(path: string, bucket: string) {
+  const trimmed = path.trim();
+  if (!trimmed) return "";
+  if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) return trimmed;
+
+  let normalized = trimmed.replace(/^\/+/, "");
+  if (normalized.startsWith(`${bucket}/`)) {
+    normalized = normalized.slice(bucket.length + 1);
+  }
+  return normalized;
+}
+
+async function findSupabaseUserByEmail(email: string) {
+  const admin = supabaseAdmin();
+  const perPage = 200;
+
+  for (let page = 1; page <= 5; page += 1) {
+    const { data, error } = await admin.auth.admin.listUsers({ page, perPage });
+    if (error) return null;
+    const users = data?.users ?? [];
+    const found = users.find((u) => normalizeEmail(u.email || "") === normalizeEmail(email));
+    if (found) return found;
+    if (users.length < perPage) break;
+  }
+
+  return null;
+}
+
+async function getUserDocSignedUrl(params: { userId: string; kind: UserDocKind; userEmail?: string | null }) {
   const bucket = process.env.SUPABASE_USER_DOCS_BUCKET || "user-documents";
 
   const admin = supabaseAdmin();
+
+  const candidatePaths: string[] = [];
+
   const { data, error } = await admin.storage.from(bucket).list(params.userId, { limit: 100, offset: 0 });
-  if (error) {
-    return {
-      ok: false as const,
-      error: error.message,
-      bucket,
-    };
+  if (!error) {
+    const objects = data ?? [];
+    const match = objects.find((o) => typeof o.name === "string" && o.name.startsWith(`${params.kind}.`));
+    if (match) {
+      candidatePaths.push(`${params.userId}/${match.name}`);
+    }
   }
 
-  const objects = data ?? [];
-  const match = objects.find((o) => typeof o.name === "string" && o.name.startsWith(`${params.kind}.`));
-  if (!match) {
+  if (params.userEmail) {
+    const supaUser = await findSupabaseUserByEmail(params.userEmail);
+    const metadata = (supaUser?.user_metadata ?? {}) as Record<string, unknown>;
+    const metadataPath =
+      params.kind === "profile"
+        ? metadata.profileImagePath
+        : params.kind === "id"
+          ? metadata.idDocumentImagePath
+          : params.kind === "license"
+            ? metadata.driversLicenseImagePath
+            : metadata.proofOfResidenceImagePath;
+    if (typeof metadataPath === "string" && metadataPath.trim()) {
+      candidatePaths.push(metadataPath.trim());
+    }
+  }
+
+  const path = candidatePaths
+    .map((candidate) => sanitizeStoragePath(candidate, bucket))
+    .find((candidate) => candidate.length > 0) || null;
+
+  if (!path) {
     return {
       ok: false as const,
       error: "Document not found (user has not uploaded it yet)",
@@ -229,7 +282,15 @@ async function getUserDocSignedUrl(params: { userId: string; kind: UserDocKind }
     };
   }
 
-  const path = `${params.userId}/${match.name}`;
+  if (path.startsWith("http://") || path.startsWith("https://")) {
+    return {
+      ok: true as const,
+      bucket: "public-url",
+      path,
+      signedUrl: path,
+    };
+  }
+
   const { data: signedData, error: signedError } = await admin.storage.from(bucket).createSignedUrl(path, 60 * 5);
   if (signedError || !signedData?.signedUrl) {
     return {
@@ -291,8 +352,9 @@ async function getListingDocSignedUrl(params: { listingId: string; kind: Listing
   }
 
   const bucket = process.env.SUPABASE_LISTING_DOCS_BUCKET || "listing-documents";
+  const normalizedStored = sanitizeStoragePath(stored, bucket);
   const admin = supabaseAdmin();
-  const { data, error } = await admin.storage.from(bucket).createSignedUrl(stored, 60 * 5);
+  const { data, error } = await admin.storage.from(bucket).createSignedUrl(normalizedStored, 60 * 5);
 
   if (error || !data?.signedUrl) {
     return {
@@ -301,14 +363,14 @@ async function getListingDocSignedUrl(params: { listingId: string; kind: Listing
         error?.message ||
         `Could not create signed URL (ensure bucket "${bucket}" exists and SUPABASE_SERVICE_ROLE_KEY is set).`,
       bucket,
-      path: stored,
+      path: normalizedStored,
     };
   }
 
   return {
     ok: true as const,
     bucket,
-    path: stored,
+    path: normalizedStored,
     signedUrl: data.signedUrl,
   };
 }
@@ -766,7 +828,11 @@ export default async function AdminDashboardPage({
 
   if (selectedUserId && selectedDocKind && selectedUserAllowed) {
     try {
-      selectedDocPreview = await getUserDocSignedUrl({ userId: selectedUserId, kind: selectedDocKind });
+      selectedDocPreview = await getUserDocSignedUrl({
+        userId: selectedUserId,
+        kind: selectedDocKind,
+        userEmail: selectedUser?.email ?? null,
+      });
     } catch (e) {
       selectedDocPreview = {
         ok: false,

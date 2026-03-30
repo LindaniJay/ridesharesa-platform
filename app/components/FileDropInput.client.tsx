@@ -8,6 +8,7 @@ type Props = {
   helper?: string;
   accept?: string;
   required?: boolean;
+  onFileSelected?: (file: File | null) => void;
 };
 
 function prettyBytes(bytes: number) {
@@ -22,7 +23,7 @@ function prettyBytes(bytes: number) {
   return `${value.toFixed(value >= 10 || i === 0 ? 0 : 1)} ${units[i]}`;
 }
 
-export default function FileDropInput({ name, label, helper, accept, required = false }: Props) {
+export default function FileDropInput({ name, label, helper, accept, required = false, onFileSelected }: Props) {
   const [dragOver, setDragOver] = useState(false);
   const [file, setFile] = useState<File | null>(null);
 
@@ -49,6 +50,7 @@ export default function FileDropInput({ name, label, helper, accept, required = 
           setDragOver(false);
           const next = e.dataTransfer.files?.[0] ?? null;
           setFile(next);
+          onFileSelected?.(next);
         }}
       >
         <input
@@ -57,7 +59,11 @@ export default function FileDropInput({ name, label, helper, accept, required = 
           required={required}
           accept={accept}
           className="w-full text-sm"
-          onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+          onChange={(e) => {
+            const next = e.target.files?.[0] ?? null;
+            setFile(next);
+            onFileSelected?.(next);
+          }}
         />
         <div className="mt-2 rounded-md border border-border bg-card/70 px-2.5 py-1.5 text-xs text-foreground/70">
           {hint}

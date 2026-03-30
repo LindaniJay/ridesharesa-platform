@@ -110,7 +110,7 @@ async function uploadDocument(params: {
 
   const maxBytes = 8 * 1024 * 1024;
   if (params.file.size > maxBytes) {
-    throw new Error("Image too large (max 8MB)");
+    throw new Error("File too large (max 8MB)");
   }
 
   const ext = safeExtFromFileName(params.file.name);
@@ -180,8 +180,8 @@ export async function POST(req: Request) {
   try {
     const [profile, idDoc, license, residenceProof] = await Promise.all([
       uploadDocument({ bucket, userId: dbUser.id, key: "profile", file: profilePhoto }),
-      uploadDocument({ bucket, userId: dbUser.id, key: "id", file: idDocument }),
-      uploadDocument({ bucket, userId: dbUser.id, key: "license", file: driversLicense }),
+      uploadDocument({ bucket, userId: dbUser.id, key: "id", file: idDocument, allowPdf: true }),
+      uploadDocument({ bucket, userId: dbUser.id, key: "license", file: driversLicense, allowPdf: true }),
       uploadDocument({ bucket, userId: dbUser.id, key: "proof_residence", file: proofOfResidence, allowPdf: true }),
     ]);
 

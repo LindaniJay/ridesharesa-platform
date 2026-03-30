@@ -8,6 +8,18 @@ function normalizeEmail(value: string) {
   return value.trim().toLowerCase();
 }
 
+function sanitizeStoragePath(path: string, bucket: string) {
+  const trimmed = path.trim();
+  if (!trimmed) return "";
+  if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) return trimmed;
+
+  let normalized = trimmed.replace(/^\/+/, "");
+  if (normalized.startsWith(`${bucket}/`)) {
+    normalized = normalized.slice(bucket.length + 1);
+  }
+  return normalized;
+}
+
 type Kind = "profile" | "id" | "license" | "proof_residence";
 
 function isKind(value: string): value is Kind {
@@ -105,7 +117,9 @@ export async function GET(
       if (storagePath) candidatePaths.push(storagePath);
     }
 
-    const path = candidatePaths.find((p) => typeof p === "string" && p.length > 0) || null;
+    const path = candidatePaths
+      .map((p) => sanitizeStoragePath(p, bucket))
+      .find((p) => typeof p === "string" && p.length > 0) || null;
     if (!path) {
       return NextResponse.json(
         {
@@ -118,6 +132,10 @@ export async function GET(
         },
         { status: 404 },
       );
+    }
+
+    if (path.startsWith("http://") || path.startsWith("https://")) {
+      return NextResponse.redirect(path);
     }
 
     const admin = supabaseAdmin();
