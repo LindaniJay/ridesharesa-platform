@@ -1,5 +1,11 @@
 import { revalidatePath } from "next/cache";
 import Link from "next/link";
+import AdminBulkSelector from "@/app/admin/AdminBulkSelector.client";
+import AdminCharts from "@/app/admin/AdminCharts.client";
+import AdminCommandPalette from "@/app/admin/AdminCommandPalette.client";
+import AdminKeyboardShortcuts from "@/app/admin/AdminKeyboardShortcuts.client";
+import { writeAuditLog } from "@/app/lib/auditLog";
+import { scoreBooking, scoreUser, riskBadgeClass, riskLabel } from "@/app/lib/riskScore";
 
 export const dynamic = "force-dynamic";
 
@@ -70,26 +76,6 @@ function buildDailySeries(
   return values;
 }
 
-function MiniBars({ values, className }: { values: number[]; className?: string }) {
-  const max = Math.max(1, ...values);
-  const width = 300;
-  const height = 64;
-  const gap = 2;
-  const barCount = values.length;
-  const barWidth = Math.max(1, Math.floor((width - gap * (barCount - 1)) / barCount));
-
-  return (
-    <svg viewBox={`0 0 ${width} ${height}`} className={cn("h-16 w-full text-foreground/20", className)}>
-      {values.map((v, i) => {
-        const h = Math.max(1, Math.round((v / max) * (height - 6)));
-        const x = i * (barWidth + gap);
-        const y = height - h;
-        return <rect key={i} x={x} y={y} width={barWidth} height={h} fill="currentColor" rx={1} />;
-      })}
-    </svg>
-  );
-}
-
 function iso(d: Date) {
   return d.toISOString().slice(0, 10);
 }
@@ -101,6 +87,7 @@ function parseStatus<T extends string>(value: unknown, allowed: readonly T[]) {
 
 type AdminSection =
   | "overview"
+  | "audit"
   | "settings"
   | "analytics"
   | "vehicles"
@@ -119,6 +106,18 @@ function parseUserDocKind(value: unknown): UserDocKind | null {
   return v === "profile" || v === "id" || v === "license" || v === "proof_residence" ? v : null;
 }
 
+
+function parseAuditSnapshot(value: string | null) {
+  if (!value) return null;
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed)
+      ? (parsed as Record<string, unknown>)
+      : null;
+  } catch {
+    return null;
+  }
+}
 function parseListingDocKind(value: unknown): ListingDocKind | null {
   const v = String(value ?? "").trim();
   return v === "licenseDisk" || v === "registration" || v === "licenseCard" ? v : null;
@@ -240,6 +239,7 @@ function parseSection(value: unknown): AdminSection | null {
   const v = String(value ?? "").trim();
   const allowed: readonly AdminSection[] = [
     "overview",
+    "audit",
     "settings",
     "analytics",
     "vehicles",
@@ -409,7 +409,15 @@ export default async function AdminDashboardPage({
         totalCents: true,
         currency: true,
         createdAt: true,
-        renter: { select: { email: true } },
+        renter: {
+          select: {
+            id: true,
+            email: true,
+            createdAt: true,
+            idVerificationStatus: true,
+            driversLicenseStatus: true,
+          },
+        },
         listing: { select: { title: true } },
       },
     }),
@@ -461,7 +469,15 @@ export default async function AdminDashboardPage({
         totalCents: true,
         currency: true,
         createdAt: true,
-        renter: { select: { email: true } },
+        renter: {
+          select: {
+            id: true,
+            email: true,
+            createdAt: true,
+            idVerificationStatus: true,
+            driversLicenseStatus: true,
+          },
+        },
         listing: { select: { id: true, title: true, city: true, host: { select: { email: true } } } },
       },
     }),
@@ -473,8 +489,17 @@ export default async function AdminDashboardPage({
         id: true,
         totalCents: true,
         currency: true,
+        startDate: true,
         createdAt: true,
-        renter: { select: { email: true } },
+        renter: {
+          select: {
+            id: true,
+            email: true,
+            createdAt: true,
+            idVerificationStatus: true,
+            driversLicenseStatus: true,
+          },
+        },
         listing: { select: { title: true, host: { select: { email: true } } } },
       },
     }),
@@ -591,6 +616,40 @@ export default async function AdminDashboardPage({
     }),
   ]);
 
+  const statsUserIds = Array.from(
+    new Set([
+      ...allUsers.map((user) => user.id),
+      ...bookingsOps.map((booking) => booking.renter.id),
+      ...pendingEftBookings.map((booking) => booking.renter.id),
+    ]),
+  );
+
+  const [bookingCountRows, cancelledBookingCountRows, incidentCountRows] = statsUserIds.length
+    ? await Promise.all([
+        prisma.booking.groupBy({
+          by: ["renterId"],
+          where: { renterId: { in: statsUserIds } },
+          _count: { _all: true },
+        }),
+        prisma.booking.groupBy({
+          by: ["renterId"],
+          where: { renterId: { in: statsUserIds }, status: "CANCELLED" },
+          _count: { _all: true },
+        }),
+        prisma.incidentReport.groupBy({
+          by: ["userId"],
+          where: { userId: { in: statsUserIds } },
+          _count: { _all: true },
+        }),
+      ])
+    : [[], [], []];
+
+  const totalBookingsByUser = new Map(bookingCountRows.map((row) => [row.renterId, row._count._all] as const));
+  const cancelledBookingsByUser = new Map(
+    cancelledBookingCountRows.map((row) => [row.renterId, row._count._all] as const),
+  );
+  const incidentCountByUser = new Map(incidentCountRows.map((row) => [row.userId, row._count._all] as const));
+
   const selectedUser = selectedUserId
     ? await prisma.user.findUnique({
         where: { id: selectedUserId },
@@ -699,46 +758,97 @@ export default async function AdminDashboardPage({
 
   async function approveListing(formData: FormData) {
     "use server";
+    const { dbUser: adminUser } = await requireRole("ADMIN");
     const listingId = String(formData.get("listingId") ?? "");
     if (!listingId) return;
+    const before = await prisma.listing.findUnique({
+      where: { id: listingId },
+      select: { isApproved: true, status: true },
+    });
     await prisma.listing.update({ where: { id: listingId }, data: { isApproved: true } });
+    await writeAuditLog({
+      adminId: adminUser.id,
+      adminEmail: adminUser.email,
+      action: "approveListing",
+      targetId: listingId,
+      targetKind: "listing",
+      before: before ?? undefined,
+      after: { ...(before ?? {}), isApproved: true },
+    });
     revalidatePath("/listings");
     revalidatePath("/admin");
   }
 
   async function setListingStatus(formData: FormData) {
     "use server";
+    const { dbUser: adminUser } = await requireRole("ADMIN");
     const listingId = String(formData.get("listingId") ?? "");
     const status = String(formData.get("status") ?? "");
     if (!listingId) return;
     if (!['ACTIVE', 'PAUSED', 'DRAFT'].includes(status)) return;
+    const before = await prisma.listing.findUnique({
+      where: { id: listingId },
+      select: { status: true, isApproved: true },
+    });
     await prisma.listing.update({ where: { id: listingId }, data: { status: status as ListingStatus } });
+    await writeAuditLog({
+      adminId: adminUser.id,
+      adminEmail: adminUser.email,
+      action: "setListingStatus",
+      targetId: listingId,
+      targetKind: "listing",
+      before: before ?? undefined,
+      after: { ...(before ?? {}), status },
+    });
     revalidatePath("/listings");
     revalidatePath("/admin");
   }
 
   async function setUserRole(formData: FormData) {
     "use server";
+    const { dbUser: adminUser } = await requireRole("ADMIN");
     const userId = String(formData.get("userId") ?? "");
     const role = String(formData.get("role") ?? "");
     if (!userId) return;
     if (!['ADMIN', 'HOST', 'RENTER'].includes(role)) return;
+    const before = await prisma.user.findUnique({ where: { id: userId }, select: { role: true } });
     await prisma.user.update({ where: { id: userId }, data: { role: role as Role } });
+    await writeAuditLog({
+      adminId: adminUser.id,
+      adminEmail: adminUser.email,
+      action: "setUserRole",
+      targetId: userId,
+      targetKind: "user",
+      before: before ?? undefined,
+      after: { role },
+    });
     revalidatePath("/admin");
   }
 
   async function setUserStatus(formData: FormData) {
     "use server";
+    const { dbUser: adminUser } = await requireRole("ADMIN");
     const userId = String(formData.get("userId") ?? "");
     const status = String(formData.get("status") ?? "");
     if (!userId) return;
     if (!['ACTIVE', 'SUSPENDED'].includes(status)) return;
+    const before = await prisma.user.findUnique({ where: { id: userId }, select: { status: true } });
     await prisma.user.update({ where: { id: userId }, data: { status: status as UserStatus } });
+    await writeAuditLog({
+      adminId: adminUser.id,
+      adminEmail: adminUser.email,
+      action: "setUserStatus",
+      targetId: userId,
+      targetKind: "user",
+      before: before ?? undefined,
+      after: { status },
+    });
     revalidatePath("/admin");
   }
 
   async function setUserVerification(formData: FormData) {
     "use server";
+    const { dbUser: adminUser } = await requireRole("ADMIN");
     const userId = String(formData.get("userId") ?? "");
     const field = String(formData.get("field") ?? "");
     const status = String(formData.get("status") ?? "");
@@ -746,16 +856,32 @@ export default async function AdminDashboardPage({
     if (!['idVerificationStatus', 'driversLicenseStatus'].includes(field)) return;
     if (!['UNVERIFIED', 'PENDING', 'VERIFIED', 'REJECTED'].includes(status)) return;
     const nextStatus = status as VerificationStatus;
+    const before = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { idVerificationStatus: true, driversLicenseStatus: true },
+    });
     await prisma.user.update({
       where: { id: userId },
       data: field === "idVerificationStatus" ? { idVerificationStatus: nextStatus } : { driversLicenseStatus: nextStatus },
+    });
+    await writeAuditLog({
+      adminId: adminUser.id,
+      adminEmail: adminUser.email,
+      action: "setUserVerification",
+      targetId: userId,
+      targetKind: "user",
+      before: before ?? undefined,
+      after:
+        field === "idVerificationStatus"
+          ? { ...(before ?? {}), idVerificationStatus: nextStatus }
+          : { ...(before ?? {}), driversLicenseStatus: nextStatus },
     });
     revalidatePath("/admin");
   }
 
   async function markManualBookingPaid(formData: FormData) {
     "use server";
-    await requireRole("ADMIN");
+    const { dbUser: adminUser } = await requireRole("ADMIN");
 
     const bookingId = String(formData.get("bookingId") ?? "");
     if (!bookingId) return;
@@ -775,12 +901,22 @@ export default async function AdminDashboardPage({
       data: { status: "CONFIRMED", paidAt: new Date() },
     });
 
+    await writeAuditLog({
+      adminId: adminUser.id,
+      adminEmail: adminUser.email,
+      action: "markManualBookingPaid",
+      targetId: bookingId,
+      targetKind: "booking",
+      before: { status: booking.status, stripeCheckoutSessionId: booking.stripeCheckoutSessionId },
+      after: { status: "CONFIRMED", paidAt: true },
+    });
+
     revalidatePath("/admin");
   }
 
   async function approveBooking(formData: FormData) {
     "use server";
-    await requireRole("ADMIN");
+    const { dbUser: adminUser } = await requireRole("ADMIN");
 
     const bookingId = String(formData.get("bookingId") ?? "");
     if (!bookingId) return;
@@ -799,6 +935,16 @@ export default async function AdminDashboardPage({
       data: { status: "CONFIRMED" },
     });
 
+    await writeAuditLog({
+      adminId: adminUser.id,
+      adminEmail: adminUser.email,
+      action: "approveBooking",
+      targetId: bookingId,
+      targetKind: "booking",
+      before: { status: booking.status, paidAt: Boolean(booking.paidAt) },
+      after: { status: "CONFIRMED" },
+    });
+
     revalidatePath("/admin");
     revalidatePath("/host");
     revalidatePath("/renter");
@@ -807,27 +953,49 @@ export default async function AdminDashboardPage({
 
   async function setSupportTicketStatus(formData: FormData) {
     "use server";
+    const { dbUser: adminUser } = await requireRole("ADMIN");
     const ticketId = String(formData.get("ticketId") ?? "");
     const status = String(formData.get("status") ?? "");
     if (!ticketId) return;
     if (!['OPEN', 'IN_PROGRESS', 'RESOLVED', 'CLOSED'].includes(status)) return;
+    const before = await prisma.supportTicket.findUnique({ where: { id: ticketId }, select: { status: true } });
     await prisma.supportTicket.update({ where: { id: ticketId }, data: { status: status as SupportTicketStatus } });
+    await writeAuditLog({
+      adminId: adminUser.id,
+      adminEmail: adminUser.email,
+      action: "setSupportTicketStatus",
+      targetId: ticketId,
+      targetKind: "supportTicket",
+      before: before ?? undefined,
+      after: { status },
+    });
     revalidatePath("/admin");
   }
 
   async function setIncidentStatus(formData: FormData) {
     "use server";
+    const { dbUser: adminUser } = await requireRole("ADMIN");
     const incidentId = String(formData.get("incidentId") ?? "");
     const status = String(formData.get("status") ?? "");
     if (!incidentId) return;
     if (!['OPEN', 'IN_REVIEW', 'RESOLVED', 'CLOSED'].includes(status)) return;
+    const before = await prisma.incidentReport.findUnique({ where: { id: incidentId }, select: { status: true } });
     await prisma.incidentReport.update({ where: { id: incidentId }, data: { status: status as IncidentStatus } });
+    await writeAuditLog({
+      adminId: adminUser.id,
+      adminEmail: adminUser.email,
+      action: "setIncidentStatus",
+      targetId: incidentId,
+      targetKind: "incident",
+      before: before ?? undefined,
+      after: { status },
+    });
     revalidatePath("/admin");
   }
 
   async function createHostPayout(formData: FormData) {
     "use server";
-    await requireRole("ADMIN");
+    const { dbUser: adminUser } = await requireRole("ADMIN");
 
     const hostId = String(formData.get("hostId") ?? "").trim();
     const amount = Number(String(formData.get("amount") ?? "").trim());
@@ -842,7 +1010,7 @@ export default async function AdminDashboardPage({
     const periodStart = periodStartStr ? new Date(periodStartStr) : null;
     const periodEnd = periodEndStr ? new Date(periodEndStr) : null;
 
-    await prisma.hostPayout.create({
+    const payout = await prisma.hostPayout.create({
       data: {
         hostId,
         amountCents,
@@ -853,22 +1021,109 @@ export default async function AdminDashboardPage({
       },
     });
 
+    await writeAuditLog({
+      adminId: adminUser.id,
+      adminEmail: adminUser.email,
+      action: "createHostPayout",
+      targetId: payout.id,
+      targetKind: "payout",
+      after: { hostId, amountCents, currency },
+    });
+
     revalidatePath("/admin");
   }
 
   async function setPayoutStatus(formData: FormData) {
     "use server";
-    await requireRole("ADMIN");
+    const { dbUser: adminUser } = await requireRole("ADMIN");
 
     const payoutId = String(formData.get("payoutId") ?? "").trim();
     const status = String(formData.get("status") ?? "").trim();
     if (!payoutId) return;
     if (!['PENDING', 'PAID', 'FAILED'].includes(status)) return;
 
+    const before = await prisma.hostPayout.findUnique({ where: { id: payoutId }, select: { status: true } });
+
     await prisma.hostPayout.update({
       where: { id: payoutId },
       data: { status: status as PayoutStatus },
     });
+    await writeAuditLog({
+      adminId: adminUser.id,
+      adminEmail: adminUser.email,
+      action: "setPayoutStatus",
+      targetId: payoutId,
+      targetKind: "payout",
+      before: before ?? undefined,
+      after: { status },
+    });
+    revalidatePath("/admin");
+  }
+
+  async function bulkApproveListings(ids: string[]) {
+    "use server";
+    const { dbUser: adminUser } = await requireRole("ADMIN");
+    const listingIds = Array.from(new Set(ids.map((id) => String(id).trim()).filter(Boolean))).slice(0, 100);
+    if (listingIds.length === 0) return;
+
+    await prisma.listing.updateMany({
+      where: { id: { in: listingIds } },
+      data: { isApproved: true },
+    });
+
+    await writeAuditLog({
+      adminId: adminUser.id,
+      adminEmail: adminUser.email,
+      action: "bulkApproveListings",
+      targetKind: "listing",
+      after: { listingIds, count: listingIds.length, isApproved: true },
+    });
+
+    revalidatePath("/admin");
+    revalidatePath("/listings");
+  }
+
+  async function bulkVerifyUserIds(ids: string[]) {
+    "use server";
+    const { dbUser: adminUser } = await requireRole("ADMIN");
+    const userIds = Array.from(new Set(ids.map((id) => String(id).trim()).filter(Boolean))).slice(0, 100);
+    if (userIds.length === 0) return;
+
+    await prisma.user.updateMany({
+      where: { id: { in: userIds }, role: { not: "ADMIN" } },
+      data: { idVerificationStatus: "VERIFIED" },
+    });
+
+    await writeAuditLog({
+      adminId: adminUser.id,
+      adminEmail: adminUser.email,
+      action: "bulkVerifyUserIds",
+      targetKind: "user",
+      after: { userIds, count: userIds.length, idVerificationStatus: "VERIFIED" },
+    });
+
+    revalidatePath("/admin");
+  }
+
+  async function bulkSuspendUsers(ids: string[]) {
+    "use server";
+    const { dbUser: adminUser } = await requireRole("ADMIN");
+    const userIds = Array.from(new Set(ids.map((id) => String(id).trim()).filter(Boolean))).slice(0, 100);
+    if (userIds.length === 0) return;
+
+    await prisma.user.updateMany({
+      where: { id: { in: userIds }, role: { not: "ADMIN" } },
+      data: { status: "SUSPENDED" },
+    });
+
+    await writeAuditLog({
+      adminId: adminUser.id,
+      adminEmail: adminUser.email,
+      action: "bulkSuspendUsers",
+      targetKind: "user",
+      after: { userIds, count: userIds.length, status: "SUSPENDED" },
+    });
+
     revalidatePath("/admin");
   }
 
@@ -901,6 +1156,7 @@ export default async function AdminDashboardPage({
 
   const sidebarSections: { key: AdminSection; label: string }[] = [
     { key: "overview", label: "Overview" },
+    { key: "audit", label: "Audit log" },
     { key: "settings", label: "Settings" },
     { key: "analytics", label: "Analytics" },
     { key: "vehicles", label: "Vehicles" },
@@ -936,6 +1192,17 @@ export default async function AdminDashboardPage({
       })
     : null;
 
+  let adminAuditLogError: string | null = null;
+  const adminAuditLogs = section === "audit"
+    ? await prisma.adminAuditLog.findMany({
+        orderBy: { createdAt: "desc" },
+        take: 100,
+      }).catch(() => {
+        adminAuditLogError = "Audit log table is not available yet. Apply the Prisma migration to enable this section.";
+        return [];
+      })
+    : [];
+
   const currentQuery = {
     q: q || undefined,
     bookingStatus: bookingStatus ?? undefined,
@@ -944,11 +1211,16 @@ export default async function AdminDashboardPage({
   };
 
   return (
+    <>
+    <AdminKeyboardShortcuts />
     <main className="grid gap-6 lg:grid-cols-[260px_1fr]">
       <aside className="space-y-4 lg:sticky lg:top-6 lg:self-start">
         <div className="space-y-1">
           <h1 className="text-2xl font-semibold tracking-tight">Admin dashboard</h1>
-          <p className="text-sm text-foreground/60">Operations, finance, trust & safety, and support.</p>
+          <p className="text-sm text-foreground/60">Operations, finance, trust &amp; safety, and support.</p>
+          <div className="pt-2">
+            <AdminCommandPalette />
+          </div>
         </div>
 
         <Card>
@@ -1128,6 +1400,89 @@ export default async function AdminDashboardPage({
 
       ) : null}
 
+      {section === "audit" ? (
+      <section className="space-y-3">
+        <div className="space-y-1">
+          <h2 className="text-lg font-semibold">Audit log</h2>
+          <div className="text-sm text-foreground/60">Recent admin actions across listings, users, bookings, payouts, support, and risk operations.</div>
+        </div>
+
+        {adminAuditLogError ? (
+          <Card>
+            <CardHeader>
+              <CardTitle>Audit log unavailable</CardTitle>
+              <CardDescription>{adminAuditLogError}</CardDescription>
+            </CardHeader>
+          </Card>
+        ) : adminAuditLogs.length === 0 ? (
+          <Card>
+            <CardHeader>
+              <CardTitle>No audit entries yet</CardTitle>
+              <CardDescription>Admin actions will appear here after they are performed.</CardDescription>
+            </CardHeader>
+          </Card>
+        ) : (
+          <div className="space-y-3">
+            {adminAuditLogs.map((entry) => {
+              const before = parseAuditSnapshot(entry.before);
+              const after = parseAuditSnapshot(entry.after);
+              return (
+                <Card key={entry.id}>
+                  <CardHeader>
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div className="space-y-1">
+                        <CardTitle className="text-base">{entry.action}</CardTitle>
+                        <CardDescription>
+                          {entry.adminEmail}
+                          {entry.targetKind ? ` • ${entry.targetKind}` : ""}
+                          {entry.targetId ? ` • ${entry.targetId}` : ""}
+                        </CardDescription>
+                      </div>
+                      <div className="text-xs text-foreground/60">{entry.createdAt.toLocaleString("en-ZA")}</div>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="grid gap-4 lg:grid-cols-2">
+                    <div className="space-y-2">
+                      <div className="text-xs font-medium uppercase tracking-wide text-foreground/50">Before</div>
+                      {before ? (
+                        <div className="space-y-1 rounded-xl border border-border bg-muted/40 p-3 text-sm">
+                          {Object.entries(before).map(([key, value]) => (
+                            <div key={key} className="flex items-start justify-between gap-3">
+                              <span className="text-foreground/60">{key}</span>
+                              <span className="break-all text-right">{String(value)}</span>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="text-sm text-foreground/50">No previous snapshot.</div>
+                      )}
+                    </div>
+
+                    <div className="space-y-2">
+                      <div className="text-xs font-medium uppercase tracking-wide text-foreground/50">After</div>
+                      {after ? (
+                        <div className="space-y-1 rounded-xl border border-border bg-muted/40 p-3 text-sm">
+                          {Object.entries(after).map(([key, value]) => (
+                            <div key={key} className="flex items-start justify-between gap-3">
+                              <span className="text-foreground/60">{key}</span>
+                              <span className="break-all text-right">{String(value)}</span>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="text-sm text-foreground/50">No new snapshot.</div>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+        )}
+      </section>
+
+      ) : null}
+
       {section === "settings" ? (
         <section className="space-y-3">
           <h2 className="text-lg font-semibold">Settings</h2>
@@ -1228,7 +1583,18 @@ export default async function AdminDashboardPage({
                 </div>
               </div>
               <div className="mt-3">
-                <MiniBars values={Array.isArray(bookingsSeries) ? bookingsSeries : []} className="text-accent/35" />
+                <AdminCharts.Area
+                  data={(Array.isArray(bookingsSeries) ? bookingsSeries : []).map((value, index) => {
+                    const day = new Date(trendStart);
+                    day.setDate(trendStart.getDate() + index);
+                    return {
+                      label: day.toLocaleDateString("en-ZA", { month: "short", day: "numeric" }),
+                      value,
+                    };
+                  })}
+                  valueLabel="Bookings"
+                  color="#6366f1"
+                />
               </div>
             </CardContent>
           </Card>
@@ -1238,7 +1604,7 @@ export default async function AdminDashboardPage({
               <div className="flex items-center justify-between gap-3">
                 <div className="space-y-1">
                   <CardTitle>Top cities</CardTitle>
-                  <CardDescription>Confirmed bookings + revenue (30 days).</CardDescription>
+                  <CardDescription>Confirmed bookings (30 days).</CardDescription>
                 </div>
                 <Badge variant="info">30d</Badge>
               </div>
@@ -1247,17 +1613,12 @@ export default async function AdminDashboardPage({
               {Array.isArray(topCitiesRows) && topCitiesRows.length === 0 ? (
                 <div className="text-sm text-foreground/60">No confirmed bookings in the last 30 days.</div>
               ) : Array.isArray(topCitiesRows) ? (
-                <div className="space-y-2">
-                  {topCitiesRows.map((r) => (
-                    <div key={r.city} className="flex items-center justify-between gap-3 text-sm">
-                      <div className="min-w-0">
-                        <div className="truncate font-medium">{r.city}</div>
-                        <div className="text-xs text-foreground/60">{formatInt(r.bookings)} bookings</div>
-                      </div>
-                      <div className="shrink-0 tabular-nums text-foreground/80">{formatMoneyZar(r.revenueCents)}</div>
-                    </div>
-                  ))}
-                </div>
+                <AdminCharts.Bar
+                  data={topCitiesRows.map((row) => ({ name: row.city, value: row.bookings }))}
+                  valueLabel="Bookings"
+                  color="#22d3ee"
+                  horizontal
+                />
               ) : null}
             </CardContent>
           </Card>
@@ -1292,7 +1653,19 @@ export default async function AdminDashboardPage({
                 </div>
               </div>
               <div className="mt-3">
-                <MiniBars values={Array.isArray(revenueSeries) ? revenueSeries : []} className="text-accent/35" />
+                <AdminCharts.Area
+                  data={(Array.isArray(revenueSeries) ? revenueSeries : []).map((value, index) => {
+                    const day = new Date(trendStart);
+                    day.setDate(trendStart.getDate() + index);
+                    return {
+                      label: day.toLocaleDateString("en-ZA", { month: "short", day: "numeric" }),
+                      value,
+                    };
+                  })}
+                  valueLabel="Revenue (cents)"
+                  color="#10b981"
+                  format={(value) => `R${(value / 100).toFixed(0)}`}
+                />
               </div>
               <div className="mt-2 text-xs text-foreground/60">If you support multiple currencies, split revenue by currency.</div>
             </CardContent>
@@ -1326,7 +1699,18 @@ export default async function AdminDashboardPage({
                 </div>
               </div>
               <div className="mt-3">
-                <MiniBars values={Array.isArray(signupsSeries) ? signupsSeries : []} className="text-accent/35" />
+                <AdminCharts.Area
+                  data={(Array.isArray(signupsSeries) ? signupsSeries : []).map((value, index) => {
+                    const day = new Date(trendStart);
+                    day.setDate(trendStart.getDate() + index);
+                    return {
+                      label: day.toLocaleDateString("en-ZA", { month: "short", day: "numeric" }),
+                      value,
+                    };
+                  })}
+                  valueLabel="Signups"
+                  color="#f59e0b"
+                />
               </div>
             </CardContent>
           </Card>
@@ -1341,6 +1725,32 @@ export default async function AdminDashboardPage({
         <div className="text-sm text-foreground/60">
           Pending approvals and listing status management.
         </div>
+        {pendingListings.length > 0 ? (
+          <Card>
+            <CardHeader>
+              <CardTitle>Bulk listing actions</CardTitle>
+              <CardDescription>Approve multiple pending listings at once.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <AdminBulkSelector
+                noun="listing"
+                items={pendingListings.map((listing) => ({
+                  id: listing.id,
+                  label: listing.title,
+                  sub: `${listing.city} • ${listing.host.email}`,
+                }))}
+                actions={[
+                  {
+                    label: "Approve selected",
+                    variant: "primary",
+                    confirm: "Approve {n} selected listings?",
+                    action: bulkApproveListings,
+                  },
+                ]}
+              />
+            </CardContent>
+          </Card>
+        ) : null}
         {pendingListings.length === 0 ? (
           <Card>
             <CardHeader>
@@ -1552,14 +1962,55 @@ export default async function AdminDashboardPage({
             </div>
           </div>
 
-          <form className="flex flex-wrap items-center gap-2" action="/admin" method="get">
-            <input type="hidden" name="section" value={section} />
-            <Input name="q" defaultValue={q} placeholder="Search by email" className="max-w-sm" />
-            <Button type="submit" variant="secondary">
-              Search
-            </Button>
-          </form>
+          <div className="flex flex-wrap items-center gap-2">
+            <a
+              className="inline-flex items-center justify-center rounded-lg px-3.5 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/30 border border-border bg-card text-foreground shadow-sm hover:bg-muted"
+              href="/api/admin/exports/users"
+            >
+              Export users (CSV)
+            </a>
+            <form className="flex flex-wrap items-center gap-2" action="/admin" method="get">
+              <input type="hidden" name="section" value={section} />
+              <Input name="q" defaultValue={q} placeholder="Search by email" className="max-w-sm" />
+              <Button type="submit" variant="secondary">
+                Search
+              </Button>
+            </form>
+          </div>
         </div>
+
+        {allUsers.length > 0 ? (
+          <Card>
+            <CardHeader>
+              <CardTitle>Bulk user actions</CardTitle>
+              <CardDescription>Apply verification or status changes to multiple users.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <AdminBulkSelector
+                noun="user"
+                items={allUsers.map((user) => ({
+                  id: user.id,
+                  label: user.email,
+                  sub: `${user.role} • ${user.status}`,
+                }))}
+                actions={[
+                  {
+                    label: "Verify selected IDs",
+                    variant: "primary",
+                    confirm: "Mark ID verification as VERIFIED for {n} selected users?",
+                    action: bulkVerifyUserIds,
+                  },
+                  {
+                    label: "Suspend selected",
+                    variant: "ghost",
+                    confirm: "Suspend {n} selected users?",
+                    action: bulkSuspendUsers,
+                  },
+                ]}
+              />
+            </CardContent>
+          </Card>
+        ) : null}
 
         <div className="grid gap-4 lg:grid-cols-[520px_1fr]">
           <div className="space-y-3">
@@ -1574,6 +2025,16 @@ export default async function AdminDashboardPage({
               allUsers.map((u) => {
                 const active = selectedUserId === u.id;
                 const clearHref = adminHref({ section: "users", q: q || null });
+                const accountAgeDays = Math.max(0, Math.floor((now.getTime() - u.createdAt.getTime()) / (24 * 60 * 60 * 1000)));
+                const userRisk = scoreUser({
+                  status: u.status,
+                  idVerificationStatus: u.idVerificationStatus,
+                  driversLicenseStatus: u.driversLicenseStatus,
+                  cancelledBookings: cancelledBookingsByUser.get(u.id) ?? 0,
+                  totalBookings: totalBookingsByUser.get(u.id) ?? 0,
+                  incidentCount: incidentCountByUser.get(u.id) ?? 0,
+                  accountAgeDays,
+                });
                 return (
                   <Card key={u.id} className={active ? "border-accent/40 bg-accent-subtle" : undefined}>
                     <CardHeader>
@@ -1584,6 +2045,9 @@ export default async function AdminDashboardPage({
                           <div className="flex flex-wrap items-center gap-2 pt-1">
                             <Badge variant={badgeVariantForRole(u.role)}>{u.role}</Badge>
                             <Badge variant={badgeVariantForUserStatus(u.status)}>{u.status}</Badge>
+                            <span className={riskBadgeClass(userRisk.level)}>
+                              {riskLabel(userRisk.level)} risk {userRisk.score}
+                            </span>
                             {/* Document verification controls */}
                             <form action={setUserVerification} className="flex items-center gap-2">
                               <input type="hidden" name="userId" value={u.id} />
@@ -1860,7 +2324,15 @@ export default async function AdminDashboardPage({
 
       {section === "bookings" ? (
       <section className="space-y-3">
-        <h2 className="text-lg font-semibold">Booking & operations</h2>
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <h2 className="text-lg font-semibold">Booking & operations</h2>
+          <a
+            className="inline-flex items-center justify-center rounded-lg px-3.5 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/30 border border-border bg-card text-foreground shadow-sm hover:bg-muted"
+            href="/api/admin/exports/bookings"
+          >
+            Export bookings (CSV)
+          </a>
+        </div>
 
         <form className="flex flex-wrap items-center gap-2" action="/admin" method="get">
           <input type="hidden" name="section" value={section} />
@@ -1918,6 +2390,7 @@ export default async function AdminDashboardPage({
                     <th className="px-3 py-2">Renter</th>
                     <th className="px-3 py-2">Dates</th>
                     <th className="px-3 py-2">Status</th>
+                    <th className="px-3 py-2">Risk</th>
                     <th className="px-3 py-2">Payment</th>
                     <th className="px-3 py-2">Ref#</th>
                     <th className="px-3 py-2">Total</th>
@@ -1927,7 +2400,17 @@ export default async function AdminDashboardPage({
                 </thead>
                 <tbody>
                    {Array.isArray(bookingsOps)
-                     ? bookingsOps.map((b) => (
+                     ? bookingsOps.map((b) => {
+                         const bookingRisk = scoreBooking({
+                           idVerificationStatus: b.renter.idVerificationStatus,
+                           driversLicenseStatus: b.renter.driversLicenseStatus,
+                           accountAgeDays: Math.max(0, Math.floor((now.getTime() - b.renter.createdAt.getTime()) / (24 * 60 * 60 * 1000))),
+                           totalCents: b.totalCents,
+                           sameDay: iso(b.createdAt) === iso(b.startDate),
+                           cancelledBookings: cancelledBookingsByUser.get(b.renter.id) ?? 0,
+                           totalBookings: totalBookingsByUser.get(b.renter.id) ?? 0,
+                         });
+                         return (
                          <tr key={b.id} className="border-t border-border">
                            <td className="px-3 py-2">
                              <Link className="underline" href={`/listings/${b.listing.id}`}>
@@ -1941,6 +2424,11 @@ export default async function AdminDashboardPage({
                            </td>
                            <td className="px-3 py-2">
                              <Badge variant={badgeVariantForBookingStatus(b.status)}>{b.status}</Badge>
+                           </td>
+                           <td className="px-3 py-2">
+                             <span className={cn("inline-flex rounded-full px-2 py-1 text-xs font-medium", riskBadgeClass(bookingRisk.level))} title={bookingRisk.flags.join(" • ")}>
+                               {riskLabel(bookingRisk.level)} {bookingRisk.score}
+                             </span>
                            </td>
                            <td className="px-3 py-2">
                              <Badge variant={b.stripeCheckoutSessionId ? "info" : "warning"}>
@@ -1974,7 +2462,8 @@ export default async function AdminDashboardPage({
                              )}
                            </td>
                          </tr>
-                       ))
+                         );
+                       })
                      : null}
                 </tbody>
               </table>
@@ -2082,17 +2571,33 @@ export default async function AdminDashboardPage({
                       <th className="px-3 py-2">Listing</th>
                       <th className="px-3 py-2">Host</th>
                       <th className="px-3 py-2">Renter</th>
+                      <th className="px-3 py-2">Risk</th>
                       <th className="px-3 py-2">Total</th>
                       <th className="px-3 py-2">Created</th>
                       <th className="px-3 py-2">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {pendingEftBookings.map((b) => (
+                    {pendingEftBookings.map((b) => {
+                      const bookingRisk = scoreBooking({
+                        idVerificationStatus: b.renter.idVerificationStatus,
+                        driversLicenseStatus: b.renter.driversLicenseStatus,
+                        accountAgeDays: Math.max(0, Math.floor((now.getTime() - b.renter.createdAt.getTime()) / (24 * 60 * 60 * 1000))),
+                        totalCents: b.totalCents,
+                        sameDay: iso(b.createdAt) === iso(b.startDate),
+                        cancelledBookings: cancelledBookingsByUser.get(b.renter.id) ?? 0,
+                        totalBookings: totalBookingsByUser.get(b.renter.id) ?? 0,
+                      });
+                      return (
                       <tr key={b.id} className="border-t border-border">
                         <td className="px-3 py-2">{b.listing.title}</td>
                         <td className="px-3 py-2">{b.listing.host.email}</td>
                         <td className="px-3 py-2">{b.renter.email}</td>
+                        <td className="px-3 py-2">
+                          <span className={cn("inline-flex rounded-full px-2 py-1 text-xs font-medium", riskBadgeClass(bookingRisk.level))} title={bookingRisk.flags.join(" • ")}>
+                            {riskLabel(bookingRisk.level)} {bookingRisk.score}
+                          </span>
+                        </td>
                         <td className="px-3 py-2">
                           {(b.totalCents / 100).toFixed(0)} {b.currency}
                         </td>
@@ -2114,7 +2619,8 @@ export default async function AdminDashboardPage({
                           </div>
                         </td>
                       </tr>
-                    ))}
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -2466,5 +2972,7 @@ export default async function AdminDashboardPage({
       ) : null}
       </div>
     </main>
+    </>
   );
 }
+

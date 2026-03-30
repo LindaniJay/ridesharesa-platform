@@ -356,3 +356,20 @@ model PushSubscription {
 
   @@index([userId])
 }
+
+model AdminAuditLog {
+  id         String   @id @default(cuid())
+  adminId    String
+  adminEmail String
+  action     String
+  targetId   String?
+  targetKind String?
+  before     String?
+  after      String?
+  createdAt  DateTime @default(now())
+
+  @@index([adminId])
+  @@index([action])
+  @@index([targetId])
+  @@index([createdAt])
+}
