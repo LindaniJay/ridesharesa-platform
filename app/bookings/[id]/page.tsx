@@ -270,7 +270,7 @@ export default async function BookingPage({
             : "Payment is processing. This page will update after Stripe confirms payment.";
 
   return (
-    <main className="mx-auto max-w-5xl space-y-6 pb-8">
+    <main className="mx-auto max-w-5xl space-y-6 pb-8 mobile-tight stagger-children">
       <div className="text-sm text-black/60 dark:text-white/60">
         <Link className="underline" href="/listings">
           Listings

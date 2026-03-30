@@ -287,7 +287,7 @@ export default async function HostDashboardPage() {
   }
 
   return (
-    <main className="min-h-screen space-y-8 pb-12">
+    <main className="min-h-screen space-y-8 pb-12 mobile-tight stagger-children">
       {/* Hero Header with community badges */}
       <Card className="rounded-3xl p-8">
         <div className="flex flex-wrap items-end justify-between gap-4">

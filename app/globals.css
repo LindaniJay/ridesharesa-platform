@@ -113,6 +113,61 @@ body {
   animation: floatBg 15s ease-in-out infinite;
 }
 
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideInPanel {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.fade-in-up {
+  animation: fadeInUp 220ms ease-out both;
+}
+
+.slide-in-panel {
+  animation: slideInPanel 220ms ease-out both;
+}
+
+.stagger-children > * {
+  animation: fadeInUp 260ms ease-out both;
+}
+
+.stagger-children > *:nth-child(1) { animation-delay: 20ms; }
+.stagger-children > *:nth-child(2) { animation-delay: 50ms; }
+.stagger-children > *:nth-child(3) { animation-delay: 80ms; }
+.stagger-children > *:nth-child(4) { animation-delay: 110ms; }
+.stagger-children > *:nth-child(5) { animation-delay: 140ms; }
+
+@media (max-width: 640px) {
+  .mobile-tight {
+    padding-left: 0.625rem;
+    padding-right: 0.625rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fade-in-up,
+  .slide-in-panel,
+  .stagger-children > * {
+    animation: none !important;
+  }
+}
+
 @layer components {
   .dashboard-section {
     @apply space-y-4;

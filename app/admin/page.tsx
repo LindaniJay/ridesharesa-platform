@@ -1361,7 +1361,7 @@ export default async function AdminDashboardPage({
   return (
     <>
     <AdminKeyboardShortcuts />
-    <main className="grid gap-6 lg:grid-cols-[260px_1fr]">
+    <main className="grid gap-6 lg:grid-cols-[260px_1fr] mobile-tight">
       <aside className="space-y-4 lg:sticky lg:top-6 lg:self-start">
         <div className="space-y-1">
           <h1 className="text-2xl font-semibold tracking-tight">Admin dashboard</h1>

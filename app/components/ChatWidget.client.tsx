@@ -120,6 +120,7 @@ export default function ChatWidget() {
   const listRef = useRef<HTMLDivElement | null>(null);
 
   const canSend = useMemo(() => input.trim().length > 0 && !busy, [input, busy]);
+  const hasConversation = messages.length > 0 || cards.length > 0;
 
   useEffect(() => {
     if (!open) return;
@@ -372,9 +373,9 @@ export default function ChatWidget() {
       )}
     >
       {open ? (
-        <div className="mx-auto w-full max-w-[520px] sm:mx-0 sm:w-[420px] sm:max-w-[420px]">
-          <Card className="flex h-[70dvh] max-h-[640px] w-full flex-col overflow-hidden p-0 sm:h-[560px]">
-            <CardHeader className="flex flex-row items-start justify-between gap-3 border-b border-border bg-card px-4 py-3">
+        <div className="mx-auto w-full max-w-[520px] sm:mx-0 sm:w-[420px] sm:max-w-[420px] slide-in-panel">
+          <Card className="flex h-[72dvh] max-h-[650px] w-full flex-col overflow-hidden border-border/90 p-0 sm:h-[575px]">
+            <CardHeader className="flex flex-row items-start justify-between gap-3 border-b border-border bg-gradient-to-r from-card via-card to-muted/20 px-4 py-3">
               <div className="min-w-0 space-y-0.5">
                 <CardTitle className="truncate text-base">Help & Support</CardTitle>
                 <div className="text-xs text-foreground/60">
@@ -405,14 +406,53 @@ export default function ChatWidget() {
             <CardContent className="mt-0 flex min-h-0 flex-1 flex-col gap-3 bg-background px-4 py-3">
               <div
                 ref={listRef}
-                className="min-h-0 flex-1 overflow-auto rounded-xl border border-border bg-muted/40 p-3"
+                className="min-h-0 flex-1 overflow-auto rounded-2xl border border-border bg-muted/35 p-3"
               >
-                <div className="space-y-2">
+                {!hasConversation && !busy ? (
+                  <div className="fade-in-up flex h-full min-h-[220px] flex-col items-center justify-center text-center">
+                    <div className="rounded-2xl border border-border bg-card/70 p-4 shadow-sm">
+                      <svg viewBox="0 0 24 24" className="mx-auto h-8 w-8 text-accent" fill="none" stroke="currentColor" strokeWidth="1.8">
+                        <path d="M4 12a8 8 0 0 1 8-8h4a4 4 0 0 1 0 8h-1l-3 3v-3h-2a6 6 0 1 0 6 6" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    </div>
+                    <div className="mt-3 text-sm font-medium">Start a conversation</div>
+                    <div className="mt-1 max-w-[300px] text-xs text-foreground/60">
+                      Ask about your booking, listing availability, payment references, or document status.
+                    </div>
+                    <div className="mt-3 flex flex-wrap justify-center gap-2">
+                      <Button
+                        variant="secondary"
+                        className="h-8 px-3 text-xs"
+                        onClick={() => void handleAction({ kind: "help" })}
+                        disabled={busy}
+                      >
+                        Help me
+                      </Button>
+                      <Button
+                        variant="secondary"
+                        className="h-8 px-3 text-xs"
+                        onClick={() => void handleAction({ kind: "listBookings" })}
+                        disabled={busy}
+                      >
+                        My bookings
+                      </Button>
+                      <Button
+                        variant="secondary"
+                        className="h-8 px-3 text-xs"
+                        onClick={() => void handleAction({ kind: "getVerification" })}
+                        disabled={busy}
+                      >
+                        Document status
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                <div className="space-y-2 stagger-children">
                   {messages.map((m) => (
                     <div
                       key={m.id}
                       className={cn(
-                        "max-w-[88%] whitespace-pre-wrap rounded-2xl px-3 py-2 text-sm leading-relaxed",
+                        "max-w-[88%] whitespace-pre-wrap rounded-2xl px-3 py-2 text-sm leading-relaxed shadow-sm",
                         m.role === "user"
                           ? "ml-auto bg-accent text-accent-foreground"
                           : "border border-border bg-card text-foreground",
@@ -431,7 +471,7 @@ export default function ChatWidget() {
                   {cards.length > 0 ? (
                     <div className="mt-2 grid gap-2">
                       {cards.map((c) => (
-                        <div key={c.id} className="rounded-xl border border-border bg-card p-3 shadow-sm">
+                        <div key={c.id} className="rounded-xl border border-border bg-card p-3 shadow-sm fade-in-up">
                           <div className="text-sm font-medium">{c.title}</div>
                           {c.lines?.length ? (
                             <div className="mt-1 space-y-0.5 text-xs text-foreground/70">
@@ -467,10 +507,11 @@ export default function ChatWidget() {
                     </div>
                   ) : null}
                 </div>
+                )}
               </div>
 
               {quickReplies.length > 0 ? (
-                <div className="flex gap-2 overflow-x-auto pb-1 sm:flex-wrap sm:overflow-visible">
+                <div className="fade-in-up flex gap-2 overflow-x-auto pb-1 sm:flex-wrap sm:overflow-visible">
                   {quickReplies.map((q) => (
                     <Button
                       key={q.id}
@@ -486,7 +527,7 @@ export default function ChatWidget() {
               ) : null}
 
               {needsLangPick ? (
-                <div className="flex gap-2 overflow-x-auto pb-1 sm:flex-wrap sm:overflow-visible">
+                <div className="fade-in-up flex gap-2 overflow-x-auto pb-1 sm:flex-wrap sm:overflow-visible">
                   {(Object.keys(LANG_LABEL) as ChatLang[]).map((code) => (
                     <Button
                       key={code}
@@ -502,7 +543,7 @@ export default function ChatWidget() {
               ) : null}
 
               <form
-                className="flex items-center gap-2"
+                className="fade-in-up flex items-center gap-2"
                 onSubmit={(e) => {
                   e.preventDefault();
                   void sendText(input);
@@ -530,7 +571,7 @@ export default function ChatWidget() {
       ) : (
         <Button
           onClick={() => setOpen(true)}
-          className="h-12 w-12 rounded-full p-0 shadow-sm"
+          className="h-12 w-12 rounded-full p-0 shadow-[0_12px_25px_-15px_rgba(0,0,0,0.55)]"
           aria-label="Open chat"
         >
           <svg

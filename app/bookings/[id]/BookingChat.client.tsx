@@ -86,7 +86,7 @@ export default function BookingChat(props: {
   }, [endpoint]);
 
   return (
-    <Card>
+    <Card className="overflow-hidden">
       <CardHeader>
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
@@ -108,7 +108,7 @@ export default function BookingChat(props: {
           </div>
         ) : null}
 
-        <div className="max-h-64 space-y-2 overflow-auto rounded-xl border border-border bg-card p-3 text-sm">
+        <div className="max-h-72 space-y-2 overflow-auto rounded-2xl border border-border bg-muted/30 p-3 text-sm">
           {loading ? (
             <div className="space-y-2">
               <Skeleton className="h-12 w-[82%]" />
@@ -116,9 +116,19 @@ export default function BookingChat(props: {
               <Skeleton className="h-12 w-[74%]" />
             </div>
           ) : messages.length === 0 ? (
-            <div className="text-foreground/60">No messages yet.</div>
+            <div className="fade-in-up flex min-h-[180px] flex-col items-center justify-center text-center">
+              <div className="rounded-2xl border border-border bg-card p-3 shadow-sm">
+                <svg viewBox="0 0 24 24" className="h-7 w-7 text-accent" fill="none" stroke="currentColor" strokeWidth="1.8">
+                  <path d="M5 6h14M5 12h10M5 18h8" strokeLinecap="round" />
+                  <path d="M20 17v3l-2-1.5L16 20v-3" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </div>
+              <div className="mt-2 text-sm font-medium">No messages yet</div>
+              <div className="mt-1 text-xs text-foreground/60">Start by sending your first message below.</div>
+            </div>
           ) : (
-            messages.map((m) => {
+            <div className="stagger-children space-y-2">
+            {messages.map((m) => {
               const you = m.sender.id === props.viewerId;
               const name = (m.sender.name && m.sender.name.trim()) || m.sender.email;
               return (
@@ -133,18 +143,21 @@ export default function BookingChat(props: {
                   ) : null}
                   <div
                     className={
-                      "mt-1 inline-block max-w-[90%] rounded-xl border border-border bg-muted px-3 py-2 text-sm text-foreground"
+                      you
+                        ? "mt-1 inline-block max-w-[90%] rounded-2xl bg-accent px-3 py-2 text-sm text-accent-foreground shadow-sm"
+                        : "mt-1 inline-block max-w-[90%] rounded-2xl border border-border bg-card px-3 py-2 text-sm text-foreground shadow-sm"
                     }
                   >
                     {m.body}
                   </div>
                 </div>
               );
-            })
+            })}
+            </div>
           )}
         </div>
 
-        <div className="space-y-2">
+        <div className="space-y-2 fade-in-up">
           {props.viewerRole === "RENTER" ? (
             <div className="space-y-1">
               <label htmlFor="recipientRole" className="text-sm text-foreground/80">
