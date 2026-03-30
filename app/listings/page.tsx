@@ -5,6 +5,7 @@ import ListingMap from "@/app/components/ListingMap";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/app/components/ui/Card";
 import Input from "@/app/components/ui/Input";
 import Button from "@/app/components/ui/Button";
+import { RESERVED_BOOKING_STATUSES } from "@/app/lib/bookings";
 import { prisma } from "@/app/lib/prisma";
 
 export const dynamic = "force-dynamic";
@@ -34,6 +35,10 @@ export default async function ListingsPage({
   const start = first(resolvedSearchParams?.start).trim();
   const end = first(resolvedSearchParams?.end).trim();
   const sort = (first(resolvedSearchParams?.sort).trim() || "recent") as ListingsSearchParams["sort"];
+  const minPrice = Number(first(resolvedSearchParams?.minPrice)) || 0;
+  const maxPrice = Number(first(resolvedSearchParams?.maxPrice)) || 0;
+  const instantBooking = first(resolvedSearchParams?.instantBooking) === "on";
+  const carType = first(resolvedSearchParams?.carType).trim();
 
   const orderBy =
     sort === "price_asc"
@@ -43,7 +48,6 @@ export default async function ListingsPage({
         : ({ createdAt: "desc" } as const);
 
     const now = new Date();
-    const reservedStatuses: Array<"PENDING_APPROVAL" | "CONFIRMED"> = ["PENDING_APPROVAL", "CONFIRMED"];
 
     const startDate = start ? new Date(start) : null;
     const endDate = end ? new Date(end) : null;
@@ -60,12 +64,12 @@ export default async function ListingsPage({
       bookings: {
         none: hasValidDates
           ? {
-              status: { in: reservedStatuses },
+              status: { in: RESERVED_BOOKING_STATUSES },
               startDate: { lt: endDate! },
               endDate: { gt: startDate! },
             }
           : {
-              status: { in: reservedStatuses },
+              status: { in: RESERVED_BOOKING_STATUSES },
               startDate: { lte: now },
               endDate: { gte: now },
             },
@@ -79,6 +83,10 @@ export default async function ListingsPage({
             ],
           }
         : {}),
+      ...(minPrice > 0 ? { dailyRateCents: { gte: Math.round(minPrice * 100) } } : {}),
+      ...(maxPrice > 0 ? { dailyRateCents: { lte: Math.round(maxPrice * 100) } } : {}),
+      ...(instantBooking ? { instantBooking: true } : {}),
+      ...(carType ? { title: { contains: carType, mode: "insensitive" } } : {}),
     },
     orderBy,
     take: 50,
@@ -138,9 +146,25 @@ export default async function ListingsPage({
                 <option value="price_desc">Price: high to low</option>
               </select>
             </label>
+            <label className="block sm:col-span-1">
+              <div className="mb-1 text-sm">Min price (ZAR)</div>
+              <Input name="minPrice" type="number" min="0" defaultValue={minPrice || ""} placeholder="0" />
+            </label>
+            <label className="block sm:col-span-1">
+              <div className="mb-1 text-sm">Max price (ZAR)</div>
+              <Input name="maxPrice" type="number" min="0" defaultValue={maxPrice || ""} placeholder="0" />
+            </label>
+            <label className="block sm:col-span-1">
+              <div className="mb-1 text-sm">Car type</div>
+              <Input name="carType" defaultValue={carType} placeholder="e.g. SUV, sedan" />
+            </label>
+            <label className="flex items-center gap-2 sm:col-span-1">
+              <input type="checkbox" name="instantBooking" defaultChecked={instantBooking} className="accent-accent" />
+              <span className="text-sm">Instant booking</span>
+            </label>
             <div className="sm:col-span-6 flex flex-wrap items-center gap-2">
               <Button type="submit">Update results</Button>
-              {(q || start || end || (sort && sort !== "recent")) && (
+              {(q || start || end || (sort && sort !== "recent") || minPrice || maxPrice || instantBooking || carType) && (
                 <Link className="text-sm underline" href="/listings">
                   Clear
                 </Link>

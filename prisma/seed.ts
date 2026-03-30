@@ -322,6 +322,57 @@ async function main() {
   for (const l of createdListings) {
     console.log(`  - ${l.title} (${l.city}) id=${l.id}`);
   }
+
+  // Seed sample bookings for the renter
+  if (createdListings.length > 0) {
+    const now = new Date();
+    const sampleBookings = [
+      {
+        listingId: createdListings[0].id,
+        startDate: new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000),
+        endDate: new Date(now.getTime() + 10 * 24 * 60 * 60 * 1000),
+        days: 3,
+        status: "CONFIRMED" as const,
+      },
+      {
+        listingId: createdListings[Math.min(1, createdListings.length - 1)].id,
+        startDate: new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000),
+        endDate: new Date(now.getTime() - 11 * 24 * 60 * 60 * 1000),
+        days: 3,
+        status: "CONFIRMED" as const,
+      },
+    ];
+
+    for (const b of sampleBookings) {
+      const listing = await prisma.listing.findUnique({
+        where: { id: b.listingId },
+        select: { dailyRateCents: true, currency: true },
+      });
+      if (!listing) continue;
+
+      const existing = await prisma.booking.findFirst({
+        where: { renterId: renterUser.id, listingId: b.listingId, startDate: b.startDate },
+        select: { id: true },
+      });
+      if (existing) continue;
+
+      const totalCents = b.days * listing.dailyRateCents;
+      await prisma.booking.create({
+        data: {
+          renterId: renterUser.id,
+          listingId: b.listingId,
+          startDate: b.startDate,
+          endDate: b.endDate,
+          days: b.days,
+          totalCents,
+          currency: listing.currency,
+          status: b.status,
+          paidAt: b.status === "CONFIRMED" ? new Date() : null,
+        },
+      });
+    }
+    console.log(`\nSeeded ${sampleBookings.length} sample bookings for renter (${renterEmail}).`);
+  }
 }
 
 main()

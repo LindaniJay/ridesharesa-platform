@@ -2,9 +2,7 @@ import type { NextRequest } from "next/server";
 
 import { updateSupabaseSession } from "./app/lib/supabase/middleware";
 
-export const runtime = "nodejs";
-
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   return updateSupabaseSession(request);
 }
 

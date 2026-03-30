@@ -16,7 +16,7 @@ npm install
 
 2) Configure env
 
-Copy `.env.example` to `.env` and fill in:
+Copy `.env.example` to `.env.local` (recommended) or `.env` and fill in:
 
 - `DATABASE_URL` (Supabase Postgres connection string; pooled is fine for runtime)
 - `DIRECT_URL` (Supabase direct connection string; recommended for migrations)
@@ -24,8 +24,10 @@ Copy `.env.example` to `.env` and fill in:
 	- Use transaction pooler (`:6543`) for `DATABASE_URL` where possible.
 	- Keep direct DB (`:5432`) in `DIRECT_URL` for migrations.
 - Optional runtime tuning (helps avoid `MaxClientsInSessionMode`): `PG_POOL_MAX`, `PG_CONNECT_TIMEOUT_MS`, `PG_IDLE_TIMEOUT_MS`
-- `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_STORAGE_BUCKET`
+- `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+- `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_STORAGE_BUCKET`, `SUPABASE_LISTING_DOCS_BUCKET`
 - `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`
+- `APP_URL` (public base URL used for Stripe return URLs)
 - `RESEND_API_KEY`, `RESEND_FROM`
 - `SENTRY_DSN` (optional)
 
@@ -50,6 +52,7 @@ npm run db:seed
 5) Stripe webhook (local)
 
 Use the Stripe CLI to forward webhooks to your dev server:
+```bash
 stripe listen --forward-to localhost:3000/api/stripe/webhook
 ```
 
@@ -83,6 +86,9 @@ npm install
 
 2) Generate VAPID keys:
 
+```bash
+npx web-push generate-vapid-keys --json
+```
 
 ## Scripts
 
@@ -103,9 +109,6 @@ Usage:
 - Run:
 	- `node scripts/grant-admins.mjs <email1> <email2> ...`
 	- or `node scripts/grant-admins.mjs <email1=password1> <email2=password2> ...`
-```bash
-npx web-push generate-vapid-keys --json
-```
 
 3) Add these to `.env`:
 
@@ -117,6 +120,14 @@ npx web-push generate-vapid-keys --json
 
 ```bash
 npm run db:migrate
+```
+
+## Quality checks
+
+```bash
+npm run lint
+npm run test
+npm run build
 ```
 
 ### iOS caveats

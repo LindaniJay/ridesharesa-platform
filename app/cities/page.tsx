@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/app/components/ui/Card";
+import { RESERVED_BOOKING_STATUSES } from "@/app/lib/bookings";
 import { prisma } from "@/app/lib/prisma";
 
 export const dynamic = "force-dynamic";
@@ -20,7 +21,6 @@ function slugifyCity(city: string) {
 
 export default async function CitiesIndexPage() {
   const now = new Date();
-  const reservedStatuses: Array<"PENDING_APPROVAL" | "CONFIRMED"> = ["PENDING_APPROVAL", "CONFIRMED"];
 
   const listings = await prisma.listing.findMany({
     where: {
@@ -28,7 +28,7 @@ export default async function CitiesIndexPage() {
       isApproved: true,
       bookings: {
         none: {
-          status: { in: reservedStatuses },
+          status: { in: RESERVED_BOOKING_STATUSES },
           startDate: { lte: now },
           endDate: { gte: now },
         },

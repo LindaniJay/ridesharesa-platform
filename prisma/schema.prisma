@@ -140,6 +140,7 @@ model Listing {
 
   status     ListingStatus @default(DRAFT)
   isApproved Boolean       @default(false)
+    instantBooking Boolean  @default(false)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

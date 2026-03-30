@@ -4,6 +4,7 @@ import Link from "next/link";
 export const dynamic = "force-dynamic";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/app/components/ui/Card";
+import { RESERVED_BOOKING_STATUSES } from "@/app/lib/bookings";
 import { prisma } from "@/app/lib/prisma";
 import { requireRole } from "@/app/lib/require";
 import CheckoutClient from "@/app/checkout/[listingId]/CheckoutClient";
@@ -66,11 +67,10 @@ export default async function CheckoutPage({
     end!.getTime() > start!.getTime();
 
   if (hasValidDates) {
-    const reservedStatuses: Array<"PENDING_APPROVAL" | "CONFIRMED"> = ["PENDING_APPROVAL", "CONFIRMED"];
     const conflict = await prisma.booking.findFirst({
       where: {
         listingId: listing.id,
-        status: { in: reservedStatuses },
+        status: { in: RESERVED_BOOKING_STATUSES },
         startDate: { lt: end! },
         endDate: { gt: start! },
       },

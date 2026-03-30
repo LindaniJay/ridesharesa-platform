@@ -60,6 +60,7 @@ export default async function NewListingPage({
     const licenseDiskPhoto = formData.get("licenseDiskPhoto");
     const registrationDoc = formData.get("registrationDoc");
     const licenseCardPhoto = formData.get("licenseCardPhoto");
+    const instantBooking = formData.get("instantBooking") === "on";
 
     if (!title || !description || !city) {
       redirect("/host/listings/new?error=missing");
@@ -102,6 +103,7 @@ export default async function NewListingPage({
         licenseDiskImageUrl: null,
         registrationImageUrl: null,
         licenseCardImageUrl: null,
+        instantBooking,
         // isApproved stays false until admin approval
       },
       select: { id: true },
@@ -307,7 +309,7 @@ export default async function NewListingPage({
                 </div>
 
                 <div className="rounded-xl border border-border bg-card/65 p-4">
-                  <div className="mb-3 text-sm font-semibold text-foreground/85">Step 4: Location and pricing</div>
+                  <div className="mb-3 text-sm font-semibold text-foreground/85">Step 4: Location, pricing, and booking options</div>
                   <div className="space-y-3">
                     <div>
                       <div className="mb-1 text-sm">Pickup location</div>
@@ -323,6 +325,10 @@ export default async function NewListingPage({
                         required
                         placeholder="450"
                       />
+                    </label>
+                    <label className="flex items-center gap-2 mt-2">
+                      <input type="checkbox" name="instantBooking" className="accent-accent" />
+                      <span className="text-sm">Enable instant booking (no approval required)</span>
                     </label>
                   </div>
                 </div>

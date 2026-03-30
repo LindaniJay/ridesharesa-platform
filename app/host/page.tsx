@@ -225,12 +225,19 @@ export default async function HostDashboardPage() {
 
   return (
     <main className="min-h-screen space-y-8 pb-12">
-      {/* Hero Header */}
+      {/* Hero Header with community badges */}
       <Card className="rounded-3xl p-8">
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div className="space-y-2">
             <h1 className="text-4xl font-bold tracking-tight">Welcome back, Host!</h1>
             <p className="text-lg text-muted-foreground">Manage your vehicles, bookings, and earnings in one place.</p>
+            {/* Community badges */}
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <Badge variant="success">All-Star Host</Badge>
+              <Badge variant="info">Verified</Badge>
+              {confirmedTrips > 10 && <Badge variant="info">Top Host</Badge>}
+              {confirmedTrips > 0 && <Badge variant="neutral">{confirmedTrips} trips</Badge>}
+            </div>
           </div>
           <Link href="/host/listings/new">
             <Button>
@@ -368,7 +375,9 @@ export default async function HostDashboardPage() {
             <CardDescription>Keep your host verification pack current.</CardDescription>
           </CardHeader>
           <CardContent>
-            <DocumentsUploadForm successHref="/host" nextHref="/host" />
+            <form>
+              <DocumentsUploadForm successHref="/host" nextHref="/host" />
+            </form>
           </CardContent>
         </Card>
       </section>

@@ -1,6 +1,12 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
+import {
+  CHAUFFEUR_RATE_CENTS_PER_KM,
+  RESERVED_BOOKING_STATUSES,
+  calculateBookingTotalCents,
+  daysBetween,
+} from "@/app/lib/bookings";
 import { prisma } from "@/app/lib/prisma";
 import { stripe } from "@/app/lib/stripe";
 import { requireRole } from "@/app/lib/require";
@@ -16,14 +22,6 @@ const BodySchema = z.object({
     })
     .optional(),
 });
-
-function daysBetween(start: Date, end: Date) {
-  const ms = end.getTime() - start.getTime();
-  const days = Math.ceil(ms / (1000 * 60 * 60 * 24));
-  return Number.isFinite(days) ? days : 0;
-}
-
-const CHAUFFEUR_RATE_CENTS_PER_KM = 10 * 100;
 
 export async function POST(req: Request) {
   const { dbUser } = await requireRole("RENTER");
@@ -57,11 +55,10 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Invalid date range" }, { status: 400 });
   }
 
-  const reservedStatuses: Array<"PENDING_APPROVAL" | "CONFIRMED"> = ["PENDING_APPROVAL", "CONFIRMED"];
   const conflict = await prisma.booking.findFirst({
     where: {
       listingId: listing.id,
-      status: { in: reservedStatuses },
+      status: { in: RESERVED_BOOKING_STATUSES },
       startDate: { lt: end },
       endDate: { gt: start },
     },
@@ -78,9 +75,12 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Invalid chauffeur kilometers" }, { status: 400 });
   }
 
-  const baseCents = days * listing.dailyRateCents;
-  const chauffeurCents = chauffeurEnabled && chauffeurKm > 0 ? chauffeurKm * CHAUFFEUR_RATE_CENTS_PER_KM : 0;
-  const totalCents = baseCents + chauffeurCents;
+  const { totalCents } = calculateBookingTotalCents({
+    days,
+    dailyRateCents: listing.dailyRateCents,
+    chauffeurEnabled,
+    chauffeurKm,
+  });
 
   const booking = await prisma.booking.create({
     data: {

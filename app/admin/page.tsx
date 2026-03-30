@@ -409,10 +409,8 @@ export default async function AdminDashboardPage({
         totalCents: true,
         currency: true,
         createdAt: true,
-        paymentReference: true,
-        stripeCheckoutSessionId: true,
         renter: { select: { email: true } },
-        listing: { select: { title: true, host: { select: { email: true } } } },
+        listing: { select: { title: true } },
       },
     }),
     prisma.user.count(),
@@ -670,21 +668,27 @@ export default async function AdminDashboardPage({
   const bookingsSeries = buildDailySeries(
     trendStart,
     30,
-    bookingsTrendRows.map((r) => ({ day: r.day, value: r.bookings })),
+    Array.isArray(bookingsTrendRows)
+      ? bookingsTrendRows.map((r) => ({ day: r.day, value: r.bookings }))
+      : [],
   );
   const revenueSeries = buildDailySeries(
     trendStart,
     30,
-    revenueTrendRows.map((r) => ({ day: r.day, value: r.revenueCents })),
+    Array.isArray(revenueTrendRows)
+      ? revenueTrendRows.map((r) => ({ day: r.day, value: typeof r.revenueCents === "number" ? r.revenueCents : 0 }))
+      : [],
   );
   const signupsSeries = buildDailySeries(
     trendStart,
     30,
-    signupsTrendRows.map((r) => ({ day: r.day, value: r.signups })),
+    Array.isArray(signupsTrendRows)
+      ? signupsTrendRows.map((r) => ({ day: r.day, value: r.signups }))
+      : [],
   );
 
-  const revenue30 = revenue30Agg._sum.totalCents ?? 0;
-  const revenuePrev30 = revenuePrev30Agg._sum.totalCents ?? 0;
+  const revenue30 = revenue30Agg && revenue30Agg._sum ? revenue30Agg._sum.totalCents ?? 0 : 0;
+  const revenuePrev30 = revenuePrev30Agg && revenuePrev30Agg._sum ? revenuePrev30Agg._sum.totalCents ?? 0 : 0;
   const bookingsDelta = pctChange(bookingsMonthly, bookingsPrev30);
   const revenueDelta = pctChange(revenue30, revenuePrev30);
   const users30 = signupsSeries.reduce((a, b) => a + b, 0);
@@ -1017,126 +1021,106 @@ export default async function AdminDashboardPage({
 
       <div className="space-y-8">
       {section === "overview" ? (
-      <section className="space-y-3">
-        <h2 className="text-lg font-semibold">Platform overview</h2>
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <section className="space-y-6">
+        <h2 className="text-2xl font-bold">Admin Dashboard Overview</h2>
+        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
           <Card>
             <CardHeader>
-              <CardTitle>Total users</CardTitle>
-              <CardDescription>Hosts + renters + admins.</CardDescription>
+              <CardTitle>Users</CardTitle>
+              <CardDescription>Hosts, renters, admins</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-semibold tabular-nums">{formatInt(totalUsers)}</div>
+              <div className="text-4xl font-bold">{formatInt(totalUsers)}</div>
+              <div className="mt-2 text-xs text-foreground/60">User management, onboarding, verification</div>
             </CardContent>
           </Card>
           <Card>
             <CardHeader>
-              <CardTitle>Total cars listed</CardTitle>
-              <CardDescription>All vehicle listings.</CardDescription>
+              <CardTitle>Listings</CardTitle>
+              <CardDescription>Cars, compliance, photos</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-semibold tabular-nums">{formatInt(totalCars)}</div>
+              <div className="text-4xl font-bold">{formatInt(totalCars)}</div>
+              <div className="mt-2 text-xs text-foreground/60">Listing approval, document checks</div>
             </CardContent>
           </Card>
           <Card>
             <CardHeader>
-              <CardTitle>Total bookings</CardTitle>
-              <CardDescription>All-time.</CardDescription>
+              <CardTitle>Bookings</CardTitle>
+              <CardDescription>All-time, status breakdown</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-semibold tabular-nums">{formatInt(totalBookingsAll)}</div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader>
-              <CardTitle>Active rentals now</CardTitle>
-              <CardDescription>Confirmed, currently in-range.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-semibold tabular-nums">{formatInt(activeRentalsNow)}</div>
-            </CardContent>
-          </Card>
-        </div>
-
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Bookings (daily)</CardTitle>
-              <CardDescription>Last 24 hours.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-semibold tabular-nums">{formatInt(bookingsDaily)}</div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader>
-              <CardTitle>Bookings (weekly)</CardTitle>
-              <CardDescription>Last 7 days.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-semibold tabular-nums">{formatInt(bookingsWeekly)}</div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader>
-              <CardTitle>Bookings (monthly)</CardTitle>
-              <CardDescription>Last 30 days.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-semibold tabular-nums">{formatInt(bookingsMonthly)}</div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader>
-              <CardTitle>Revenue overview</CardTitle>
-              <CardDescription>Gross confirmed bookings.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-semibold tabular-nums">
-                {formatMoneyZar(grossRevenue._sum.totalCents ?? 0)}
-              </div>
-              <div className="mt-1 text-sm text-foreground/60">
-                Total across all currencies; commission tracking not configured
+              <div className="text-4xl font-bold">{formatInt(totalBookingsAll)}</div>
+              <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
+                <div className="rounded-lg border border-border bg-muted/40 px-2 py-1.5">
+                  <div className="text-foreground/60">Last 24h</div>
+                  <div className="font-semibold text-sm">{formatInt(bookingsDaily)}</div>
+                </div>
+                <div className="rounded-lg border border-border bg-muted/40 px-2 py-1.5">
+                  <div className="text-foreground/60">Last 7d</div>
+                  <div className="font-semibold text-sm">{formatInt(bookingsWeekly)}</div>
+                </div>
+                <div className="rounded-lg border border-border bg-muted/40 px-2 py-1.5">
+                  <div className="text-foreground/60">Last 30d</div>
+                  <div className="font-semibold text-sm">{formatInt(bookingsMonthly)}</div>
+                </div>
+                <div className="rounded-lg border border-border bg-muted/40 px-2 py-1.5">
+                  <div className="text-foreground/60">Cancelled</div>
+                  <div className="font-semibold text-sm">{formatInt(cancellations)}</div>
+                </div>
               </div>
             </CardContent>
           </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle>Revenue</CardTitle>
+              <CardDescription>Confirmed ZAR bookings</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="text-4xl font-bold">{formatMoneyZar(grossRevenue && grossRevenue._sum ? grossRevenue._sum.totalCents ?? 0 : 0)}</div>
+              <div className="mt-2 text-xs text-foreground/60">Payouts, refunds, chargebacks</div>
+            </CardContent>
+          </Card>
         </div>
-
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4 mt-6">
           <Card>
             <CardHeader>
-              <CardTitle>Cancellations</CardTitle>
-              <CardDescription>All-time cancelled bookings.</CardDescription>
+              <CardTitle>Verification</CardTitle>
+              <CardDescription>Document workflow</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-semibold tabular-nums">{formatInt(cancellations)}</div>
+              <div className="text-lg font-semibold">ID, License, Proof of Residence</div>
+              <div className="mt-2 text-xs text-foreground/60">Admin review, status updates, compliance</div>
             </CardContent>
           </Card>
           <Card>
             <CardHeader>
-              <CardTitle>Disputes & incidents</CardTitle>
-              <CardDescription>Open/in-review incidents.</CardDescription>
+              <CardTitle>Support</CardTitle>
+              <CardDescription>Tickets, incidents, disputes</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-semibold tabular-nums">{formatInt(openIncidentsCount)}</div>
+              <div className="text-lg font-semibold">{formatInt(openTicketsCount)} open tickets</div>
+              <div className="mt-2 text-xs text-foreground/60">Chat, messaging, help center</div>
             </CardContent>
           </Card>
           <Card>
             <CardHeader>
-              <CardTitle>Support tickets</CardTitle>
-              <CardDescription>Open/in-progress.</CardDescription>
+              <CardTitle>Risk & Safety</CardTitle>
+              <CardDescription>Trust, insurance, fraud</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-semibold tabular-nums">{formatInt(openTicketsCount)}</div>
+              <div className="text-lg font-semibold">{formatInt(openIncidentsCount)} open incidents</div>
+              <div className="mt-2 text-xs text-foreground/60">Trust badges, insurance, compliance</div>
             </CardContent>
           </Card>
           <Card>
             <CardHeader>
-              <CardTitle>Finance</CardTitle>
-              <CardDescription>Refunds/chargebacks.</CardDescription>
+              <CardTitle>Analytics</CardTitle>
+              <CardDescription>Trends, charts, exports</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="text-sm text-foreground/60">Not enabled yet</div>
+              <div className="text-lg font-semibold">30d stats, CSV export</div>
+              <div className="mt-2 text-xs text-foreground/60">Bookings, revenue, signups</div>
             </CardContent>
           </Card>
         </div>
@@ -1244,7 +1228,7 @@ export default async function AdminDashboardPage({
                 </div>
               </div>
               <div className="mt-3">
-                <MiniBars values={bookingsSeries} className="text-accent/35" />
+                <MiniBars values={Array.isArray(bookingsSeries) ? bookingsSeries : []} className="text-accent/35" />
               </div>
             </CardContent>
           </Card>
@@ -1260,9 +1244,9 @@ export default async function AdminDashboardPage({
               </div>
             </CardHeader>
             <CardContent>
-              {topCitiesRows.length === 0 ? (
+              {Array.isArray(topCitiesRows) && topCitiesRows.length === 0 ? (
                 <div className="text-sm text-foreground/60">No confirmed bookings in the last 30 days.</div>
-              ) : (
+              ) : Array.isArray(topCitiesRows) ? (
                 <div className="space-y-2">
                   {topCitiesRows.map((r) => (
                     <div key={r.city} className="flex items-center justify-between gap-3 text-sm">
@@ -1274,7 +1258,7 @@ export default async function AdminDashboardPage({
                     </div>
                   ))}
                 </div>
-              )}
+              ) : null}
             </CardContent>
           </Card>
         </div>
@@ -1308,7 +1292,7 @@ export default async function AdminDashboardPage({
                 </div>
               </div>
               <div className="mt-3">
-                <MiniBars values={revenueSeries} className="text-accent/35" />
+                <MiniBars values={Array.isArray(revenueSeries) ? revenueSeries : []} className="text-accent/35" />
               </div>
               <div className="mt-2 text-xs text-foreground/60">If you support multiple currencies, split revenue by currency.</div>
             </CardContent>
@@ -1342,7 +1326,7 @@ export default async function AdminDashboardPage({
                 </div>
               </div>
               <div className="mt-3">
-                <MiniBars values={signupsSeries} className="text-accent/35" />
+                <MiniBars values={Array.isArray(signupsSeries) ? signupsSeries : []} className="text-accent/35" />
               </div>
             </CardContent>
           </Card>
@@ -1429,63 +1413,65 @@ export default async function AdminDashboardPage({
                   </tr>
                 </thead>
                 <tbody>
-                  {listingsAll.map((l) => (
-                    <tr key={l.id} className="border-t border-border">
-                      <td className="px-3 py-2">
-                        <Link className="underline" href={`/listings/${l.id}`}>
-                          {l.title}
-                        </Link>
-                      </td>
-                      <td className="px-3 py-2">{l.city}</td>
-                      <td className="px-3 py-2">{l.host.email}</td>
-                      <td className="px-3 py-2">
-                        <Badge variant={badgeVariantForListingStatus(l.status)}>{l.status}</Badge>
-                      </td>
-                      <td className="px-3 py-2">
-                        <Badge variant={l.isApproved ? "success" : "warning"}>
-                          {l.isApproved ? "Yes" : "No"}
-                        </Badge>
-                      </td>
-                      <td className="px-3 py-2">
-                        <div className="flex flex-wrap items-center gap-2 text-xs">
-                          <Link
-                            href={adminHref({ section: "vehicles", listingId: l.id, listingDoc: "licenseDisk" })}
-                            className={cn(
-                              "underline decoration-border hover:text-foreground",
-                              selectedListingId === l.id && selectedListingDocKind === "licenseDisk"
-                                ? "text-foreground"
-                                : "text-foreground/80",
-                            )}
-                          >
-                            Disk
-                          </Link>
-                          <Link
-                            href={adminHref({ section: "vehicles", listingId: l.id, listingDoc: "registration" })}
-                            className={cn(
-                              "underline decoration-border hover:text-foreground",
-                              selectedListingId === l.id && selectedListingDocKind === "registration"
-                                ? "text-foreground"
-                                : "text-foreground/80",
-                            )}
-                          >
-                            Reg
-                          </Link>
-                          <Link
-                            href={adminHref({ section: "vehicles", listingId: l.id, listingDoc: "licenseCard" })}
-                            className={cn(
-                              "underline decoration-border hover:text-foreground",
-                              selectedListingId === l.id && selectedListingDocKind === "licenseCard"
-                                ? "text-foreground"
-                                : "text-foreground/80",
-                            )}
-                          >
-                            Card
-                          </Link>
-                        </div>
-                      </td>
-                      <td className="px-3 py-2">{iso(l.createdAt)}</td>
-                    </tr>
-                  ))}
+                   {Array.isArray(listingsAll)
+                     ? listingsAll.map((l) => (
+                         <tr key={l.id} className="border-t border-border">
+                           <td className="px-3 py-2">
+                             <Link className="underline" href={`/listings/${l.id}`}>
+                               {l.title}
+                             </Link>
+                           </td>
+                           <td className="px-3 py-2">{l.city}</td>
+                           <td className="px-3 py-2">{l.host.email}</td>
+                           <td className="px-3 py-2">
+                             <Badge variant={badgeVariantForListingStatus(l.status)}>{l.status}</Badge>
+                           </td>
+                           <td className="px-3 py-2">
+                             <Badge variant={l.isApproved ? "success" : "warning"}>
+                               {l.isApproved ? "Yes" : "No"}
+                             </Badge>
+                           </td>
+                           <td className="px-3 py-2">
+                             <div className="flex flex-wrap items-center gap-2 text-xs">
+                               <Link
+                                 href={adminHref({ section: "vehicles", listingId: l.id, listingDoc: "licenseDisk" })}
+                                 className={cn(
+                                   "underline decoration-border hover:text-foreground",
+                                   selectedListingId === l.id && selectedListingDocKind === "licenseDisk"
+                                     ? "text-foreground"
+                                     : "text-foreground/80",
+                                 )}
+                               >
+                                 Disk
+                               </Link>
+                               <Link
+                                 href={adminHref({ section: "vehicles", listingId: l.id, listingDoc: "registration" })}
+                                 className={cn(
+                                   "underline decoration-border hover:text-foreground",
+                                   selectedListingId === l.id && selectedListingDocKind === "registration"
+                                     ? "text-foreground"
+                                     : "text-foreground/80",
+                                 )}
+                               >
+                                 Reg
+                               </Link>
+                               <Link
+                                 href={adminHref({ section: "vehicles", listingId: l.id, listingDoc: "licenseCard" })}
+                                 className={cn(
+                                   "underline decoration-border hover:text-foreground",
+                                   selectedListingId === l.id && selectedListingDocKind === "licenseCard"
+                                     ? "text-foreground"
+                                     : "text-foreground/80",
+                                 )}
+                               >
+                                 Card
+                               </Link>
+                             </div>
+                           </td>
+                           <td className="px-3 py-2">{iso(l.createdAt)}</td>
+                         </tr>
+                       ))
+                     : null}
                 </tbody>
               </table>
             </div>
@@ -1598,6 +1584,42 @@ export default async function AdminDashboardPage({
                           <div className="flex flex-wrap items-center gap-2 pt-1">
                             <Badge variant={badgeVariantForRole(u.role)}>{u.role}</Badge>
                             <Badge variant={badgeVariantForUserStatus(u.status)}>{u.status}</Badge>
+                            {/* Document verification controls */}
+                            <form action={setUserVerification} className="flex items-center gap-2">
+                              <input type="hidden" name="userId" value={u.id} />
+                              <select
+                                name="field"
+                                defaultValue="idVerificationStatus"
+                                className="rounded-md border border-border bg-card px-2 py-1 text-xs text-foreground outline-none focus-visible:ring-2 focus-visible:ring-accent/30"
+                              >
+                                <option value="idVerificationStatus">ID</option>
+                                <option value="driversLicenseStatus">License</option>
+                              </select>
+                              <select
+                                name="status"
+                                defaultValue={u.idVerificationStatus}
+                                className="rounded-md border border-border bg-card px-2 py-1 text-xs text-foreground outline-none focus-visible:ring-2 focus-visible:ring-accent/30"
+                              >
+                                <option value="UNVERIFIED">Unverified</option>
+                                <option value="PENDING">Pending</option>
+                                <option value="VERIFIED">Verified</option>
+                                <option value="REJECTED">Rejected</option>
+                              </select>
+                              <Button type="submit" variant="secondary">Update</Button>
+                            </form>
+                            <Link
+                              href={adminHref({ section: "users", userId: u.id, doc: "id" })}
+                              className="underline text-xs decoration-border hover:text-foreground"
+                            >
+                              View ID
+                            </Link>
+                            <Link
+                              href={adminHref({ section: "users", userId: u.id, doc: "license" })}
+                              className="underline text-xs decoration-border hover:text-foreground"
+                            >
+                              View License
+                            </Link>
+                          </div>
                           </div>
                         </div>
 
@@ -1651,7 +1673,6 @@ export default async function AdminDashboardPage({
                             </Button>
                           </Link>
                         </div>
-                      </div>
                     </CardHeader>
                     <CardContent>
                       <div className="flex flex-wrap items-center gap-2">
@@ -1905,54 +1926,56 @@ export default async function AdminDashboardPage({
                   </tr>
                 </thead>
                 <tbody>
-                  {bookingsOps.map((b) => (
-                    <tr key={b.id} className="border-t border-border">
-                      <td className="px-3 py-2">
-                        <Link className="underline" href={`/listings/${b.listing.id}`}>
-                          {b.listing.title}
-                        </Link>
-                      </td>
-                      <td className="px-3 py-2">{b.listing.host.email}</td>
-                      <td className="px-3 py-2">{b.renter.email}</td>
-                      <td className="px-3 py-2">
-                        {iso(b.startDate)} → {iso(b.endDate)}
-                      </td>
-                      <td className="px-3 py-2">
-                        <Badge variant={badgeVariantForBookingStatus(b.status)}>{b.status}</Badge>
-                      </td>
-                      <td className="px-3 py-2">
-                        <Badge variant={b.stripeCheckoutSessionId ? "info" : "warning"}>
-                          {b.stripeCheckoutSessionId ? "Stripe" : "EFT"}
-                        </Badge>
-                      </td>
-                      <td className="px-3 py-2">
-                        {b.paymentReference ? (
-                          <span className="font-mono text-sm font-semibold">{b.paymentReference}</span>
-                        ) : (
-                          <span className="text-xs text-foreground/50">—</span>
-                        )}
-                      </td>
-                      <td className="px-3 py-2">
-                        {(b.totalCents / 100).toFixed(0)} {b.currency}
-                      </td>
-                      <td className="px-3 py-2">{iso(b.createdAt)}</td>
-                      <td className="px-3 py-2">
-                        {b.status === "PENDING_APPROVAL" ? (
-                          <form action={approveBooking}>
-                            <input type="hidden" name="bookingId" value={b.id} />
-                            <Button type="submit" variant="secondary">Approve</Button>
-                          </form>
-                        ) : !b.stripeCheckoutSessionId && b.status === "PENDING_PAYMENT" ? (
-                          <form action={markManualBookingPaid}>
-                            <input type="hidden" name="bookingId" value={b.id} />
-                            <Button type="submit" variant="secondary">Mark paid</Button>
-                          </form>
-                        ) : (
-                          <span className="text-sm text-foreground/60">—</span>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
+                   {Array.isArray(bookingsOps)
+                     ? bookingsOps.map((b) => (
+                         <tr key={b.id} className="border-t border-border">
+                           <td className="px-3 py-2">
+                             <Link className="underline" href={`/listings/${b.listing.id}`}>
+                               {b.listing.title}
+                             </Link>
+                           </td>
+                           <td className="px-3 py-2">{b.listing.host.email}</td>
+                           <td className="px-3 py-2">{b.renter.email}</td>
+                           <td className="px-3 py-2">
+                             {iso(b.startDate)} → {iso(b.endDate)}
+                           </td>
+                           <td className="px-3 py-2">
+                             <Badge variant={badgeVariantForBookingStatus(b.status)}>{b.status}</Badge>
+                           </td>
+                           <td className="px-3 py-2">
+                             <Badge variant={b.stripeCheckoutSessionId ? "info" : "warning"}>
+                               {b.stripeCheckoutSessionId ? "Stripe" : "EFT"}
+                             </Badge>
+                           </td>
+                           <td className="px-3 py-2">
+                             {b.paymentReference ? (
+                               <span className="font-mono text-sm font-semibold">{b.paymentReference}</span>
+                             ) : (
+                               <span className="text-xs text-foreground/50">—</span>
+                             )}
+                           </td>
+                           <td className="px-3 py-2">
+                             {(b.totalCents / 100).toFixed(0)} {b.currency}
+                           </td>
+                           <td className="px-3 py-2">{iso(b.createdAt)}</td>
+                           <td className="px-3 py-2">
+                             {b.status === "PENDING_APPROVAL" ? (
+                               <form action={approveBooking}>
+                                 <input type="hidden" name="bookingId" value={b.id} />
+                                 <Button type="submit" variant="secondary">Approve</Button>
+                               </form>
+                             ) : !b.stripeCheckoutSessionId && b.status === "PENDING_PAYMENT" ? (
+                               <form action={markManualBookingPaid}>
+                                 <input type="hidden" name="bookingId" value={b.id} />
+                                 <Button type="submit" variant="secondary">Mark paid</Button>
+                               </form>
+                             ) : (
+                               <span className="text-sm text-foreground/60">—</span>
+                             )}
+                           </td>
+                         </tr>
+                       ))
+                     : null}
                 </tbody>
               </table>
             </div>

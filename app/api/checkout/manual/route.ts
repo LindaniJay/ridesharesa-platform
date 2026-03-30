@@ -1,6 +1,13 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
+import {
+  RESERVED_BOOKING_STATUSES,
+  calculateBookingTotalCents,
+  daysBetween,
+  generatePaymentReferenceCode,
+  isPaymentReferenceConflict,
+} from "@/app/lib/bookings";
 import { prisma } from "@/app/lib/prisma";
 import { requireRole } from "@/app/lib/require";
 
@@ -16,36 +23,41 @@ const BodySchema = z.object({
     .optional(),
 });
 
-function daysBetween(start: Date, end: Date) {
-  const ms = end.getTime() - start.getTime();
-  const days = Math.ceil(ms / (1000 * 60 * 60 * 24));
-  return Number.isFinite(days) ? days : 0;
-}
+async function createManualBooking(params: {
+  listingId: string;
+  renterId: string;
+  startDate: Date;
+  endDate: Date;
+  days: number;
+  totalCents: number;
+  currency: string;
+}) {
+  const maxAttempts = 5;
 
-const CHAUFFEUR_RATE_CENTS_PER_KM = 10 * 100;
-
-// Generate a unique 6-digit payment reference code
-async function generatePaymentReference(): Promise<string> {
-  let attempts = 0;
-  const maxAttempts = 10;
-
-  while (attempts < maxAttempts) {
-    const code = String(Math.floor(Math.random() * 900000) + 100000); // 6-digit number
-
-    const existing = await prisma.booking.findUnique({
-      where: { paymentReference: code },
-      select: { id: true },
-    });
-
-    if (!existing) {
-      return code;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      return await prisma.booking.create({
+        data: {
+          listingId: params.listingId,
+          renterId: params.renterId,
+          paymentReference: generatePaymentReferenceCode(),
+          startDate: params.startDate,
+          endDate: params.endDate,
+          days: params.days,
+          totalCents: params.totalCents,
+          currency: params.currency,
+          status: "PENDING_PAYMENT",
+        },
+        select: { id: true },
+      });
+    } catch (error) {
+      if (attempt === maxAttempts || !isPaymentReferenceConflict(error)) {
+        throw error;
+      }
     }
-
-    attempts++;
   }
 
-  // Fallback: use timestamp-based code if collision happens too many times
-  return String(Math.floor(Date.now() % 900000) + 100000);
+  throw new Error("Unable to allocate a unique payment reference");
 }
 
 export async function POST(req: Request) {
@@ -80,11 +92,10 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Invalid date range" }, { status: 400 });
   }
 
-  const reservedStatuses: Array<"PENDING_APPROVAL" | "CONFIRMED"> = ["PENDING_APPROVAL", "CONFIRMED"];
   const conflict = await prisma.booking.findFirst({
     where: {
       listingId: listing.id,
-      status: { in: reservedStatuses },
+      status: { in: RESERVED_BOOKING_STATUSES },
       startDate: { lt: end },
       endDate: { gt: start },
     },
@@ -101,26 +112,21 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Invalid chauffeur kilometers" }, { status: 400 });
   }
 
-  const baseCents = days * listing.dailyRateCents;
-  const chauffeurCents = chauffeurEnabled && chauffeurKm > 0 ? chauffeurKm * CHAUFFEUR_RATE_CENTS_PER_KM : 0;
-  const totalCents = baseCents + chauffeurCents;
+  const { totalCents } = calculateBookingTotalCents({
+    days,
+    dailyRateCents: listing.dailyRateCents,
+    chauffeurEnabled,
+    chauffeurKm,
+  });
 
-  const paymentReference = await generatePaymentReference();
-
-  const booking = await prisma.booking.create({
-    data: {
-      listingId: listing.id,
-      renterId,
-      paymentReference,
-      startDate: start,
-      endDate: end,
-      days,
-      totalCents,
-      currency: listing.currency,
-      status: "PENDING_PAYMENT",
-      // Note: no Stripe fields set; this is a manual/EFT payment flow.
-    },
-    select: { id: true },
+  const booking = await createManualBooking({
+    listingId: listing.id,
+    renterId,
+    startDate: start,
+    endDate: end,
+    days,
+    totalCents,
+    currency: listing.currency,
   });
 
   const breakdownParams = new URLSearchParams();

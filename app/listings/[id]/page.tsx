@@ -6,6 +6,7 @@ import ListingMap from "@/app/components/ListingMap";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/app/components/ui/Card";
 import Button from "@/app/components/ui/Button";
 import Input from "@/app/components/ui/Input";
+import { RESERVED_BOOKING_STATUSES } from "@/app/lib/bookings";
 import { prisma } from "@/app/lib/prisma";
 import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
 
@@ -57,7 +58,6 @@ export default async function ListingDetailsPage({
   const carryQS = carry.toString();
 
   const now = new Date();
-  const reservedStatuses: Array<"PENDING_APPROVAL" | "CONFIRMED"> = ["PENDING_APPROVAL", "CONFIRMED"];
 
   const startDate = start ? new Date(start) : null;
   const endDate = end ? new Date(end) : null;
@@ -86,7 +86,7 @@ export default async function ListingDetailsPage({
     prisma.booking.findMany({
       where: {
         listingId: id,
-        status: { in: reservedStatuses },
+        status: { in: RESERVED_BOOKING_STATUSES },
         endDate: { gte: now },
       },
       orderBy: { startDate: "asc" },
@@ -97,7 +97,7 @@ export default async function ListingDetailsPage({
       ? prisma.booking.findFirst({
           where: {
             listingId: id,
-            status: { in: reservedStatuses },
+            status: { in: RESERVED_BOOKING_STATUSES },
             startDate: { lt: endDate! },
             endDate: { gt: startDate! },
           },
@@ -127,6 +127,26 @@ export default async function ListingDetailsPage({
 
       <div className="grid gap-6 lg:grid-cols-2">
         <div className="space-y-3">
+          {/* Trust badges and safety info */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Trust & Safety</CardTitle>
+              <CardDescription>Verified hosts, secure payments, and insurance protection.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-2 text-sm">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="inline-block rounded-full bg-green-100 px-2 py-1 text-xs font-medium text-green-700">Verified Host</span>
+                <span className="inline-block rounded-full bg-blue-100 px-2 py-1 text-xs font-medium text-blue-700">Insurance Included</span>
+                <span className="inline-block rounded-full bg-yellow-100 px-2 py-1 text-xs font-medium text-yellow-700">Safe Payments</span>
+              </div>
+              <ul className="list-disc pl-5 mt-2">
+                <li>Host identity and vehicle documents verified</li>
+                <li>Basic liability insurance included for every trip</li>
+                <li>Secure payment processing</li>
+                <li>24/7 support and roadside assistance</li>
+              </ul>
+            </CardContent>
+          </Card>
           {heroUrl ? (
             <Card>
               <CardHeader>

@@ -1,8 +1,29 @@
 import { NextResponse } from "next/server";
 import type Stripe from "stripe";
 
+import {
+  STRIPE_RELEASE_EVENT_TYPES,
+  STRIPE_SUCCESS_EVENT_TYPES,
+  nextBookingStatusForStripeEvent,
+} from "@/app/lib/bookings";
 import { prisma } from "@/app/lib/prisma";
 import { stripe } from "@/app/lib/stripe";
+
+async function findBookingForSession(session: Stripe.Checkout.Session) {
+  const bookingId = session.metadata?.bookingId;
+
+  if (bookingId) {
+    return prisma.booking.findUnique({
+      where: { id: bookingId },
+      select: { id: true, status: true },
+    });
+  }
+
+  return prisma.booking.findFirst({
+    where: { stripeCheckoutSessionId: session.id },
+    select: { id: true, status: true },
+  });
+}
 
 export async function POST(req: Request) {
   const secret = process.env.STRIPE_WEBHOOK_SECRET;
@@ -25,43 +46,46 @@ export async function POST(req: Request) {
   }
 
   const type = event.type;
+  const nextStatus = nextBookingStatusForStripeEvent(type);
 
-  if (
-    type === "checkout.session.completed" ||
-    type === "checkout.session.async_payment_succeeded"
-  ) {
+  if (nextStatus && (STRIPE_SUCCESS_EVENT_TYPES.has(type) || STRIPE_RELEASE_EVENT_TYPES.has(type))) {
     const session = event.data.object as Stripe.Checkout.Session;
     const sessionId = session.id;
-    const bookingId = session.metadata?.bookingId;
 
     const paymentIntent =
       typeof session.payment_intent === "string"
         ? session.payment_intent
         : session.payment_intent?.id ?? null;
 
-    const bookingSelect = {
-      id: true,
-      status: true,
-      currency: true,
-      totalCents: true,
-      renter: { select: { email: true, name: true } },
-      listing: { select: { title: true, city: true } },
-    } as const;
-
-    const booking = bookingId
-      ? await prisma.booking.findUnique({ where: { id: bookingId }, select: bookingSelect })
-      : await prisma.booking.findFirst({ where: { stripeCheckoutSessionId: sessionId }, select: bookingSelect });
+    const booking = await findBookingForSession(session);
 
     if (booking) {
-      await prisma.booking.update({
-        where: { id: booking.id },
-        data: {
-          status: "PENDING_APPROVAL",
-          paidAt: new Date(),
-          stripeCheckoutSessionId: sessionId,
-          stripePaymentIntentId: paymentIntent,
-        },
-      });
+      if (nextStatus === "PENDING_APPROVAL") {
+        await prisma.booking.update({
+          where: { id: booking.id },
+          data: {
+            status: nextStatus,
+            paidAt: new Date(),
+            stripeCheckoutSessionId: sessionId,
+            stripePaymentIntentId: paymentIntent,
+          },
+        });
+      }
+
+      if (nextStatus === "CANCELLED") {
+        await prisma.booking.updateMany({
+          where: {
+            id: booking.id,
+            status: { in: ["PENDING_PAYMENT", "PENDING_APPROVAL"] },
+          },
+          data: {
+            status: nextStatus,
+            paidAt: null,
+            stripeCheckoutSessionId: sessionId,
+            stripePaymentIntentId: paymentIntent,
+          },
+        });
+      }
     }
   }
 

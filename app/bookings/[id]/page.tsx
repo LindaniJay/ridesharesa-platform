@@ -277,6 +277,44 @@ export default async function BookingPage({
 
       <BookingStatusClient status={booking.status} method={isManualPayment ? "manual" : "stripe"} />
 
+      {/* Promo code input */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Promo Code</CardTitle>
+          <CardDescription>Enter a promo code for discounts.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form method="POST" action="/api/bookings/apply-promo" className="flex items-center gap-2">
+            <input type="hidden" name="bookingId" value={booking.id} />
+            <input
+              name="promoCode"
+              type="text"
+              placeholder="Enter code"
+              className="rounded-md border border-border px-2 py-1 text-sm text-foreground bg-card outline-none focus-visible:ring-2 focus-visible:ring-accent/30"
+            />
+            <Button type="submit" variant="secondary">Apply</Button>
+          </form>
+        </CardContent>
+      </Card>
+
+      {/* Insurance info section */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Insurance & Protection</CardTitle>
+          <CardDescription>
+            Every trip includes basic liability insurance and 24/7 roadside assistance. Optional premium coverage is available at checkout.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-2 text-sm">
+          <ul className="list-disc pl-5">
+            <li>Basic liability insurance included for renter and host</li>
+            <li>Optional premium coverage for higher limits and lower excess</li>
+            <li>24/7 roadside assistance for breakdowns and emergencies</li>
+            <li>See <Link href="/terms">terms</Link> for full details</li>
+          </ul>
+        </CardContent>
+      </Card>
+
       <Card>
         <CardHeader>
           <CardTitle>Trip progress</CardTitle>

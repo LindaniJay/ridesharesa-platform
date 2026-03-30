@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
+import type React from "react";
 
 import Button from "@/app/components/ui/Button";
 import Input from "@/app/components/ui/Input";
@@ -13,7 +14,7 @@ export default function DocumentsUploadForm({
   successHref: string;
   nextHref?: string;
   autoRedirectByRole?: boolean;
-}) {
+}): React.ReactElement {
   const [profilePhoto, setProfilePhoto] = useState<File | null>(null);
   const [idDocument, setIdDocument] = useState<File | null>(null);
   const [driversLicense, setDriversLicense] = useState<File | null>(null);
@@ -34,7 +35,6 @@ export default function DocumentsUploadForm({
 
     const now = new Date();
     if (parsed > now) return false;
-
     const threeMonthsAgo = new Date(now);
     threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
     return parsed >= threeMonthsAgo;
@@ -63,7 +63,6 @@ export default function DocumentsUploadForm({
       form.set("driversLicense", driversLicense);
       form.set("proofOfResidence", proofOfResidence);
       form.set("proofOfResidenceIssuedAt", proofOfResidenceIssuedAt);
-
       const res = await fetch("/api/account/documents", {
         method: "POST",
         body: form,
@@ -78,7 +77,20 @@ export default function DocumentsUploadForm({
       }
 
       if (!res.ok || !json?.ok) {
-        setError(json?.error || "Upload failed. Please try again.");
+        // Enhanced error handling
+        if (json?.error) {
+          if (json.error.includes("File too large")) {
+            setError("File too large. Max 8MB per document.");
+          } else if (json.error.includes("Only images or PDF uploads are supported")) {
+            setError("Unsupported file type. Only images or PDF allowed.");
+          } else if (json.error.toLowerCase().includes("bucket") || json.error.toLowerCase().includes("not found")) {
+            setError("Storage bucket not found. Please contact support.");
+          } else {
+            setError(json.error);
+          }
+        } else {
+          setError("Upload failed. Please try again.");
+        }
         return;
       }
 
@@ -99,17 +111,29 @@ export default function DocumentsUploadForm({
       }
 
       window.location.href = successHref;
-    } catch {
-      setError("Upload failed. Please try again.");
+    } catch (err) {
+      if (err instanceof Error) {
+        if (err.message.includes("File too large")) {
+          setError("File too large. Max 8MB per document.");
+        } else if (err.message.includes("Only images or PDF uploads are supported")) {
+          setError("Unsupported file type. Only images or PDF allowed.");
+        } else if (err.message.toLowerCase().includes("bucket") || err.message.toLowerCase().includes("not found")) {
+          setError("Storage bucket not found. Please contact support.");
+        } else {
+          setError(err.message);
+        }
+      } else {
+        setError("Upload failed. Please try again.");
+      }
     } finally {
       setLoading(false);
     }
   }
 
-  return (
-    <form onSubmit={onSubmit} className="space-y-5">
-      <input
-        ref={profileRef}
+    return (
+      <form onSubmit={onSubmit} className="space-y-5">
+        <input
+          ref={profileRef}
         type="file"
         accept="image/*"
         className="hidden"
