@@ -1,6 +1,13 @@
 import { randomInt } from "node:crypto";
 
-import { Prisma, type BookingStatus } from "@prisma/client";
+import type { BookingStatus } from "@prisma/client";
+
+type PrismaKnownRequestErrorLike = {
+  code?: string;
+  meta?: {
+    target?: string | string[];
+  };
+};
 
 export const CHAUFFEUR_RATE_CENTS_PER_KM = 10 * 100;
 
@@ -50,10 +57,12 @@ export function generatePaymentReferenceCode() {
 }
 
 export function isPaymentReferenceConflict(error: unknown) {
-  if (!(error instanceof Prisma.PrismaClientKnownRequestError)) return false;
-  if (error.code !== "P2002") return false;
+  if (!error || typeof error !== "object") return false;
 
-  const target = error.meta?.target;
+  const known = error as PrismaKnownRequestErrorLike;
+  if (known.code !== "P2002") return false;
+
+  const target = known.meta?.target;
   const targetText = Array.isArray(target) ? target.join(",") : String(target ?? "");
 
   return targetText.includes("paymentReference");
