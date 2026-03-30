@@ -182,7 +182,7 @@ body {
   }
 
   .dashboard-table {
-    @apply w-full text-left text-sm;
+    @apply min-w-[640px] w-full text-left text-sm;
   }
 
   .dashboard-table thead {

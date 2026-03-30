@@ -505,7 +505,7 @@ export default async function HostDashboardPage() {
             </CardHeader>
           </Card>
         ) : (
-          <div className="overflow-hidden rounded-xl border border-border shadow-sm">
+          <div className="overflow-x-auto rounded-xl border border-border shadow-sm">
             <table className="dashboard-table">
               <thead className="bg-muted">
                 <tr>
@@ -692,7 +692,7 @@ export default async function HostDashboardPage() {
             {pastBookings.length === 0 ? (
               <div className="text-sm text-foreground/60">No past bookings.</div>
             ) : (
-              <div className="overflow-hidden rounded-xl border border-border">
+              <div className="overflow-x-auto rounded-xl border border-border">
                 <table className="dashboard-table">
                   <thead className="bg-muted">
                     <tr>
@@ -838,7 +838,7 @@ export default async function HostDashboardPage() {
             {listingPerformanceRows.length === 0 ? (
               <div className="text-sm text-foreground/60">No confirmed bookings in the last 30 days.</div>
             ) : (
-              <div className="overflow-hidden rounded-xl border border-border">
+              <div className="overflow-x-auto rounded-xl border border-border">
                 <table className="dashboard-table">
                   <thead className="bg-muted">
                     <tr>

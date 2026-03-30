@@ -91,7 +91,7 @@ export default function AdminBulkSelector({
         </div>
       )}
 
-      <div className="overflow-hidden rounded-xl border border-border">
+      <div className="overflow-x-auto rounded-xl border border-border">
         <table className="dashboard-table">
           <thead className="bg-muted">
             <tr>

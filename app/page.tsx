@@ -3,6 +3,8 @@ import { translations } from "@/app/i18n";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/app/components/ui/Card";
 import Input from "@/app/components/ui/Input";
 import Button from "@/app/components/ui/Button";
+import { RESERVED_BOOKING_STATUSES } from "@/app/lib/bookings";
+import { prisma } from "@/app/lib/prisma";
 
 export const dynamic = "force-dynamic";
 
@@ -227,8 +229,8 @@ function TopListingsRow({ title, listings }: { title: string; listings: TopListi
   );
 }
 
-export default function Home() {
-  let topListingsRaw: Array<{
+export default async function Home() {
+  type TopListingRaw = {
     id: string;
     title: string;
     city: string;
@@ -237,20 +239,82 @@ export default function Home() {
     currency: string;
     imageUrl: string | null;
     host: { reviewsReceived: Array<{ rating: number }> };
-  }> = [];
+  };
+
+  const now = new Date();
+  let topListingsRaw: TopListingRaw[] = [];
   let availableCarsNow = 0;
   let activeHosts = 0;
   let confirmedTrips = 0;
 
-  // NOTE: If you need to fetch data asynchronously, use a client component or getServerSideProps.
-  // For build/prerender, use static data or move DB calls to API routes.
-  // Here, we skip DB calls for build compatibility.
+  try {
+    const [topListingsRes, availableCarsRes, activeHostsRes, confirmedTripsRes] = await Promise.all([
+      prisma.listing.findMany({
+        where: {
+          status: "ACTIVE",
+          isApproved: true,
+        },
+        orderBy: { createdAt: "desc" },
+        take: 5,
+        select: {
+          id: true,
+          title: true,
+          city: true,
+          country: true,
+          dailyRateCents: true,
+          currency: true,
+          imageUrl: true,
+          host: {
+            select: {
+              reviewsReceived: {
+                select: { rating: true },
+              },
+            },
+          },
+        },
+      }),
+      prisma.listing.count({
+        where: {
+          status: "ACTIVE",
+          isApproved: true,
+          bookings: {
+            none: {
+              status: { in: RESERVED_BOOKING_STATUSES },
+              startDate: { lte: now },
+              endDate: { gte: now },
+            },
+          },
+        },
+      }),
+      prisma.user.count({
+        where: {
+          role: "HOST",
+          status: "ACTIVE",
+          listings: {
+            some: {
+              status: "ACTIVE",
+              isApproved: true,
+            },
+          },
+        },
+      }),
+      prisma.booking.count({
+        where: {
+          status: "CONFIRMED",
+        },
+      }),
+    ]);
 
-  // Example static data for build
-  topListingsRaw = [];
-  availableCarsNow = 0;
-  activeHosts = 0;
-  confirmedTrips = 0;
+    topListingsRaw = topListingsRes;
+    availableCarsNow = availableCarsRes;
+    activeHosts = activeHostsRes;
+    confirmedTrips = confirmedTripsRes;
+  } catch {
+    topListingsRaw = [];
+    availableCarsNow = 0;
+    activeHosts = 0;
+    confirmedTrips = 0;
+  }
   const topListings: TopListing[] = topListingsRaw.map((l) => {
     const ratings = l.host.reviewsReceived.map((r) => r.rating).filter((n) => Number.isFinite(n));
     const hostRating = ratings.length ? ratings.reduce((a, b) => a + b, 0) / ratings.length : null;
@@ -277,7 +341,7 @@ export default function Home() {
   return (
     <main className="relative">
       {/* Language selector */}
-      <div className="absolute right-4 top-4 z-10">
+      <div className="absolute right-4 top-4 z-10 hidden sm:block">
         <form method="GET" action="/">
           <select name="lang" defaultValue={lang} className="rounded-md border border-border px-2 py-1 text-sm">
             <option value="en">{translations.en.welcome}</option>
@@ -299,28 +363,35 @@ export default function Home() {
         <div className="space-y-4 sm:space-y-5">
           <div className="inline-flex items-center gap-2 rounded-full border border-border bg-card/60 px-3 py-1 text-xs text-foreground/70 backdrop-blur">
             <span className="inline-flex h-2 w-2 rounded-full bg-accent/70" />
-            Clean, secure car rentals
+            Cape Town, Johannesburg, Durban
           </div>
 
             <h1 className="max-w-2xl text-3xl sm:text-4xl lg:text-6xl font-semibold tracking-tight text-foreground lg:leading-[1.02]">
-              Rent cars from trusted local owners. Fast, affordable, secure.
+              Move smarter with trusted local cars, flexible pickup, and transparent pricing.
             </h1>
           <p className="max-w-xl text-sm sm:text-base leading-relaxed text-foreground/70">
-            Book in minutes. Host with confidence.
+            From weekend escapes to daily commutes, discover verified vehicles and book in minutes.
           </p>
+
+          <div className="flex flex-wrap gap-2 text-xs text-foreground/70">
+            <span className="rounded-full border border-border bg-card/55 px-2.5 py-1">Verified hosts</span>
+            <span className="rounded-full border border-border bg-card/55 px-2.5 py-1">Clear pricing</span>
+            <span className="rounded-full border border-border bg-card/55 px-2.5 py-1">In-app support</span>
+            <span className="rounded-full border border-border bg-card/55 px-2.5 py-1">Roadside assist</span>
+          </div>
 
           <div className="flex flex-wrap items-center gap-2">
             <Link href="/listings">
-              <Button className="h-9 sm:h-11 px-3 sm:px-5 text-sm sm:text-base">Find a car</Button>
+              <Button className="h-9 sm:h-11 px-3 sm:px-5 text-sm sm:text-base">Start exploring</Button>
             </Link>
             <Link href="/host">
-              <Button variant="secondary" className="h-9 sm:h-11 px-3 sm:px-5 text-sm sm:text-base">Become a host</Button>
+              <Button variant="secondary" className="h-9 sm:h-11 px-3 sm:px-5 text-sm sm:text-base">List your car</Button>
             </Link>
             <Link className="text-xs sm:text-sm font-medium text-foreground/70 underline underline-offset-4 hover:text-foreground" href="/listings">
-              Browse listings
+              See all vehicles
             </Link>
             <Link className="text-xs sm:text-sm font-medium text-foreground/70 underline underline-offset-4 hover:text-foreground" href="/how-it-works">
-              How it works
+              Booking guide
             </Link>
           </div>
 
@@ -352,8 +423,8 @@ export default function Home() {
               <div className="absolute -bottom-24 -right-16 h-64 w-64 rounded-full bg-foreground/8 blur-3xl" />
             </div>
             <CardHeader className="relative pb-0">
-              <CardTitle className="text-base">Search</CardTitle>
-              <CardDescription>Location, pickup date, return date.</CardDescription>
+              <CardTitle className="text-base">Plan your trip</CardTitle>
+              <CardDescription>Pick a city, set your dates, and compare options instantly.</CardDescription>
             </CardHeader>
             <CardContent className="relative pt-3 sm:pt-4">
               <form action="/listings" method="GET" className="grid gap-2 sm:gap-3 sm:grid-cols-6 sm:items-end">
@@ -370,9 +441,20 @@ export default function Home() {
                   <Input name="end" type="date" className="text-sm" />
                 </label>
                 <div className="sm:col-span-1">
-                  <Button type="submit" className="w-full text-sm">Search</Button>
+                  <Button type="submit" className="w-full text-sm">Show cars</Button>
                 </div>
               </form>
+              <div className="mt-3 flex flex-wrap gap-2 text-xs text-foreground/65">
+                <Link className="rounded-full border border-border bg-background/40 px-2.5 py-1 hover:bg-background/70" href="/listings?q=Cape+Town">
+                  Cape Town cars
+                </Link>
+                <Link className="rounded-full border border-border bg-background/40 px-2.5 py-1 hover:bg-background/70" href="/listings?q=Johannesburg">
+                  Johannesburg cars
+                </Link>
+                <Link className="rounded-full border border-border bg-background/40 px-2.5 py-1 hover:bg-background/70" href="/listings?q=Durban">
+                  Durban cars
+                </Link>
+              </div>
             </CardContent>
           </Card>
         </div>
@@ -436,10 +518,34 @@ export default function Home() {
         </div>
       </section>
 
+      <section className="grid gap-4 pb-6 lg:grid-cols-3">
+        {[
+          {
+            title: "Built for real life trips",
+            body: "Daily rentals, weekend escapes, airport pickup, and longer monthly bookings.",
+          },
+          {
+            title: "Clear, trustworthy booking flow",
+            body: "Simple checkout, proof-based manual payment flow, and clear booking lifecycle steps.",
+          },
+          {
+            title: "Support that stays with the trip",
+            body: "Chat, incidents, and assist tools are linked to bookings for faster resolution.",
+          },
+        ].map((item) => (
+          <Card key={item.title} className="border-border bg-card/55 backdrop-blur supports-[backdrop-filter]:bg-card/40">
+            <CardHeader>
+              <CardTitle className="text-base">{item.title}</CardTitle>
+            </CardHeader>
+            <CardContent className="text-sm text-foreground/70">{item.body}</CardContent>
+          </Card>
+        ))}
+      </section>
+
       <section className="space-y-4 pb-6">
         <div className="space-y-1">
-          <h2 className="text-lg font-semibold">Marketplace pulse</h2>
-          <p className="text-sm text-foreground/60">Live platform signals that help renters and hosts make faster decisions.</p>
+          <h2 className="text-lg font-semibold">Live mobility index</h2>
+          <p className="text-sm text-foreground/60">Quick platform signals to help you choose when and where to book or list.</p>
         </div>
 
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -547,8 +653,42 @@ export default function Home() {
 
       <section className="space-y-4 pb-6">
         <div className="space-y-1">
-          <h2 className="text-lg font-semibold">Choose your role</h2>
-          <p className="text-sm text-foreground/60">Dedicated experiences for renters, hosts, and operations teams.</p>
+          <h2 className="text-lg font-semibold">Trip confidence</h2>
+          <p className="text-sm text-foreground/60">What renters and hosts can expect before, during, and after every trip.</p>
+        </div>
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {[
+            {
+              title: "Before pickup",
+              text: "Review requirements, upload docs once, and prepare handover photos.",
+            },
+            {
+              title: "During trip",
+              text: "Use booking chat for host/admin coordination and route support issues quickly.",
+            },
+            {
+              title: "Unexpected events",
+              text: "Use Assist to pin location and open incidents with context in one place.",
+            },
+            {
+              title: "After return",
+              text: "Access receipts, leave ratings, and maintain transparent trip history.",
+            },
+          ].map((item) => (
+            <Card key={item.title} className="border-border bg-card/55 backdrop-blur supports-[backdrop-filter]:bg-card/40">
+              <CardHeader>
+                <CardTitle className="text-sm">{item.title}</CardTitle>
+              </CardHeader>
+              <CardContent className="text-sm text-foreground/70">{item.text}</CardContent>
+            </Card>
+          ))}
+        </div>
+      </section>
+
+      <section className="space-y-4 pb-6">
+        <div className="space-y-1">
+          <h2 className="text-lg font-semibold">Pick your lane</h2>
+          <p className="text-sm text-foreground/60">Purpose-built tools for renters, hosts, and operations teams.</p>
         </div>
 
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -622,8 +762,8 @@ export default function Home() {
             <div className="absolute -right-24 -bottom-28 h-80 w-80 rounded-full bg-foreground/10 blur-3xl" />
           </div>
           <div className="relative mx-auto max-w-2xl space-y-3">
-            <h2 className="text-2xl font-semibold tracking-tight">Ready to get started?</h2>
-            <p className="text-sm text-foreground/70">Join as a renter or a host.</p>
+            <h2 className="text-2xl font-semibold tracking-tight">Ready for your next drive?</h2>
+            <p className="text-sm text-foreground/70">Create your account, compare cars, and book with confidence.</p>
             <div className="flex flex-wrap justify-center gap-2 pt-1">
               <Link href="/sign-up">
                 <Button className="h-11 px-5 text-base">Create account</Button>

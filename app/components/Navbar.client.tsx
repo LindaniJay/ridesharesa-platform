@@ -57,6 +57,7 @@ export default function NavbarClient() {
   const [email, setEmail] = useState<string | null>(null);
   const [role, setRole] = useState<"ADMIN" | "HOST" | "RENTER" | null>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [carsLabel, setCarsLabel] = useState<"Find Cars" | "Discover Cars">("Find Cars");
 
   useEffect(() => {
     let cancelled = false;
@@ -109,6 +110,23 @@ export default function NavbarClient() {
     };
   }, []);
 
+  useEffect(() => {
+    try {
+      const key = "rs_nav_cars_label_v1";
+      const saved = window.localStorage.getItem(key);
+      if (saved === "find" || saved === "discover") {
+        setCarsLabel(saved === "discover" ? "Discover Cars" : "Find Cars");
+        return;
+      }
+
+      const assigned = Math.random() < 0.5 ? "find" : "discover";
+      window.localStorage.setItem(key, assigned);
+      setCarsLabel(assigned === "discover" ? "Discover Cars" : "Find Cars");
+    } catch {
+      // Ignore storage errors.
+    }
+  }, []);
+
   async function onSignOut() {
     await supabaseBrowser().auth.signOut();
     setMobileMenuOpen(false);
@@ -150,7 +168,7 @@ export default function NavbarClient() {
                 How it works
               </NavLink>
               <NavLink href="/listings" active={isActivePath(pathname, "/listings")}>
-                Listings
+                {carsLabel}
               </NavLink>
               <NavLink href="/assist" active={isActivePath(pathname, "/assist")}>
                 Assist
@@ -212,7 +230,7 @@ export default function NavbarClient() {
               </Link>
               <Link
                 href="/sign-up"
-                className="inline-flex rounded-lg bg-accent px-2 sm:px-3 py-1 sm:py-2 text-xs sm:text-sm font-medium text-accent-foreground shadow-sm hover:opacity-90"
+                className="hidden rounded-lg bg-accent px-2 sm:px-3 py-1 sm:py-2 text-xs sm:text-sm font-medium text-accent-foreground shadow-sm hover:opacity-90 sm:inline-flex"
               >
                 Sign up
               </Link>
@@ -231,7 +249,7 @@ export default function NavbarClient() {
               How it works
             </NavLink>
             <NavLink href="/listings" active={isActivePath(pathname, "/listings")}>
-              Listings
+              {carsLabel}
             </NavLink>
             <NavLink href="/assist" active={isActivePath(pathname, "/assist")}>
               Assist
@@ -252,7 +270,7 @@ export default function NavbarClient() {
               </NavLink>
             )}
             {!email ? (
-              <div className="pt-1">
+              <div className="space-y-2 pt-1">
                 <Link
                   href="/sign-in"
                   onClick={() => setMobileMenuOpen(false)}
@@ -261,6 +279,16 @@ export default function NavbarClient() {
                   <span className="inline-flex items-center gap-2">
                     <DoorOpenIcon />
                     Sign in
+                  </span>
+                </Link>
+                <Link
+                  href="/sign-up"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="btn-link-secondary w-full justify-center"
+                >
+                  <span className="inline-flex items-center gap-2">
+                    <DoorOpenIcon />
+                    Sign up
                   </span>
                 </Link>
               </div>

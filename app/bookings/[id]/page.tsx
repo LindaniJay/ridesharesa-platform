@@ -448,7 +448,7 @@ export default async function BookingPage({
             <div className="rounded-xl border border-border bg-card p-3">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div className="text-foreground/60">Payment Reference</div>
-                <div className="font-mono text-xl font-bold tracking-wider text-green-600 dark:text-green-400">
+                <div className="break-all text-right font-mono text-base font-bold tracking-wide text-green-600 dark:text-green-400 sm:text-xl sm:tracking-wider">
                   {booking.paymentReference || `RS-${booking.id}`}
                 </div>
               </div>

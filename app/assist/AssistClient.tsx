@@ -117,22 +117,25 @@ export default function AssistClient() {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center gap-2">
-        <Button
-          type="button"
-          variant={kind === "TIRE" ? "primary" : "secondary"}
-          onClick={() => setKind("TIRE")}
-        >
-          Flat tyre
-        </Button>
-        <Button
-          type="button"
-          variant={kind === "FUEL" ? "primary" : "secondary"}
-          onClick={() => setKind("FUEL")}
-        >
-          Out of petrol
-        </Button>
-        <div className="text-sm text-foreground/60">Selected: {helpTitle}</div>
+      <div className="rounded-2xl border border-border bg-card/60 p-3 sm:p-4">
+        <div className="mb-2 text-sm font-medium">What do you need help with?</div>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            type="button"
+            variant={kind === "TIRE" ? "primary" : "secondary"}
+            onClick={() => setKind("TIRE")}
+          >
+            Flat tyre
+          </Button>
+          <Button
+            type="button"
+            variant={kind === "FUEL" ? "primary" : "secondary"}
+            onClick={() => setKind("FUEL")}
+          >
+            Out of petrol
+          </Button>
+          <div className="text-sm text-foreground/60">Selected: {helpTitle}</div>
+        </div>
       </div>
 
       <AssistMap
@@ -199,14 +202,14 @@ export default function AssistClient() {
       {geoStatus === "requesting" ? <div className="text-sm text-foreground/60">Requesting location permission…</div> : null}
       {geoStatus === "error" && geoError ? <div className="text-sm text-destructive">{geoError}</div> : null}
 
-      <div className="grid gap-3 sm:grid-cols-2">
+      <div className="grid gap-3 rounded-2xl border border-border bg-card/50 p-3 sm:grid-cols-2 sm:p-4">
         <label className="block">
           <div className="mb-1 text-sm text-foreground/70">Contact number (optional)</div>
           <Input value={contact} onChange={(e) => setContact(e.target.value)} placeholder="e.g. +27 72 000 0000" />
         </label>
         <div className="flex items-end">
           <div className="text-xs text-foreground/60">
-            Tip: you can click the map to adjust the marker.
+            Tip: tap anywhere on the map to fine-tune your pin before submitting.
           </div>
         </div>
       </div>
@@ -221,20 +224,45 @@ export default function AssistClient() {
         />
       </label>
 
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-border bg-card/50 p-3 sm:p-4">
         <Button type="button" onClick={submit} disabled={submitting}>
           {submitting ? "Submitting…" : "Request assistance"}
         </Button>
         <Link className="text-sm font-medium text-foreground/70 underline underline-offset-4 hover:text-foreground" href="/how-it-works">
           How it works
         </Link>
+        <div className="text-xs text-foreground/60">This report creates an incident ticket for operations.</div>
       </div>
 
       {result ? (
         result.ok ? (
-          <div className="rounded-xl border border-border bg-card p-3 text-sm">
-            <div className="font-medium">Request sent</div>
+          <div className="rounded-xl border border-green-500/30 bg-green-500/10 p-3 text-sm">
+            <div className="font-medium">Request sent successfully</div>
             <div className="mt-1 text-foreground/70">Incident ID: {result.incidentId}</div>
+            <div className="mt-3 rounded-lg border border-border bg-card p-3">
+              <div className="text-xs font-semibold uppercase tracking-wide text-foreground/60">Status timeline</div>
+              <ol className="mt-2 space-y-2">
+                {[
+                  { label: "Received", active: true },
+                  { label: "Assigned", active: false },
+                  { label: "In progress", active: false },
+                  { label: "Resolved", active: false },
+                ].map((step) => (
+                  <li key={step.label} className="flex items-center gap-2 text-xs">
+                    <span
+                      className={[
+                        "inline-flex h-2.5 w-2.5 rounded-full",
+                        step.active ? "bg-green-500" : "bg-foreground/25",
+                      ].join(" ")}
+                    />
+                    <span className={step.active ? "font-medium text-foreground" : "text-foreground/60"}>{step.label}</span>
+                  </li>
+                ))}
+              </ol>
+              <div className="mt-2 text-xs text-foreground/60">
+                Next status updates appear in your dashboard support and incident views.
+              </div>
+            </div>
             <div className="mt-2 flex flex-wrap gap-2">
               <Link className="text-sm underline" href="/renter">
                 Open renter dashboard
@@ -245,7 +273,7 @@ export default function AssistClient() {
             </div>
           </div>
         ) : (
-          <div className="rounded-xl border border-border bg-card p-3 text-sm">
+          <div className="rounded-xl border border-red-500/30 bg-red-500/10 p-3 text-sm">
             <div className="font-medium text-destructive">Could not submit</div>
             <div className="mt-1 text-foreground/70">{result.error}</div>
             {result.status === 401 ? (

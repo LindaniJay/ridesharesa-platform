@@ -1607,7 +1607,7 @@ export default async function AdminDashboardPage({
                     {diffRows.length === 0 ? (
                       <div className="text-sm text-foreground/50">No snapshot payload available for this action.</div>
                     ) : (
-                      <div className="overflow-hidden rounded-xl border border-border">
+                      <div className="overflow-x-auto rounded-xl border border-border">
                         <table className="dashboard-table">
                           <thead className="bg-muted">
                             <tr>
@@ -1970,7 +1970,7 @@ export default async function AdminDashboardPage({
             <CardDescription>Latest listings across the platform.</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="overflow-hidden rounded-xl border border-border">
+            <div className="overflow-x-auto rounded-xl border border-border">
                         <table className="dashboard-table">
                 <thead className="bg-muted">
                   <tr>
@@ -2545,7 +2545,7 @@ export default async function AdminDashboardPage({
             <CardDescription>Latest bookings with renter/host context.</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="overflow-hidden rounded-xl border border-border">
+            <div className="overflow-x-auto rounded-xl border border-border">
               <table className="dashboard-table">
                 <thead className="bg-muted">
                   <tr>
@@ -2636,7 +2636,7 @@ export default async function AdminDashboardPage({
           </CardContent>
         </Card>
 
-        <div className="overflow-hidden rounded-xl border border-border shadow-sm">
+        <div className="overflow-x-auto rounded-xl border border-border shadow-sm">
           <table className="dashboard-table">
             <thead className="bg-muted">
               <tr>
@@ -2729,7 +2729,7 @@ export default async function AdminDashboardPage({
             {pendingEftBookings.length === 0 ? (
               <div className="text-sm text-foreground/60">No pending EFT bookings.</div>
             ) : (
-              <div className="overflow-hidden rounded-xl border border-border">
+              <div className="overflow-x-auto rounded-xl border border-border">
                 <table className="dashboard-table">
                   <thead className="bg-muted">
                     <tr>
@@ -2877,7 +2877,7 @@ export default async function AdminDashboardPage({
             {recentPayouts.length === 0 ? (
               <div className="text-sm text-foreground/60">No payouts yet.</div>
             ) : (
-              <div className="overflow-hidden rounded-xl border border-border">
+              <div className="overflow-x-auto rounded-xl border border-border">
                 <table className="dashboard-table">
                   <thead className="bg-muted">
                     <tr>
@@ -2931,7 +2931,7 @@ export default async function AdminDashboardPage({
         <h2 className="text-lg font-semibold">Messages</h2>
         <p className="text-sm text-foreground/60">Admins can see and open any booking chat.</p>
 
-        <div className="overflow-hidden rounded-xl border border-border shadow-sm">
+        <div className="overflow-x-auto rounded-xl border border-border shadow-sm">
           <table className="dashboard-table">
             <thead className="bg-muted">
               <tr>
@@ -3009,7 +3009,7 @@ export default async function AdminDashboardPage({
             {incidentReports.length === 0 ? (
               <div className="text-sm text-foreground/60">No incidents found.</div>
             ) : (
-              <div className="overflow-hidden rounded-xl border border-border">
+              <div className="overflow-x-auto rounded-xl border border-border">
                 <table className="dashboard-table">
                   <thead className="bg-muted">
                     <tr>
@@ -3101,7 +3101,7 @@ export default async function AdminDashboardPage({
             {supportTickets.length === 0 ? (
               <div className="text-sm text-foreground/60">No tickets found.</div>
             ) : (
-              <div className="overflow-hidden rounded-xl border border-border">
+              <div className="overflow-x-auto rounded-xl border border-border">
                 <table className="dashboard-table">
                   <thead className="bg-muted">
                     <tr>
