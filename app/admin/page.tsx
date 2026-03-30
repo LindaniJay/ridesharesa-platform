@@ -560,11 +560,15 @@ export default async function AdminDashboardPage({
       },
     }),
     prisma.booking.findMany({
-      where: { status: "PENDING_PAYMENT", stripeCheckoutSessionId: null },
+      where: {
+        status: { in: ["PENDING_PAYMENT", "PENDING_APPROVAL"] },
+        stripeCheckoutSessionId: null,
+      },
       orderBy: { createdAt: "desc" },
       take: 50,
       select: {
         id: true,
+        status: true,
         totalCents: true,
         currency: true,
         startDate: true,
@@ -2653,7 +2657,7 @@ export default async function AdminDashboardPage({
         <Card>
           <CardHeader>
             <CardTitle>EFT confirmations</CardTitle>
-            <CardDescription>Bookings awaiting manual/EFT payment confirmation.</CardDescription>
+            <CardDescription>Bookings awaiting payment confirmation or admin approval.</CardDescription>
           </CardHeader>
           <CardContent>
             {pendingEftBookings.length === 0 ? (
@@ -2666,6 +2670,7 @@ export default async function AdminDashboardPage({
                       <th className="px-3 py-2">Listing</th>
                       <th className="px-3 py-2">Host</th>
                       <th className="px-3 py-2">Renter</th>
+                      <th className="px-3 py-2">Status</th>
                       <th className="px-3 py-2">Risk</th>
                       <th className="px-3 py-2">Total</th>
                       <th className="px-3 py-2">Created</th>
@@ -2689,6 +2694,9 @@ export default async function AdminDashboardPage({
                         <td className="px-3 py-2">{b.listing.host.email}</td>
                         <td className="px-3 py-2">{b.renter.email}</td>
                         <td className="px-3 py-2">
+                          <Badge variant={badgeVariantForBookingStatus(b.status)}>{b.status}</Badge>
+                        </td>
+                        <td className="px-3 py-2">
                           <span className={cn("inline-flex rounded-full px-2 py-1 text-xs font-medium", riskBadgeClass(bookingRisk.level))} title={bookingRisk.flags.join(" • ")}>
                             {riskLabel(bookingRisk.level)} {bookingRisk.score}
                           </span>
@@ -2708,10 +2716,18 @@ export default async function AdminDashboardPage({
                             >
                               View proof
                             </a>
-                            <form action={markManualBookingPaid}>
-                              <input type="hidden" name="bookingId" value={b.id} />
-                              <Button type="submit" variant="secondary">Mark paid</Button>
-                            </form>
+                            {b.status === "PENDING_PAYMENT" ? (
+                              <form action={markManualBookingPaid}>
+                                <input type="hidden" name="bookingId" value={b.id} />
+                                <Button type="submit" variant="secondary">Mark paid</Button>
+                              </form>
+                            ) : null}
+                            {b.status === "PENDING_APPROVAL" ? (
+                              <form action={approveBooking}>
+                                <input type="hidden" name="bookingId" value={b.id} />
+                                <Button type="submit" variant="secondary">Approve</Button>
+                              </form>
+                            ) : null}
                           </div>
                         </td>
                       </tr>

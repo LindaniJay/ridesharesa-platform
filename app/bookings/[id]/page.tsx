@@ -6,6 +6,7 @@ export const dynamic = "force-dynamic";
 import Badge from "@/app/components/ui/Badge";
 import Button from "@/app/components/ui/Button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/app/components/ui/Card";
+import FileDropInput from "@/app/components/FileDropInput.client";
 import { badgeVariantForBookingStatus } from "@/app/lib/badgeVariants";
 import { prisma } from "@/app/lib/prisma";
 import { requireUser } from "@/app/lib/require";
@@ -112,6 +113,15 @@ function parseIntParam(v: unknown) {
   return i;
 }
 
+function formatMoney(cents: number, currency: string) {
+  const value = Math.max(0, cents) / 100;
+  return new Intl.NumberFormat("en-ZA", {
+    style: "currency",
+    currency,
+    maximumFractionDigits: 0,
+  }).format(value);
+}
+
 export default async function BookingPage({
   params,
   searchParams,
@@ -126,6 +136,10 @@ export default async function BookingPage({
   const chauffeurKmRaw = Array.isArray(resolvedSearchParams?.chauffeurKm)
     ? resolvedSearchParams?.chauffeurKm[0]
     : resolvedSearchParams?.chauffeurKm;
+  const paymentProofParamRaw = Array.isArray(resolvedSearchParams?.paymentProof)
+    ? resolvedSearchParams?.paymentProof[0]
+    : resolvedSearchParams?.paymentProof;
+  const paymentProofParam = typeof paymentProofParamRaw === "string" ? paymentProofParamRaw : null;
   const chauffeurKmParsed = parseIntParam(chauffeurKmRaw);
   const chauffeurKm = chauffeurKmParsed && chauffeurKmParsed > 0 ? Math.min(chauffeurKmParsed, 5000) : 0;
   const chauffeurRateCentsPerKm = 10 * 100;
@@ -218,6 +232,7 @@ export default async function BookingPage({
   const paymentProofRes = isManualPayment && (isAdmin || isRenter)
     ? await listSignedPaymentProofs({ bookingId: booking.id, kind: "payment_proof" })
     : null;
+  const hasPaymentProof = Boolean(paymentProofRes?.ok && paymentProofRes.proofs.length > 0);
 
   const rentalCents = Math.max(0, booking.totalCents - chauffeurCents);
 
@@ -255,7 +270,7 @@ export default async function BookingPage({
             : "Payment is processing. This page will update after Stripe confirms payment.";
 
   return (
-    <main className="mx-auto max-w-xl space-y-4">
+    <main className="mx-auto max-w-5xl space-y-6 pb-8">
       <div className="text-sm text-black/60 dark:text-white/60">
         <Link className="underline" href="/listings">
           Listings
@@ -268,14 +283,71 @@ export default async function BookingPage({
         <span className="text-black/80 dark:text-white/80">Booking</span>
       </div>
 
-      <div className="space-y-1">
-        <h1 className="text-2xl font-semibold tracking-tight">{heading}</h1>
-        <p className="text-sm text-foreground/60">
-          {subheading}
-        </p>
-      </div>
+      <Card className="overflow-hidden border-border/80">
+        <CardContent className="grid gap-4 p-5 md:grid-cols-[1.2fr_0.8fr] md:p-6">
+          <div className="space-y-3">
+            <div className="space-y-1">
+              <h1 className="text-2xl font-semibold tracking-tight">{heading}</h1>
+              <p className="text-sm text-foreground/60">{subheading}</p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge variant={badgeVariantForBookingStatus(booking.status)}>{booking.status}</Badge>
+              {booking.paymentReference ? (
+                <span className="rounded-full border border-border bg-muted/50 px-2.5 py-1 text-xs font-medium text-foreground/70">
+                  Ref {booking.paymentReference}
+                </span>
+              ) : null}
+              <span className="rounded-full border border-border bg-muted/50 px-2.5 py-1 text-xs font-medium text-foreground/70">
+                {booking.days} {booking.days === 1 ? "day" : "days"}
+              </span>
+            </div>
+            <BookingStatusClient status={booking.status} method={isManualPayment ? "manual" : "stripe"} />
+          </div>
 
-      <BookingStatusClient status={booking.status} method={isManualPayment ? "manual" : "stripe"} />
+          {booking.listing.imageUrl ? (
+            <div className="overflow-hidden rounded-2xl border border-border">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={booking.listing.imageUrl}
+                alt={booking.listing.title}
+                className="h-44 w-full object-cover"
+                loading="lazy"
+              />
+            </div>
+          ) : (
+            <div className="flex h-44 items-center justify-center rounded-2xl border border-border bg-muted text-sm text-foreground/60">
+              No vehicle image
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <Card>
+          <CardHeader>
+            <CardTitle>Trip dates</CardTitle>
+            <CardDescription>{booking.startDate.toISOString().slice(0, 10)} to {booking.endDate.toISOString().slice(0, 10)}</CardDescription>
+          </CardHeader>
+        </Card>
+        <Card>
+          <CardHeader>
+            <CardTitle>Vehicle</CardTitle>
+            <CardDescription>{booking.listing.title} in {booking.listing.city}</CardDescription>
+          </CardHeader>
+        </Card>
+        <Card>
+          <CardHeader>
+            <CardTitle>Total due</CardTitle>
+            <CardDescription>{formatMoney(booking.totalCents, booking.currency)}</CardDescription>
+          </CardHeader>
+        </Card>
+        <Card>
+          <CardHeader>
+            <CardTitle>Daily rate</CardTitle>
+            <CardDescription>{formatMoney(booking.listing.dailyRateCents, booking.currency)} / day</CardDescription>
+          </CardHeader>
+        </Card>
+      </div>
 
       {/* Promo code input */}
       <Card>
@@ -457,23 +529,50 @@ export default async function BookingPage({
                 <div className="text-sm font-medium">Upload proof of payment</div>
                 <div className="text-xs text-foreground/60">Upload a screenshot/photo or a PDF. This is private (renter + admin).</div>
 
+                {paymentProofParam === "uploaded" ? (
+                  <div className="rounded-lg border border-green-500/30 bg-green-500/10 p-2 text-xs text-foreground/80">
+                    Proof uploaded. Final step: submit this booking for admin approval.
+                  </div>
+                ) : null}
+                {paymentProofParam === "submitted" ? (
+                  <div className="rounded-lg border border-green-500/30 bg-green-500/10 p-2 text-xs text-foreground/80">
+                    Booking submitted for admin approval. You will see status updates on this page.
+                  </div>
+                ) : null}
+
                 {isRenter ? (
                   <form
                     action={`/api/bookings/${encodeURIComponent(booking.id)}/payment-proof`}
                     method="post"
                     encType="multipart/form-data"
-                    className="flex flex-wrap items-center gap-2"
+                    className="space-y-2"
                   >
-                    <input
+                    <FileDropInput
                       name="proof"
-                      type="file"
+                      label="Proof file"
                       accept="image/*,application/pdf"
                       required
-                      className="max-w-[260px] text-sm"
+                      helper="Images or PDF up to 8MB"
                     />
                     <Button type="submit" variant="secondary">
                       Upload proof
                     </Button>
+                  </form>
+                ) : null}
+
+                {isRenter && hasPaymentProof ? (
+                  <form
+                    action={`/api/bookings/${encodeURIComponent(booking.id)}/payment-proof/submit`}
+                    method="post"
+                    className="rounded-xl border border-accent/30 bg-accent-soft p-3"
+                  >
+                    <div className="text-sm font-medium">Finish booking submission</div>
+                    <div className="mt-1 text-xs text-foreground/70">
+                      This moves your booking to waiting-for-approval and notifies admin to verify payment proof.
+                    </div>
+                    <div className="mt-3">
+                      <Button type="submit">Submit for approval</Button>
+                    </div>
                   </form>
                 ) : null}
 
@@ -507,74 +606,6 @@ export default async function BookingPage({
 
       <Card>
         <CardHeader>
-          <CardTitle>{booking.listing.title}</CardTitle>
-          <CardDescription>{booking.listing.city}</CardDescription>
-        </CardHeader>
-        <CardContent>
-          {booking.listing.imageUrl ? (
-            <>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={booking.listing.imageUrl}
-                alt={booking.listing.title}
-                className="mb-3 h-40 w-full rounded-xl border border-border object-cover"
-                loading="lazy"
-              />
-            </>
-          ) : null}
-          <div className="mb-3">
-            <Badge variant={badgeVariantForBookingStatus(booking.status)}>{booking.status}</Badge>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3 text-sm">
-            <div>
-              <div className="text-black/60 dark:text-white/60">Start</div>
-              <div>{booking.startDate.toISOString().slice(0, 10)}</div>
-            </div>
-            <div>
-              <div className="text-black/60 dark:text-white/60">End</div>
-              <div>{booking.endDate.toISOString().slice(0, 10)}</div>
-            </div>
-            <div>
-              <div className="text-black/60 dark:text-white/60">Days</div>
-              <div>{booking.days}</div>
-            </div>
-            <div>
-              <div className="text-black/60 dark:text-white/60">Daily rate</div>
-              <div>
-                {(booking.listing.dailyRateCents / 100).toFixed(0)} {booking.currency}
-              </div>
-            </div>
-
-            {chauffeurKm > 0 ? (
-              <>
-                <div>
-                  <div className="text-black/60 dark:text-white/60">Rental total</div>
-                  <div>
-                    {(rentalCents / 100).toFixed(0)} {booking.currency}
-                  </div>
-                </div>
-                <div>
-                  <div className="text-black/60 dark:text-white/60">Chauffeur</div>
-                  <div>
-                    {chauffeurKm} km × 10 = {(chauffeurCents / 100).toFixed(0)} {booking.currency}
-                  </div>
-                </div>
-              </>
-            ) : null}
-
-            <div>
-              <div className="text-black/60 dark:text-white/60">Total</div>
-              <div>
-                {(booking.totalCents / 100).toFixed(0)} {booking.currency}
-              </div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
           <CardTitle>Photo log</CardTitle>
           <CardDescription>
             Handover and return photos help prevent disputes. Photos are private and shared only with the renter, host, and admin.
@@ -602,15 +633,15 @@ export default async function BookingPage({
                       action={`/api/bookings/${encodeURIComponent(booking.id)}/photos`}
                       method="post"
                       encType="multipart/form-data"
-                      className="flex items-center gap-2"
+                      className="w-full max-w-sm space-y-2"
                     >
                       <input type="hidden" name="kind" value={kind} />
-                      <input
+                      <FileDropInput
                         name="photo"
-                        type="file"
+                        label="Upload photo"
+                        helper="JPG/PNG up to 8MB"
                         accept="image/*"
                         required
-                        className="max-w-[220px] text-sm"
                       />
                       <Button type="submit" variant="secondary">
                         Upload

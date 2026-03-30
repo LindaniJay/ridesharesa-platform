@@ -12,6 +12,25 @@ function isoDate(d: Date) {
   return d.toISOString().slice(0, 10);
 }
 
+function renderStars(rating: number) {
+  return Array.from({ length: 5 }, (_, i) => {
+    const filled = i < rating;
+    return (
+      <svg
+        key={i}
+        viewBox="0 0 24 24"
+        className={filled ? "h-5 w-5 fill-amber-400 text-amber-400" : "h-5 w-5 fill-transparent text-amber-300"}
+      >
+        <path
+          stroke="currentColor"
+          strokeWidth="1.5"
+          d="M12 3l2.8 5.67 6.26.91-4.53 4.42 1.07 6.24L12 17.27 6.4 20.24l1.07-6.24L2.94 9.58l6.26-.91L12 3z"
+        />
+      </svg>
+    );
+  });
+}
+
 export default function BookingActions(props: {
   bookingId: string;
   currentEndDateISO: string;
@@ -326,21 +345,23 @@ export default function BookingActions(props: {
         ) : null}
 
         {canReview ? (
-          <div className="rounded-xl border border-border bg-card p-3">
+          <div className="rounded-2xl border border-border bg-gradient-to-br from-amber-500/10 via-card to-card p-4">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div>
-                <div className="text-sm font-medium">Rate your trip</div>
-                <div className="mt-1 text-xs text-foreground/60">Open the review popup to submit rating and feedback.</div>
+                <div className="text-sm font-medium">Rate your trip experience</div>
+                <div className="mt-1 text-xs text-foreground/60">Leave a quick star rating and optional feedback for the host.</div>
+                <div className="mt-2 flex items-center gap-1">{renderStars(Number(reviewRating) || 5)}</div>
               </div>
               <Button type="button" onClick={() => setShowReviewModal(true)}>
-                {props.existingReview ? "Edit review" : "Open review popup"}
+                {props.existingReview ? "Edit review" : "Rate with stars"}
               </Button>
             </div>
           </div>
         ) : props.existingReview ? (
-          <div className="rounded-xl border border-border bg-card p-3 text-sm">
+          <div className="rounded-2xl border border-border bg-gradient-to-br from-emerald-500/10 via-card to-card p-4 text-sm">
             <div className="font-medium">Review submitted</div>
-            <div className="mt-1 text-foreground/70">Rating: {props.existingReview.rating}/5</div>
+            <div className="mt-2 flex items-center gap-1">{renderStars(props.existingReview.rating)}</div>
+            <div className="mt-1 text-foreground/70">{props.existingReview.rating}/5 stars</div>
             {props.existingReview.comment ? <div className="mt-1 text-foreground/70">{props.existingReview.comment}</div> : null}
           </div>
         ) : null}
@@ -386,18 +407,34 @@ export default function BookingActions(props: {
 
               <div className="mt-3 grid gap-2 sm:grid-cols-2">
                 <label className="block">
-                  <div className="mb-1 text-xs text-foreground/60">Rating</div>
-                  <select
-                    value={reviewRating}
-                    onChange={(e) => setReviewRating(e.target.value)}
-                    className="w-full rounded-md border border-black/10 bg-transparent px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-black/20 dark:border-white/10 dark:focus:ring-white/20"
-                  >
-                    <option value="5">5 - Excellent</option>
-                    <option value="4">4 - Good</option>
-                    <option value="3">3 - Okay</option>
-                    <option value="2">2 - Poor</option>
-                    <option value="1">1 - Bad</option>
-                  </select>
+                  <div className="mb-2 text-xs text-foreground/60">Rating</div>
+                  <div className="flex items-center gap-1">
+                    {Array.from({ length: 5 }, (_, index) => {
+                      const value = index + 1;
+                      const selected = value <= Number(reviewRating || "0");
+                      return (
+                        <button
+                          key={value}
+                          type="button"
+                          aria-label={`Rate ${value} star${value === 1 ? "" : "s"}`}
+                          onClick={() => setReviewRating(String(value))}
+                          className="rounded-md p-1 transition-transform hover:scale-110"
+                        >
+                          <svg
+                            viewBox="0 0 24 24"
+                            className={selected ? "h-7 w-7 fill-amber-400 text-amber-400" : "h-7 w-7 fill-transparent text-amber-300"}
+                          >
+                            <path
+                              stroke="currentColor"
+                              strokeWidth="1.5"
+                              d="M12 3l2.8 5.67 6.26.91-4.53 4.42 1.07 6.24L12 17.27 6.4 20.24l1.07-6.24L2.94 9.58l6.26-.91L12 3z"
+                            />
+                          </svg>
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <div className="mt-1 text-xs text-foreground/60">Selected: {reviewRating}/5</div>
                 </label>
                 <div className="sm:col-span-2">
                   <div className="mb-1 text-xs text-foreground/60">Comment (optional)</div>
