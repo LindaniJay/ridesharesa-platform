@@ -4,7 +4,9 @@ import { useEffect, useMemo, useState } from "react";
 
 import Button from "@/app/components/ui/Button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/app/components/ui/Card";
+import Skeleton from "@/app/components/ui/Skeleton";
 import Textarea from "@/app/components/ui/Textarea";
+import { useToast } from "@/app/components/ui/ToastProvider.client";
 
 type Message = {
   id: string;
@@ -25,6 +27,7 @@ export default function BookingChat(props: {
   const [draft, setDraft] = useState("");
   const [recipientRole, setRecipientRole] = useState<"HOST" | "ADMIN">("HOST");
   const [sending, setSending] = useState(false);
+  const { showToast } = useToast();
 
   const endpoint = useMemo(() => `/api/bookings/${encodeURIComponent(props.bookingId)}/messages`, [props.bookingId]);
 
@@ -37,7 +40,9 @@ export default function BookingChat(props: {
       if (!res.ok) throw new Error(json?.error || "Failed to load messages");
       setMessages(Array.isArray(json?.messages) ? json!.messages : []);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to load messages");
+      const msg = e instanceof Error ? e.message : "Failed to load messages";
+      setError(msg);
+      showToast({ variant: "error", title: "Messages unavailable", description: msg });
     } finally {
       setLoading(false);
     }
@@ -67,7 +72,9 @@ export default function BookingChat(props: {
         await refresh();
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to send message");
+      const msg = e instanceof Error ? e.message : "Failed to send message";
+      setError(msg);
+      showToast({ variant: "error", title: "Could not send", description: msg });
     } finally {
       setSending(false);
     }
@@ -93,10 +100,21 @@ export default function BookingChat(props: {
       </CardHeader>
       <CardContent className="space-y-3">
         {error ? <div className="text-sm text-red-600">{error}</div> : null}
+        {error ? (
+          <div className="flex justify-end">
+            <Button type="button" variant="secondary" onClick={refresh}>
+              Retry loading messages
+            </Button>
+          </div>
+        ) : null}
 
         <div className="max-h-64 space-y-2 overflow-auto rounded-xl border border-border bg-card p-3 text-sm">
           {loading ? (
-            <div className="text-foreground/60">Loading…</div>
+            <div className="space-y-2">
+              <Skeleton className="h-12 w-[82%]" />
+              <Skeleton className="h-12 w-[68%]" />
+              <Skeleton className="h-12 w-[74%]" />
+            </div>
           ) : messages.length === 0 ? (
             <div className="text-foreground/60">No messages yet.</div>
           ) : (

@@ -555,7 +555,7 @@ export default async function RenterDashboardPage({
               <h2 className="text-lg font-semibold">Payments & wallet</h2>
               <a
                 href="/api/renter/exports/payments"
-                className="inline-flex items-center justify-center rounded-lg px-3.5 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/30 border border-border bg-card text-foreground shadow-sm hover:bg-muted"
+                className="btn-link-secondary"
               >
                 Download my payments (CSV)
               </a>

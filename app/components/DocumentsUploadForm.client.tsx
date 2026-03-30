@@ -6,6 +6,7 @@ import type React from "react";
 import Button from "@/app/components/ui/Button";
 import FileDropInput from "@/app/components/FileDropInput.client";
 import Input from "@/app/components/ui/Input";
+import { useToast } from "@/app/components/ui/ToastProvider.client";
 
 export default function DocumentsUploadForm({
   successHref,
@@ -23,6 +24,7 @@ export default function DocumentsUploadForm({
   const [proofOfResidenceIssuedAt, setProofOfResidenceIssuedAt] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const { showToast } = useToast();
 
   function isProofIssueDateValid(value: string) {
     if (!value) return false;
@@ -42,11 +44,13 @@ export default function DocumentsUploadForm({
 
     if (!profilePhoto || !idDocument || !driversLicense || !proofOfResidence) {
       setError("Please upload all required documents.");
+      showToast({ variant: "error", title: "Upload incomplete", description: "Please upload all required documents." });
       return;
     }
 
     if (!isProofIssueDateValid(proofOfResidenceIssuedAt)) {
       setError("Proof of residence must be issued within the last 3 months.");
+      showToast({ variant: "error", title: "Invalid issue date", description: "Proof of residence must be issued within the last 3 months." });
       return;
     }
 
@@ -77,18 +81,25 @@ export default function DocumentsUploadForm({
         if (json?.error) {
           if (json.error.includes("File too large")) {
             setError("File too large. Max 8MB per document.");
+            showToast({ variant: "error", title: "File too large", description: "Max 8MB per document." });
           } else if (json.error.includes("Only images or PDF uploads are supported")) {
             setError("Unsupported file type. Only images or PDF allowed.");
+            showToast({ variant: "error", title: "Unsupported file type", description: "Only images or PDF are supported." });
           } else if (json.error.toLowerCase().includes("bucket") || json.error.toLowerCase().includes("not found")) {
             setError("Storage bucket not found. Please contact support.");
+            showToast({ variant: "error", title: "Storage unavailable", description: "Please contact support and retry." });
           } else {
             setError(json.error);
+            showToast({ variant: "error", title: "Upload failed", description: json.error });
           }
         } else {
           setError("Upload failed. Please try again.");
+          showToast({ variant: "error", title: "Upload failed", description: "Please try again." });
         }
         return;
       }
+
+      showToast({ variant: "success", title: "Documents uploaded", description: "Your verification pack was submitted successfully." });
 
       if (autoRedirectByRole) {
         const meRes = await fetch("/api/me", { cache: "no-store" });
@@ -111,15 +122,20 @@ export default function DocumentsUploadForm({
       if (err instanceof Error) {
         if (err.message.includes("File too large")) {
           setError("File too large. Max 8MB per document.");
+          showToast({ variant: "error", title: "File too large", description: "Max 8MB per document." });
         } else if (err.message.includes("Only images or PDF uploads are supported")) {
           setError("Unsupported file type. Only images or PDF allowed.");
+          showToast({ variant: "error", title: "Unsupported file type", description: "Only images or PDF are supported." });
         } else if (err.message.toLowerCase().includes("bucket") || err.message.toLowerCase().includes("not found")) {
           setError("Storage bucket not found. Please contact support.");
+          showToast({ variant: "error", title: "Storage unavailable", description: "Please contact support and retry." });
         } else {
           setError(err.message);
+          showToast({ variant: "error", title: "Upload failed", description: err.message });
         }
       } else {
         setError("Upload failed. Please try again.");
+        showToast({ variant: "error", title: "Upload failed", description: "Please try again." });
       }
     } finally {
       setLoading(false);
@@ -211,7 +227,18 @@ export default function DocumentsUploadForm({
         </div>
       </div>
 
-      {error ? <div className="text-sm text-red-600">{error}</div> : null}
+      {error ? (
+        <div className="space-y-2">
+          <div className="text-sm text-red-600">{error}</div>
+          <button
+            type="button"
+            onClick={() => setError(null)}
+            className="text-xs text-foreground/70 underline decoration-border"
+          >
+            Dismiss message
+          </button>
+        </div>
+      ) : null}
 
       <Button type="submit" disabled={loading} className="w-full">
         {loading ? "Uploading..." : "Submit for verification"}

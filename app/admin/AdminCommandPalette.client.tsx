@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import Skeleton from "@/app/components/ui/Skeleton";
 
 interface SearchResult {
   kind: "user" | "listing" | "booking" | "ticket";
@@ -16,6 +17,8 @@ export default function AdminCommandPalette() {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SearchResult[]>([]);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [retryTick, setRetryTick] = useState(0);
   const [selected, setSelected] = useState(0);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const router = useRouter();
@@ -47,25 +50,32 @@ export default function AdminCommandPalette() {
   useEffect(() => {
     if (!query.trim()) {
       setResults([]);
+      setError(null);
       return;
     }
     const timer = setTimeout(async () => {
       setLoading(true);
+      setError(null);
       try {
         const res = await fetch(`/api/admin/search?q=${encodeURIComponent(query.trim())}`, {
           cache: "no-store",
         });
-        if (res.ok) {
-          const json = (await res.json()) as { results: SearchResult[] };
-          setResults(json.results ?? []);
-          setSelected(0);
+        const json = (await res.json().catch(() => null)) as null | { results?: SearchResult[]; error?: string };
+        if (!res.ok) {
+          throw new Error(json?.error || "Search failed");
         }
+
+        setResults(json?.results ?? []);
+        setSelected(0);
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Search failed");
+        setResults([]);
       } finally {
         setLoading(false);
       }
     }, 250);
     return () => clearTimeout(timer);
-  }, [query]);
+  }, [query, retryTick]);
 
   function navigate(href: string) {
     setOpen(false);
@@ -165,6 +175,23 @@ export default function AdminCommandPalette() {
               </li>
             ))}
           </ul>
+        ) : loading ? (
+          <div className="space-y-2 px-4 py-3">
+            <Skeleton className="h-12 w-full" />
+            <Skeleton className="h-12 w-full" />
+            <Skeleton className="h-12 w-full" />
+          </div>
+        ) : error ? (
+          <div className="space-y-2 px-4 py-6 text-sm">
+            <div className="text-red-600">{error}</div>
+            <button
+              type="button"
+              onClick={() => setRetryTick((n) => n + 1)}
+              className="rounded-md border border-border px-2 py-1 text-xs text-foreground/70 hover:bg-muted"
+            >
+              Retry search
+            </button>
+          </div>
         ) : query.trim() && !loading ? (
           <div className="px-4 py-8 text-center text-sm text-foreground/50">No results for &ldquo;{query}&rdquo;</div>
         ) : !query.trim() ? (

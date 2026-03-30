@@ -1,15 +1,16 @@
 "use client";
 
-import { useRef } from "react";
 import { useState } from "react";
 
 import Button from "@/app/components/ui/Button";
+import FileDropInput from "@/app/components/FileDropInput.client";
+import { useToast } from "@/app/components/ui/ToastProvider.client";
 
 export default function AdminProfilePhotoForm() {
   const [file, setFile] = useState<File | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const inputRef = useRef<HTMLInputElement | null>(null);
+  const { showToast } = useToast();
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -17,6 +18,7 @@ export default function AdminProfilePhotoForm() {
 
     if (!file) {
       setError("Please choose an image.");
+      showToast({ variant: "error", title: "No image selected", description: "Please choose an image first." });
       return;
     }
 
@@ -24,6 +26,7 @@ export default function AdminProfilePhotoForm() {
     if (file.size > maxBytes) {
       const mb = (file.size / (1024 * 1024)).toFixed(2);
       setError(`Image too large (max 8MB). Yours is ${mb}MB.`);
+      showToast({ variant: "error", title: "Image too large", description: `Max 8MB. Selected ${mb}MB.` });
       return;
     }
 
@@ -46,14 +49,16 @@ export default function AdminProfilePhotoForm() {
 
       if (!res.ok || !json?.ok) {
         setError(json?.error || "Upload failed. Please try again.");
+        showToast({ variant: "error", title: "Upload failed", description: json?.error || "Please try again." });
         return;
       }
 
       setFile(null);
-      if (inputRef.current) inputRef.current.value = "";
+      showToast({ variant: "success", title: "Profile photo updated" });
       window.location.reload();
     } catch {
       setError("Upload failed. Please try again.");
+      showToast({ variant: "error", title: "Upload failed", description: "Please try again." });
     } finally {
       setLoading(false);
     }
@@ -61,32 +66,18 @@ export default function AdminProfilePhotoForm() {
 
   return (
     <form onSubmit={onSubmit} className="space-y-2">
-      <input
-        ref={inputRef}
-        type="file"
+      <FileDropInput
+        name="profilePhoto"
+        label="Profile image"
+        helper="Images only • Max 8MB"
         accept="image/*"
-        className="hidden"
-        onChange={(e) => setFile(e.target.files?.[0] || null)}
+        required
+        onFileSelected={setFile}
       />
-      <div className="flex items-center gap-2">
-        <Button
-          type="button"
-          variant="secondary"
-          disabled={loading}
-          onClick={() => inputRef.current?.click()}
-          className="shrink-0"
-        >
-          Choose image
-        </Button>
-        <div className="min-w-0 text-sm text-foreground/60">
-          {file ? <span className="truncate">{file.name}</span> : <span>No image selected</span>}
-        </div>
-      </div>
       {error ? <div className="text-sm text-destructive">{error}</div> : null}
       <Button type="submit" variant="secondary" disabled={loading} className="w-full">
         {loading ? "Uploading…" : "Update profile photo"}
       </Button>
-      <div className="text-xs text-foreground/60">Images only • Max 8MB</div>
     </form>
   );
 }

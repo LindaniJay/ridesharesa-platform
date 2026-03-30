@@ -7,6 +7,7 @@ import Button from "@/app/components/ui/Button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/app/components/ui/Card";
 import Input from "@/app/components/ui/Input";
 import Textarea from "@/app/components/ui/Textarea";
+import { useToast } from "@/app/components/ui/ToastProvider.client";
 
 function isoDate(d: Date) {
   return d.toISOString().slice(0, 10);
@@ -82,6 +83,7 @@ export default function BookingActions(props: {
   const [sending, setSending] = useState<null | "extension" | "return" | "cancel" | "review">(null);
   const [error, setError] = useState<string | null>(null);
   const [sent, setSent] = useState<string | null>(null);
+  const { showToast } = useToast();
 
   async function sendMessage(body: string) {
     const res = await fetch(endpoint, {
@@ -112,9 +114,12 @@ export default function BookingActions(props: {
       if (!res.ok) throw new Error(json?.error || "Failed to cancel booking");
 
       setSent("Booking cancelled successfully.");
+      showToast({ variant: "success", title: "Booking cancelled" });
       window.location.reload();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to cancel booking");
+      const msg = e instanceof Error ? e.message : "Failed to cancel booking";
+      setError(msg);
+      showToast({ variant: "error", title: "Cancellation failed", description: msg });
     } finally {
       setSending(null);
     }
@@ -138,8 +143,11 @@ export default function BookingActions(props: {
       await sendMessage(msg);
       setExtensionNote("");
       setSent("Extension request sent. Check Messages for replies.");
+      showToast({ variant: "success", title: "Extension request sent" });
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to send extension request");
+      const msg = e instanceof Error ? e.message : "Failed to send extension request";
+      setError(msg);
+      showToast({ variant: "error", title: "Extension failed", description: msg });
     } finally {
       setSending(null);
     }
@@ -168,8 +176,11 @@ export default function BookingActions(props: {
       await sendMessage(msg);
       setReturnNote("");
       setSent("Return request sent. Check Messages for replies.");
+      showToast({ variant: "success", title: "Return request sent" });
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to send return request");
+      const msg = e instanceof Error ? e.message : "Failed to send return request";
+      setError(msg);
+      showToast({ variant: "error", title: "Return request failed", description: msg });
     } finally {
       setSending(null);
     }
@@ -194,9 +205,12 @@ export default function BookingActions(props: {
       if (!res.ok) throw new Error(json?.error || "Failed to submit review");
 
       setSent("Review saved.");
+      showToast({ variant: "success", title: "Review saved" });
       window.location.reload();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to submit review");
+      const msg = e instanceof Error ? e.message : "Failed to submit review";
+      setError(msg);
+      showToast({ variant: "error", title: "Review failed", description: msg });
     } finally {
       setSending(null);
     }

@@ -492,7 +492,7 @@ export default async function HostDashboardPage() {
         <div className="flex flex-wrap items-center gap-2">
           <a
             href="/api/host/exports/payouts"
-            className="inline-flex items-center justify-center rounded-lg px-3.5 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/30 border border-border bg-card text-foreground shadow-sm hover:bg-muted"
+            className="btn-link-secondary"
           >
             Download my payouts (CSV)
           </a>
@@ -506,7 +506,7 @@ export default async function HostDashboardPage() {
           </Card>
         ) : (
           <div className="overflow-hidden rounded-xl border border-border shadow-sm">
-            <table className="w-full text-left text-sm">
+            <table className="dashboard-table">
               <thead className="bg-muted">
                 <tr>
                   <th className="px-3 py-2">Amount</th>
@@ -598,7 +598,7 @@ export default async function HostDashboardPage() {
         <div className="flex flex-wrap items-center gap-2">
           <a
             href="/api/host/exports/bookings"
-            className="inline-flex items-center justify-center rounded-lg px-3.5 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/30 border border-border bg-card text-foreground shadow-sm hover:bg-muted"
+            className="btn-link-secondary"
           >
             Download my bookings (CSV)
           </a>
@@ -693,7 +693,7 @@ export default async function HostDashboardPage() {
               <div className="text-sm text-foreground/60">No past bookings.</div>
             ) : (
               <div className="overflow-hidden rounded-xl border border-border">
-                <table className="w-full text-left text-sm">
+                <table className="dashboard-table">
                   <thead className="bg-muted">
                     <tr>
                       <th className="px-3 py-2">Vehicle</th>
@@ -839,7 +839,7 @@ export default async function HostDashboardPage() {
               <div className="text-sm text-foreground/60">No confirmed bookings in the last 30 days.</div>
             ) : (
               <div className="overflow-hidden rounded-xl border border-border">
-                <table className="w-full text-left text-sm">
+                <table className="dashboard-table">
                   <thead className="bg-muted">
                     <tr>
                       <th className="px-3 py-2">Listing</th>

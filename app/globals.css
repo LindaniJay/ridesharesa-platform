@@ -112,3 +112,37 @@ body {
 .animate-bg-float {
   animation: floatBg 15s ease-in-out infinite;
 }
+
+@layer components {
+  .dashboard-section {
+    @apply space-y-4;
+  }
+
+  .dashboard-section-title {
+    @apply text-lg font-semibold tracking-tight;
+  }
+
+  .btn-link-secondary {
+    @apply inline-flex h-10 items-center justify-center rounded-xl border border-border bg-card px-4 py-2 text-sm font-semibold text-foreground shadow-sm transition-all duration-150 hover:bg-muted/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/35 focus-visible:ring-offset-2 focus-visible:ring-offset-background;
+  }
+
+  .dashboard-table {
+    @apply w-full text-left text-sm;
+  }
+
+  .dashboard-table thead {
+    @apply bg-muted;
+  }
+
+  .dashboard-table th {
+    @apply px-3 py-2 text-xs font-semibold uppercase tracking-wide text-foreground/65;
+  }
+
+  .dashboard-table td {
+    @apply px-3 py-2 align-top;
+  }
+
+  .dashboard-table tbody tr {
+    @apply border-t border-border;
+  }
+}

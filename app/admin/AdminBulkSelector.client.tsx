@@ -92,7 +92,7 @@ export default function AdminBulkSelector({
       )}
 
       <div className="overflow-hidden rounded-xl border border-border">
-        <table className="w-full text-left text-sm">
+        <table className="dashboard-table">
           <thead className="bg-muted">
             <tr>
               <th className="w-10 px-3 py-2">

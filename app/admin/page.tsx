@@ -1608,7 +1608,7 @@ export default async function AdminDashboardPage({
                       <div className="text-sm text-foreground/50">No snapshot payload available for this action.</div>
                     ) : (
                       <div className="overflow-hidden rounded-xl border border-border">
-                        <table className="w-full text-left text-sm">
+                        <table className="dashboard-table">
                           <thead className="bg-muted">
                             <tr>
                               <th className="px-3 py-2">Field</th>
@@ -1706,7 +1706,7 @@ export default async function AdminDashboardPage({
           </div>
           <div className="flex flex-wrap items-center gap-3">
             <a
-              className="inline-flex items-center justify-center rounded-lg px-3.5 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/30 border border-border bg-card text-foreground shadow-sm hover:bg-muted"
+              className="btn-link-secondary"
               href="/api/admin/exports/stats"
             >
               Download stats (CSV)
@@ -1971,7 +1971,7 @@ export default async function AdminDashboardPage({
           </CardHeader>
           <CardContent>
             <div className="overflow-hidden rounded-xl border border-border">
-              <table className="w-full text-left text-sm">
+                        <table className="dashboard-table">
                 <thead className="bg-muted">
                   <tr>
                     <th className="px-3 py-2">Title</th>
@@ -2125,7 +2125,7 @@ export default async function AdminDashboardPage({
 
           <div className="flex flex-wrap items-center gap-2">
             <a
-              className="inline-flex items-center justify-center rounded-lg px-3.5 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/30 border border-border bg-card text-foreground shadow-sm hover:bg-muted"
+              className="btn-link-secondary"
               href="/api/admin/exports/users"
             >
               Export users (CSV)
@@ -2491,7 +2491,7 @@ export default async function AdminDashboardPage({
         <div className="flex flex-wrap items-end justify-between gap-3">
           <h2 className="text-lg font-semibold">Booking & operations</h2>
           <a
-            className="inline-flex items-center justify-center rounded-lg px-3.5 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/30 border border-border bg-card text-foreground shadow-sm hover:bg-muted"
+            className="btn-link-secondary"
             href="/api/admin/exports/bookings"
           >
             Export bookings (CSV)
@@ -2546,7 +2546,7 @@ export default async function AdminDashboardPage({
           </CardHeader>
           <CardContent>
             <div className="overflow-hidden rounded-xl border border-border">
-              <table className="w-full text-left text-sm">
+              <table className="dashboard-table">
                 <thead className="bg-muted">
                   <tr>
                     <th className="px-3 py-2">Listing</th>
@@ -2637,7 +2637,7 @@ export default async function AdminDashboardPage({
         </Card>
 
         <div className="overflow-hidden rounded-xl border border-border shadow-sm">
-          <table className="w-full text-left text-sm">
+          <table className="dashboard-table">
             <thead className="bg-muted">
               <tr>
                 <th className="px-3 py-2">Listing</th>
@@ -2673,7 +2673,7 @@ export default async function AdminDashboardPage({
         <div className="flex flex-wrap items-end justify-between gap-3">
           <h2 className="text-lg font-semibold">Payments & financials</h2>
           <a
-            className="inline-flex items-center justify-center rounded-lg px-3.5 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/30 border border-border bg-card text-foreground shadow-sm hover:bg-muted"
+            className="btn-link-secondary"
             href="/api/admin/exports/payouts"
           >
             Download payouts (CSV)
@@ -2730,7 +2730,7 @@ export default async function AdminDashboardPage({
               <div className="text-sm text-foreground/60">No pending EFT bookings.</div>
             ) : (
               <div className="overflow-hidden rounded-xl border border-border">
-                <table className="w-full text-left text-sm">
+                <table className="dashboard-table">
                   <thead className="bg-muted">
                     <tr>
                       <th className="px-3 py-2">Listing</th>
@@ -2878,7 +2878,7 @@ export default async function AdminDashboardPage({
               <div className="text-sm text-foreground/60">No payouts yet.</div>
             ) : (
               <div className="overflow-hidden rounded-xl border border-border">
-                <table className="w-full text-left text-sm">
+                <table className="dashboard-table">
                   <thead className="bg-muted">
                     <tr>
                       <th className="px-3 py-2">Host</th>
@@ -2932,7 +2932,7 @@ export default async function AdminDashboardPage({
         <p className="text-sm text-foreground/60">Admins can see and open any booking chat.</p>
 
         <div className="overflow-hidden rounded-xl border border-border shadow-sm">
-          <table className="w-full text-left text-sm">
+          <table className="dashboard-table">
             <thead className="bg-muted">
               <tr>
                 <th className="px-3 py-2">Booking</th>
@@ -3010,7 +3010,7 @@ export default async function AdminDashboardPage({
               <div className="text-sm text-foreground/60">No incidents found.</div>
             ) : (
               <div className="overflow-hidden rounded-xl border border-border">
-                <table className="w-full text-left text-sm">
+                <table className="dashboard-table">
                   <thead className="bg-muted">
                     <tr>
                       <th className="px-3 py-2">Type</th>
@@ -3102,7 +3102,7 @@ export default async function AdminDashboardPage({
               <div className="text-sm text-foreground/60">No tickets found.</div>
             ) : (
               <div className="overflow-hidden rounded-xl border border-border">
-                <table className="w-full text-left text-sm">
+                <table className="dashboard-table">
                   <thead className="bg-muted">
                     <tr>
                       <th className="px-3 py-2">Subject</th>
