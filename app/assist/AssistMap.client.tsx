@@ -1,6 +1,6 @@
 "use client";
 
-import { CircleMarker, MapContainer, Marker, Popup, TileLayer, useMapEvents } from "react-leaflet";
+import { CircleMarker, MapContainer, Marker, Popup, TileLayer, useMap, useMapEvents } from "react-leaflet";
 import L from "leaflet";
 
 // Fix default marker icon paths in bundlers
@@ -27,13 +27,13 @@ function ClickToSetMarker({ onPick }: { onPick: (lat: number, lng: number) => vo
 type AssistProvider = {
   id: string;
   name: string;
-  type: "tow" | "mechanic" | "ambulance" | "police" | "fuel";
+  type: "tow" | "mechanic" | "hospital" | "police" | "fuel";
   phone: string;
   position: [number, number];
 };
 
 function providerColor(type: AssistProvider["type"]) {
-  if (type === "ambulance") return "#dc2626";
+  if (type === "hospital") return "#dc2626";
   if (type === "police") return "#1d4ed8";
   if (type === "fuel") return "#f59e0b";
   if (type === "mechanic") return "#7c3aed";
@@ -41,11 +41,19 @@ function providerColor(type: AssistProvider["type"]) {
 }
 
 function providerLabel(type: AssistProvider["type"]) {
-  if (type === "ambulance") return "Ambulance";
+  if (type === "hospital") return "Hospital";
   if (type === "police") return "Police";
   if (type === "fuel") return "Fuel";
   if (type === "mechanic") return "Mechanic";
   return "Tow";
+}
+
+function RecenterMap({ center }: { center: [number, number] }) {
+  const map = useMap();
+
+  // Keep the map view synced with GPS/location updates from the parent.
+  map.setView(center, Math.max(map.getZoom(), 13), { animate: true });
+  return null;
 }
 
 export default function AssistMap(props: {
@@ -60,6 +68,7 @@ export default function AssistMap(props: {
     <div className="overflow-hidden rounded-xl border border-border">
       <div className="h-[380px] w-full">
         <MapContainer center={center} zoom={13} scrollWheelZoom className="h-full w-full">
+          <RecenterMap center={center} />
           <TileLayer
             attribution='&copy; OpenStreetMap contributors &copy; CARTO'
             url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"

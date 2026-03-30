@@ -19,7 +19,7 @@ const DEFAULT_CENTER: [number, number] = [-33.9249, 18.4241];
 type AssistProvider = {
   id: string;
   name: string;
-  type: "tow" | "mechanic" | "ambulance" | "police" | "fuel";
+  type: "tow" | "mechanic" | "hospital" | "police" | "fuel";
   phone: string;
   position: [number, number];
 };
@@ -36,10 +36,13 @@ const ASSIST_HUBS: AssistHub[] = [
     center: [-33.9249, 18.4241],
     providers: [
       { id: "ct-police", name: "Cape Town SAPS", type: "police", phone: "10111", position: [-33.9257, 18.4232] },
-      { id: "ct-ambulance", name: "Metro EMS Cape Town", type: "ambulance", phone: "10177", position: [-33.9188, 18.4256] },
+      { id: "ct-police-2", name: "Sea Point SAPS", type: "police", phone: "10111", position: [-33.9189, 18.3878] },
+      { id: "ct-hospital", name: "Groote Schuur Hospital", type: "hospital", phone: "+27 21 404 9111", position: [-33.94, 18.463] },
+      { id: "ct-hospital-2", name: "Netcare Christiaan Barnard", type: "hospital", phone: "+27 21 441 0000", position: [-33.9206, 18.4239] },
       { id: "ct-tow", name: "Atlantic Tow Response", type: "tow", phone: "+27 21 555 0142", position: [-33.9306, 18.4102] },
       { id: "ct-mech", name: "CBD Quick Mechanics", type: "mechanic", phone: "+27 21 555 0168", position: [-33.9285, 18.4298] },
       { id: "ct-fuel", name: "City Fuel Drop", type: "fuel", phone: "+27 21 555 0189", position: [-33.9321, 18.438] },
+      { id: "ct-fuel-2", name: "Foreshore Fuel Point", type: "fuel", phone: "+27 21 555 0170", position: [-33.9165, 18.4324] },
     ],
   },
   {
@@ -47,10 +50,13 @@ const ASSIST_HUBS: AssistHub[] = [
     center: [-26.2041, 28.0473],
     providers: [
       { id: "jhb-police", name: "JHB Central SAPS", type: "police", phone: "10111", position: [-26.2022, 28.0431] },
-      { id: "jhb-ambulance", name: "Gauteng EMS", type: "ambulance", phone: "10177", position: [-26.2064, 28.0541] },
+      { id: "jhb-police-2", name: "Hillbrow SAPS", type: "police", phone: "10111", position: [-26.1884, 28.0469] },
+      { id: "jhb-hospital", name: "Charlotte Maxeke Hospital", type: "hospital", phone: "+27 11 488 4911", position: [-26.1814, 28.0473] },
+      { id: "jhb-hospital-2", name: "Netcare Milpark", type: "hospital", phone: "+27 11 480 5600", position: [-26.1794, 28.0169] },
       { id: "jhb-tow", name: "Jozi Towline", type: "tow", phone: "+27 11 555 0131", position: [-26.21, 28.06] },
       { id: "jhb-mech", name: "City Core Auto Clinic", type: "mechanic", phone: "+27 11 555 0192", position: [-26.1985, 28.0417] },
       { id: "jhb-fuel", name: "Rapid Fuel Assist", type: "fuel", phone: "+27 11 555 0174", position: [-26.1999, 28.0522] },
+      { id: "jhb-fuel-2", name: "Braam Fuel Express", type: "fuel", phone: "+27 11 555 0151", position: [-26.1906, 28.0331] },
     ],
   },
   {
@@ -58,10 +64,13 @@ const ASSIST_HUBS: AssistHub[] = [
     center: [-29.8587, 31.0218],
     providers: [
       { id: "dbn-police", name: "Durban Central SAPS", type: "police", phone: "10111", position: [-29.857, 31.0244] },
-      { id: "dbn-ambulance", name: "KZN EMS", type: "ambulance", phone: "10177", position: [-29.862, 31.028] },
+      { id: "dbn-police-2", name: "Point SAPS", type: "police", phone: "10111", position: [-29.8748, 31.0487] },
+      { id: "dbn-hospital", name: "Addington Hospital", type: "hospital", phone: "+27 31 327 2000", position: [-29.8688, 31.042] },
+      { id: "dbn-hospital-2", name: "Netcare Parklands", type: "hospital", phone: "+27 31 204 1300", position: [-29.8382, 31.0094] },
       { id: "dbn-tow", name: "Coastal Tow Services", type: "tow", phone: "+27 31 555 0116", position: [-29.8647, 31.0181] },
       { id: "dbn-mech", name: "Harbour Auto Rescue", type: "mechanic", phone: "+27 31 555 0128", position: [-29.8534, 31.017] },
       { id: "dbn-fuel", name: "Durban Fuel Relay", type: "fuel", phone: "+27 31 555 0154", position: [-29.8663, 31.0333] },
+      { id: "dbn-fuel-2", name: "Berea Fuel Assist", type: "fuel", phone: "+27 31 555 0190", position: [-29.8461, 31.0068] },
     ],
   },
 ];
