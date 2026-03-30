@@ -368,12 +368,12 @@ export default function ChatWidget() {
       className={cn(
         "fixed z-50",
         open
-          ? "inset-x-0 bottom-0 px-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] sm:inset-auto sm:bottom-4 sm:right-4 sm:px-0 sm:pb-0"
-          : "bottom-[calc(1rem+env(safe-area-inset-bottom))] right-4",
+          ? "bottom-[calc(1rem+env(safe-area-inset-bottom))] right-3 left-3 sm:bottom-4 sm:right-4 sm:left-auto"
+          : "bottom-[calc(1rem+env(safe-area-inset-bottom))] right-3 sm:right-4",
       )}
     >
       {open ? (
-        <div className="mx-auto w-full max-w-[520px] sm:mx-0 sm:w-[420px] sm:max-w-[420px] slide-in-panel">
+        <div className="ml-auto w-full max-w-[420px] slide-in-panel">
           <Card className="flex h-[72dvh] max-h-[650px] w-full flex-col overflow-hidden border-border/90 p-0 sm:h-[575px]">
             <CardHeader className="flex flex-row items-start justify-between gap-3 border-b border-border bg-gradient-to-r from-card via-card to-muted/20 px-4 py-3">
               <div className="min-w-0 space-y-0.5">
