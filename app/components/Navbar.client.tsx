@@ -50,6 +50,25 @@ function NavLink({
   );
 }
 
+function DoorOpenIcon() {
+  return (
+    <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}>
+      <path d="M4 3h10v18H4z" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M14 4l6 3v10l-6 3" strokeLinecap="round" strokeLinejoin="round" />
+      <circle cx="10" cy="12" r="0.9" fill="currentColor" />
+    </svg>
+  );
+}
+
+function DoorClosedIcon() {
+  return (
+    <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}>
+      <path d="M5 3h12v18H5z" strokeLinecap="round" strokeLinejoin="round" />
+      <circle cx="13" cy="12" r="0.9" fill="currentColor" />
+    </svg>
+  );
+}
+
 export default function NavbarClient() {
   const pathname = usePathname();
   const router = useRouter();
@@ -57,7 +76,22 @@ export default function NavbarClient() {
   const [email, setEmail] = useState<string | null>(null);
   const [role, setRole] = useState<"ADMIN" | "HOST" | "RENTER" | null>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [carsLabel, setCarsLabel] = useState<"Find Cars" | "Discover Cars">("Find Cars");
+  const [carsLabel] = useState<"Find Cars" | "Discover Cars">(() => {
+    if (typeof window === "undefined") return "Find Cars";
+
+    try {
+      const key = "rs_nav_cars_label_v1";
+      const saved = window.localStorage.getItem(key);
+      if (saved === "find") return "Find Cars";
+      if (saved === "discover") return "Discover Cars";
+
+      const assigned = Math.random() < 0.5 ? "find" : "discover";
+      window.localStorage.setItem(key, assigned);
+      return assigned === "discover" ? "Discover Cars" : "Find Cars";
+    } catch {
+      return "Find Cars";
+    }
+  });
 
   useEffect(() => {
     let cancelled = false;
@@ -110,47 +144,11 @@ export default function NavbarClient() {
     };
   }, []);
 
-  useEffect(() => {
-    try {
-      const key = "rs_nav_cars_label_v1";
-      const saved = window.localStorage.getItem(key);
-      if (saved === "find" || saved === "discover") {
-        setCarsLabel(saved === "discover" ? "Discover Cars" : "Find Cars");
-        return;
-      }
-
-      const assigned = Math.random() < 0.5 ? "find" : "discover";
-      window.localStorage.setItem(key, assigned);
-      setCarsLabel(assigned === "discover" ? "Discover Cars" : "Find Cars");
-    } catch {
-      // Ignore storage errors.
-    }
-  }, []);
-
   async function onSignOut() {
     await supabaseBrowser().auth.signOut();
     setMobileMenuOpen(false);
     router.push("/");
     router.refresh();
-  }
-
-  function DoorOpenIcon() {
-    return (
-      <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}>
-        <path d="M4 3h10v18H4z" strokeLinecap="round" strokeLinejoin="round" />
-        <path d="M14 4l6 3v10l-6 3" strokeLinecap="round" strokeLinejoin="round" />
-        <circle cx="10" cy="12" r="0.9" fill="currentColor" />
-      </svg>
-    );
-  }
-
-  function DoorClosedIcon() {
-    return (
-      <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}>
-        <path d="M5 3h12v18H5z" strokeLinecap="round" strokeLinejoin="round" />
-        <circle cx="13" cy="12" r="0.9" fill="currentColor" />
-      </svg>
-    );
   }
 
   return (
@@ -168,7 +166,7 @@ export default function NavbarClient() {
                 How it works
               </NavLink>
               <NavLink href="/listings" active={isActivePath(pathname, "/listings")}>
-                {carsLabel}
+                <span suppressHydrationWarning>{carsLabel}</span>
               </NavLink>
               <NavLink href="/assist" active={isActivePath(pathname, "/assist")}>
                 Assist
@@ -249,7 +247,7 @@ export default function NavbarClient() {
               How it works
             </NavLink>
             <NavLink href="/listings" active={isActivePath(pathname, "/listings")}>
-              {carsLabel}
+              <span suppressHydrationWarning>{carsLabel}</span>
             </NavLink>
             <NavLink href="/assist" active={isActivePath(pathname, "/assist")}>
               Assist

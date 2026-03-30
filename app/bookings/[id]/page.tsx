@@ -234,8 +234,6 @@ export default async function BookingPage({
     : null;
   const hasPaymentProof = Boolean(paymentProofRes?.ok && paymentProofRes.proofs.length > 0);
 
-  const rentalCents = Math.max(0, booking.totalCents - chauffeurCents);
-
   const eft = {
     bankName: process.env.EFT_BANK_NAME ?? "",
     accountName: process.env.EFT_ACCOUNT_NAME ?? "",
