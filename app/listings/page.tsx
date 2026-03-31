@@ -58,58 +58,67 @@ async function findListingsViaSupabaseFallback(params: {
   instantBooking: boolean;
   carType: string;
 }) {
-  let query = supabaseAdmin()
-    .from("Listing")
-    .select("id,title,city,country,latitude,longitude,dailyRateCents,currency,imageUrl,instantBooking")
-    .eq("status", "ACTIVE")
-    .eq("isApproved", true)
-    .limit(50);
+  let lastError: Error | null = null;
+  const tableCandidates = ["listings", "Listing", "listing"];
 
-  if (params.q) {
-    const escapedQ = params.q.replace(/[,%]/g, "");
-    query = query.or(`title.ilike.%${escapedQ}%,city.ilike.%${escapedQ}%,country.ilike.%${escapedQ}%`);
+  for (const tableName of tableCandidates) {
+    let query = supabaseAdmin()
+      .from(tableName)
+      .select("id,title,city,country,latitude,longitude,dailyRateCents,currency,imageUrl,instantBooking")
+      .eq("status", "ACTIVE")
+      .eq("isApproved", true)
+      .limit(50);
+
+    if (params.q) {
+      const escapedQ = params.q.replace(/[,%]/g, "");
+      query = query.or(`title.ilike.%${escapedQ}%,city.ilike.%${escapedQ}%,country.ilike.%${escapedQ}%`);
+    }
+
+    if (params.minPrice > 0) {
+      query = query.gte("dailyRateCents", Math.round(params.minPrice * 100));
+    }
+
+    if (params.maxPrice > 0) {
+      query = query.lte("dailyRateCents", Math.round(params.maxPrice * 100));
+    }
+
+    if (params.instantBooking) {
+      query = query.eq("instantBooking", true);
+    }
+
+    if (params.carType) {
+      const escapedType = params.carType.replace(/[,%]/g, "");
+      query = query.ilike("title", `%${escapedType}%`);
+    }
+
+    if (params.sort === "price_asc") {
+      query = query.order("dailyRateCents", { ascending: true });
+    } else if (params.sort === "price_desc") {
+      query = query.order("dailyRateCents", { ascending: false });
+    } else {
+      query = query.order("createdAt", { ascending: false });
+    }
+
+    const { data, error } = await query;
+    if (!error) {
+      return (data ?? []) as {
+        id: string;
+        title: string;
+        city: string;
+        country: string;
+        latitude: number;
+        longitude: number;
+        dailyRateCents: number;
+        currency: string;
+        imageUrl: string | null;
+        instantBooking: boolean;
+      }[];
+    }
+
+    lastError = new Error(error.message);
   }
 
-  if (params.minPrice > 0) {
-    query = query.gte("dailyRateCents", Math.round(params.minPrice * 100));
-  }
-
-  if (params.maxPrice > 0) {
-    query = query.lte("dailyRateCents", Math.round(params.maxPrice * 100));
-  }
-
-  if (params.instantBooking) {
-    query = query.eq("instantBooking", true);
-  }
-
-  if (params.carType) {
-    const escapedType = params.carType.replace(/[,%]/g, "");
-    query = query.ilike("title", `%${escapedType}%`);
-  }
-
-  if (params.sort === "price_asc") {
-    query = query.order("dailyRateCents", { ascending: true });
-  } else if (params.sort === "price_desc") {
-    query = query.order("dailyRateCents", { ascending: false });
-  } else {
-    query = query.order("createdAt", { ascending: false });
-  }
-
-  const { data, error } = await query;
-  if (error) throw new Error(error.message);
-
-  return (data ?? []) as {
-    id: string;
-    title: string;
-    city: string;
-    country: string;
-    latitude: number;
-    longitude: number;
-    dailyRateCents: number;
-    currency: string;
-    imageUrl: string | null;
-    instantBooking: boolean;
-  }[];
+  throw lastError ?? new Error("Supabase fallback query failed");
 }
 
 function formatRate(dailyRateCents: number, currency: string) {
@@ -225,10 +234,12 @@ export default async function ListingsPage({
           instantBooking,
           carType,
         });
-      } catch {
+      } catch (fallbackError) {
+        console.error("[listings] Supabase fallback failed:", fallbackError);
         fetchError = "Unable to load listings right now. Please try again in a moment.";
       }
     } else {
+      console.error("[listings] DB fetch failed:", err);
       fetchError = "Unable to load listings right now. Please try again in a moment.";
     }
   }
