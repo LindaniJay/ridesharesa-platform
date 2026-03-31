@@ -7,6 +7,7 @@ import Input from "@/app/components/ui/Input";
 import Button from "@/app/components/ui/Button";
 import { RESERVED_BOOKING_STATUSES } from "@/app/lib/bookings";
 import { prisma } from "@/app/lib/prisma";
+import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
 
 export const dynamic = "force-dynamic";
 
@@ -20,6 +21,96 @@ type ListingsSearchParams = {
   end?: string;
   sort?: "recent" | "price_asc" | "price_desc" | string;
 };
+
+function isTransientDbError(error: unknown) {
+  const message =
+    typeof error === "object" && error !== null && "message" in error
+      ? String((error as { message?: unknown }).message ?? "")
+      : String(error ?? "");
+
+  return /timeout|etimedout|econnreset|connection terminated|can't reach database server/i.test(message);
+}
+
+async function findListingsWithRetry(args: Parameters<typeof prisma.listing.findMany>[0]) {
+  const attempts = 2;
+
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    try {
+      return await prisma.listing.findMany(args);
+    } catch (error) {
+      if (attempt >= attempts || !isTransientDbError(error)) {
+        throw error;
+      }
+
+      // Small backoff helps absorb transient pool/connect spikes on cold starts.
+      await new Promise((resolve) => setTimeout(resolve, 250 * attempt));
+    }
+  }
+
+  return [];
+}
+
+async function findListingsViaSupabaseFallback(params: {
+  q: string;
+  sort: ListingsSearchParams["sort"];
+  minPrice: number;
+  maxPrice: number;
+  instantBooking: boolean;
+  carType: string;
+}) {
+  let query = supabaseAdmin()
+    .from("Listing")
+    .select("id,title,city,country,latitude,longitude,dailyRateCents,currency,imageUrl,instantBooking")
+    .eq("status", "ACTIVE")
+    .eq("isApproved", true)
+    .limit(50);
+
+  if (params.q) {
+    const escapedQ = params.q.replace(/[,%]/g, "");
+    query = query.or(`title.ilike.%${escapedQ}%,city.ilike.%${escapedQ}%,country.ilike.%${escapedQ}%`);
+  }
+
+  if (params.minPrice > 0) {
+    query = query.gte("dailyRateCents", Math.round(params.minPrice * 100));
+  }
+
+  if (params.maxPrice > 0) {
+    query = query.lte("dailyRateCents", Math.round(params.maxPrice * 100));
+  }
+
+  if (params.instantBooking) {
+    query = query.eq("instantBooking", true);
+  }
+
+  if (params.carType) {
+    const escapedType = params.carType.replace(/[,%]/g, "");
+    query = query.ilike("title", `%${escapedType}%`);
+  }
+
+  if (params.sort === "price_asc") {
+    query = query.order("dailyRateCents", { ascending: true });
+  } else if (params.sort === "price_desc") {
+    query = query.order("dailyRateCents", { ascending: false });
+  } else {
+    query = query.order("createdAt", { ascending: false });
+  }
+
+  const { data, error } = await query;
+  if (error) throw new Error(error.message);
+
+  return (data ?? []) as {
+    id: string;
+    title: string;
+    city: string;
+    country: string;
+    latitude: number;
+    longitude: number;
+    dailyRateCents: number;
+    currency: string;
+    imageUrl: string | null;
+    instantBooking: boolean;
+  }[];
+}
 
 function formatRate(dailyRateCents: number, currency: string) {
   return `${(dailyRateCents / 100).toFixed(0)} ${currency}`;
@@ -77,7 +168,7 @@ export default async function ListingsPage({
   let fetchError: string | null = null;
 
   try {
-    listings = await prisma.listing.findMany({
+    listings = await findListingsWithRetry({
       where: {
         status: "ACTIVE",
         isApproved: true,
@@ -124,8 +215,22 @@ export default async function ListingsPage({
       },
     });
   } catch (err) {
-    console.error("[listings] DB fetch failed:", err);
-    fetchError = "Unable to load listings right now. Please try again in a moment.";
+    if (isTransientDbError(err)) {
+      try {
+        listings = await findListingsViaSupabaseFallback({
+          q,
+          sort,
+          minPrice,
+          maxPrice,
+          instantBooking,
+          carType,
+        });
+      } catch {
+        fetchError = "Unable to load listings right now. Please try again in a moment.";
+      }
+    } else {
+      fetchError = "Unable to load listings right now. Please try again in a moment.";
+    }
   }
 
   const averageDailyRate = listings.length

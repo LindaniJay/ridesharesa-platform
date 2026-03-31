@@ -18,8 +18,14 @@ const poolMax = readPositiveInt(
   process.env.NODE_ENV === "production" ? 1 : 5,
 );
 
-const connectionTimeoutMillis = readPositiveInt(process.env.PG_CONNECT_TIMEOUT_MS, 10_000);
-const idleTimeoutMillis = readPositiveInt(process.env.PG_IDLE_TIMEOUT_MS, 30_000);
+const connectionTimeoutMillis = readPositiveInt(
+  process.env.PG_CONNECT_TIMEOUT_MS,
+  process.env.NODE_ENV === "production" ? 20_000 : 10_000,
+);
+const idleTimeoutMillis = readPositiveInt(
+  process.env.PG_IDLE_TIMEOUT_MS,
+  process.env.NODE_ENV === "production" ? 10_000 : 30_000,
+);
 const connectionString = process.env.DATABASE_URL;
 
 const pool = new Pool({
