@@ -12,7 +12,7 @@
     "build": "node scripts/build.mjs",
     "start": "next start",
     "lint": "eslint",
-    "test": "node --import tsx --test tests/booking-policy.test.ts",
+    "test": "node --import tsx --test tests/**/*.test.ts",
     "db:migrate": "node scripts/prisma.mjs migrate dev",
     "db:migrate:fallback": "node scripts/migrate-with-fallback.mjs",
     "db:generate": "node scripts/prisma.mjs generate",
