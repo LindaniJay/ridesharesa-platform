@@ -211,8 +211,10 @@ function TopListingsRow({ title, listings }: { title: string; listings: TopListi
                   </div>
                 </div>
 
-                <div className="flex items-start justify-between gap-3">
-                  <div className="text-xs text-foreground/60">Secure payments and instant booking</div>
+                <div className="flex flex-wrap gap-1.5 text-[11px] text-foreground/70">
+                  <span className="rounded-full border border-border bg-background/70 px-2 py-0.5">Verified host</span>
+                  <span className="rounded-full border border-border bg-background/70 px-2 py-0.5">Secure checkout</span>
+                  <span className="rounded-full border border-accent/25 bg-accent/10 px-2 py-0.5 text-accent">Fast pickup</span>
                 </div>
 
                 <div className="flex items-center gap-2">
@@ -499,6 +501,80 @@ export default async function Home() {
         </div>
       </section>
 
+      <section className="grid gap-4 pb-6 lg:grid-cols-[1.1fr,0.9fr]">
+        <Card className="relative overflow-hidden border-border bg-card/60 backdrop-blur supports-[backdrop-filter]:bg-card/40">
+          <div aria-hidden className="pointer-events-none absolute inset-0">
+            <div className="absolute -left-28 top-0 h-72 w-72 rounded-full bg-accent/16 blur-3xl" />
+          </div>
+          <CardContent className="relative p-6 sm:p-7">
+            <div className="max-w-xl space-y-3">
+              <div className="text-xs font-semibold uppercase tracking-[0.22em] text-accent">Why people switch</div>
+              <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">Local car access without agency friction.</h2>
+              <p className="text-sm leading-relaxed text-foreground/68 sm:text-base">
+                The experience already covers search, trust, chat, incidents, and approvals. What matters now is making those strengths feel obvious in the first 20 seconds of the product.
+              </p>
+            </div>
+
+            <div className="mt-6 grid gap-3 sm:grid-cols-3">
+              {[
+                { label: "Verified cars live", value: availableCarsNow.toLocaleString() },
+                { label: "Hosts operating", value: activeHosts.toLocaleString() },
+                { label: "Trips completed", value: confirmedTrips.toLocaleString() },
+              ].map((item) => (
+                <div key={item.label} className="rounded-2xl border border-border bg-background/35 p-4">
+                  <div className="text-xl font-semibold tracking-tight">{item.value}</div>
+                  <div className="mt-1 text-xs uppercase tracking-[0.18em] text-foreground/55">{item.label}</div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+
+        <div className="grid gap-4">
+          <Card className="border-border bg-card/60 backdrop-blur supports-[backdrop-filter]:bg-card/40">
+            <CardContent className="p-5 sm:p-6">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <div className="text-xs font-semibold uppercase tracking-[0.18em] text-foreground/55">City rhythms</div>
+                  <div className="mt-1 text-lg font-semibold tracking-tight">Popular pickup flows</div>
+                </div>
+                <div className="rounded-full border border-border bg-background/40 px-3 py-1 text-xs text-foreground/65">Live discovery</div>
+              </div>
+              <div className="mt-4 grid gap-3">
+                {[
+                  { city: "Cape Town", line: "Best for coastal weekends and airport handoffs.", href: "/listings?q=Cape+Town" },
+                  { city: "Johannesburg", line: "Strong weekday demand and fast business-trip searches.", href: "/listings?q=Johannesburg" },
+                  { city: "Durban", line: "Popular for holiday routing and flexible pickup windows.", href: "/listings?q=Durban" },
+                ].map((item) => (
+                  <Link key={item.city} href={item.href} className="rounded-2xl border border-border bg-background/35 p-4 transition-colors hover:bg-background/55">
+                    <div className="text-sm font-semibold">{item.city}</div>
+                    <div className="mt-1 text-sm text-foreground/62">{item.line}</div>
+                  </Link>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="border-border bg-card/60 backdrop-blur supports-[backdrop-filter]:bg-card/40">
+            <CardContent className="p-5 sm:p-6">
+              <div className="text-xs font-semibold uppercase tracking-[0.18em] text-foreground/55">Proof points</div>
+              <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                {[
+                  "Pricing is visible before the renter commits.",
+                  "Support stays tied to the booking context.",
+                  "Hosts and admins work from structured approval flows.",
+                  "Mobile surfaces already support quick trip actions.",
+                ].map((line) => (
+                  <div key={line} className="rounded-2xl border border-border bg-background/35 p-4 text-sm text-foreground/72">
+                    {line}
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </section>
+
       <section className="grid gap-4 pb-6 lg:grid-cols-3">
         {[
           {
@@ -737,23 +813,42 @@ export default async function Home() {
       </section>
 
       <section className="pb-12">
-        <div className="relative overflow-hidden rounded-3xl border border-border bg-card/60 px-6 py-10 text-center backdrop-blur supports-[backdrop-filter]:bg-card/40 sm:px-10">
+        <div className="relative overflow-hidden rounded-3xl border border-border bg-card/60 px-6 py-10 backdrop-blur supports-[backdrop-filter]:bg-card/40 sm:px-10">
           <div aria-hidden className="pointer-events-none absolute inset-0">
             <div className="absolute -left-24 -top-28 h-80 w-80 rounded-full bg-accent/22 blur-3xl" />
             <div className="absolute -right-24 -bottom-28 h-80 w-80 rounded-full bg-foreground/10 blur-3xl" />
           </div>
-          <div className="relative mx-auto max-w-2xl space-y-3">
-            <h2 className="text-2xl font-semibold tracking-tight">Ready for your next drive?</h2>
-            <p className="text-sm text-foreground/70">Create your account, compare cars, and book with confidence.</p>
-            <div className="flex flex-wrap justify-center gap-2 pt-1">
-              <Link href="/sign-up">
-                <Button className="h-11 px-5 text-base">Create account</Button>
-              </Link>
-              <Link href="/sign-in">
-                <Button variant="secondary" className="h-11 px-5 text-base">Sign in</Button>
-              </Link>
+          <div className="relative grid gap-6 lg:grid-cols-[1.1fr,0.9fr] lg:items-center">
+            <div className="space-y-3 text-center lg:text-left">
+              <h2 className="text-2xl font-semibold tracking-tight">Ready for your next drive?</h2>
+              <p className="max-w-xl text-sm text-foreground/70">
+                Create your account, compare cars, and book with confidence. Or open the host side and turn an idle car into active inventory.
+              </p>
+              <div className="flex flex-wrap justify-center gap-2 pt-1 lg:justify-start">
+                <Link href="/sign-up">
+                  <Button className="h-11 px-5 text-base">Create account</Button>
+                </Link>
+                <Link href="/sign-in">
+                  <Button variant="secondary" className="h-11 px-5 text-base">Sign in</Button>
+                </Link>
+                <Link href="/host">
+                  <Button variant="secondary" className="h-11 px-5 text-base">List your car</Button>
+                </Link>
+              </div>
             </div>
 
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="rounded-2xl border border-border bg-background/35 p-4">
+                <div className="text-xs uppercase tracking-[0.18em] text-foreground/55">Renters</div>
+                <div className="mt-2 text-base font-semibold">Compare faster</div>
+                <div className="mt-1 text-sm text-foreground/66">Use city shortcuts, live pricing, and map browsing to narrow the right car quickly.</div>
+              </div>
+              <div className="rounded-2xl border border-border bg-background/35 p-4">
+                <div className="text-xs uppercase tracking-[0.18em] text-foreground/55">Hosts</div>
+                <div className="mt-2 text-base font-semibold">Operate cleaner</div>
+                <div className="mt-1 text-sm text-foreground/66">Keep approvals, booking chat, and payout handling inside a tighter workflow.</div>
+              </div>
+            </div>
           </div>
         </div>
       </section>

@@ -21,6 +21,10 @@ type ListingsSearchParams = {
   sort?: "recent" | "price_asc" | "price_desc" | string;
 };
 
+function formatRate(dailyRateCents: number, currency: string) {
+  return `${(dailyRateCents / 100).toFixed(0)} ${currency}`;
+}
+
 function first(param: string | string[] | undefined) {
   if (!param) return "";
   return Array.isArray(param) ? String(param[0] ?? "") : String(param);
@@ -39,6 +43,7 @@ export default async function ListingsPage({
   const maxPrice = Number(first(resolvedSearchParams?.maxPrice)) || 0;
   const instantBooking = first(resolvedSearchParams?.instantBooking) === "on";
   const carType = first(resolvedSearchParams?.carType).trim();
+  const hasFilters = Boolean(q || start || end || (sort && sort !== "recent") || minPrice || maxPrice || instantBooking || carType);
 
   const orderBy =
     sort === "price_asc"
@@ -145,6 +150,9 @@ export default async function ListingsPage({
 
   function buildListingsHref(overrides: {
     q?: string | null;
+    start?: string | null;
+    end?: string | null;
+    sort?: string | null;
     instantBooking?: boolean | null;
     minPrice?: number | null;
     maxPrice?: number | null;
@@ -153,15 +161,18 @@ export default async function ListingsPage({
     const next = new URLSearchParams();
 
     const nextQ = overrides.q === undefined ? q : overrides.q ?? "";
+  const nextStart = overrides.start === undefined ? start : overrides.start ?? "";
+  const nextEnd = overrides.end === undefined ? end : overrides.end ?? "";
+  const nextSort = overrides.sort === undefined ? sort : overrides.sort ?? "recent";
     const nextInstantBooking = overrides.instantBooking === undefined ? instantBooking : Boolean(overrides.instantBooking);
     const nextMinPrice = overrides.minPrice === undefined ? minPrice : overrides.minPrice ?? 0;
     const nextMaxPrice = overrides.maxPrice === undefined ? maxPrice : overrides.maxPrice ?? 0;
     const nextCarType = overrides.carType === undefined ? carType : overrides.carType ?? "";
 
     if (nextQ) next.set("q", nextQ);
-    if (start) next.set("start", start);
-    if (end) next.set("end", end);
-    if (sort && sort !== "recent") next.set("sort", sort);
+  if (nextStart) next.set("start", nextStart);
+  if (nextEnd) next.set("end", nextEnd);
+  if (nextSort && nextSort !== "recent") next.set("sort", nextSort);
     if (nextMinPrice) next.set("minPrice", String(nextMinPrice));
     if (nextMaxPrice) next.set("maxPrice", String(nextMaxPrice));
     if (nextCarType) next.set("carType", nextCarType);
@@ -175,6 +186,18 @@ export default async function ListingsPage({
   if (start) carry.set("start", start);
   if (end) carry.set("end", end);
   const carryQS = carry.toString();
+  const availabilityLabel = start && end ? "Matches dates" : "Available today";
+  const hasCustomSort = typeof sort === "string" && sort !== "recent";
+  const activeFilters = [
+    q ? { label: `Keyword: ${q}`, href: buildListingsHref({ q: null }) } : null,
+    start ? { label: `From ${start}`, href: buildListingsHref({ start: null }) } : null,
+    end ? { label: `Until ${end}`, href: buildListingsHref({ end: null }) } : null,
+    hasCustomSort ? { label: `Sort: ${sort.replace("_", " ")}`, href: buildListingsHref({ sort: null }) } : null,
+    minPrice ? { label: `Min ${minPrice} ZAR`, href: buildListingsHref({ minPrice: null }) } : null,
+    maxPrice ? { label: `Max ${maxPrice} ZAR`, href: buildListingsHref({ maxPrice: null }) } : null,
+    carType ? { label: `Type: ${carType}`, href: buildListingsHref({ carType: null }) } : null,
+    instantBooking ? { label: "Instant booking", href: buildListingsHref({ instantBooking: false }) } : null,
+  ].filter((value): value is { label: string; href: string } => Boolean(value));
 
   if (fetchError) {
     return (
@@ -182,14 +205,21 @@ export default async function ListingsPage({
         <div className="space-y-1">
           <h1 className="text-2xl font-semibold tracking-tight">Listings</h1>
         </div>
-        <Card>
-          <CardHeader>
+        <Card className="relative overflow-hidden border-border bg-card/70 backdrop-blur supports-[backdrop-filter]:bg-card/50">
+          <div aria-hidden className="pointer-events-none absolute inset-0">
+            <div className="absolute -left-16 top-0 h-44 w-44 rounded-full bg-accent/16 blur-3xl" />
+            <div className="absolute -right-16 bottom-0 h-44 w-44 rounded-full bg-foreground/8 blur-3xl" />
+          </div>
+          <CardHeader className="relative">
             <CardTitle>Temporarily unavailable</CardTitle>
             <CardDescription>{fetchError}</CardDescription>
           </CardHeader>
-          <CardContent>
-            <Link className="underline text-sm" href="/listings">
+          <CardContent className="relative flex flex-wrap items-center gap-3">
+            <Link className="btn-link-secondary h-10 px-4 text-sm" href="/listings">
               Reload listings
+            </Link>
+            <Link className="btn-link-secondary h-10 px-4 text-sm" href="/cities">
+              Browse cities
             </Link>
           </CardContent>
         </Card>
@@ -282,7 +312,7 @@ export default async function ListingsPage({
       <Card id="search-panel">
         <CardHeader>
           <CardTitle>Search</CardTitle>
-          <CardDescription>Use a city name to narrow results.</CardDescription>
+          <CardDescription>Use filters, dates, and price bands to narrow the right car faster.</CardDescription>
         </CardHeader>
         <CardContent>
           <form method="GET" className="grid gap-3 sm:grid-cols-6">
@@ -328,7 +358,7 @@ export default async function ListingsPage({
             </label>
             <div className="sm:col-span-6 flex flex-wrap items-center gap-2">
               <Button type="submit">Update results</Button>
-              {(q || start || end || (sort && sort !== "recent") || minPrice || maxPrice || instantBooking || carType) && (
+              {hasFilters && (
                 <Link className="text-sm underline" href="/listings">
                   Clear
                 </Link>
@@ -336,12 +366,45 @@ export default async function ListingsPage({
               <div className="text-sm text-foreground/60">{listings.length} result(s)</div>
             </div>
           </form>
+
+          {activeFilters.length > 0 ? (
+            <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-border pt-4">
+              <div className="text-xs font-semibold uppercase tracking-[0.18em] text-foreground/55">Active filters</div>
+              {activeFilters.map((filter) => (
+                <Link
+                  key={filter.label}
+                  href={filter.href}
+                  className="inline-flex items-center gap-2 rounded-full border border-border bg-background/55 px-3 py-1.5 text-xs text-foreground/74 transition-colors hover:bg-muted"
+                >
+                  <span>{filter.label}</span>
+                  <span className="text-foreground/45">Clear</span>
+                </Link>
+              ))}
+            </div>
+          ) : null}
         </CardContent>
       </Card>
 
       <div id="map-panel">
         <ListingMap listings={listings} />
       </div>
+
+      <Card className="border-border bg-card/60 backdrop-blur supports-[backdrop-filter]:bg-card/40">
+        <CardContent className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <div className="text-xs font-semibold uppercase tracking-[0.18em] text-foreground/55">Results overview</div>
+            <div className="mt-1 text-lg font-semibold tracking-tight">{listings.length} cars ready to compare</div>
+            <div className="mt-1 text-sm text-foreground/62">
+              {hasFilters ? "Your filters are shaping a narrower, more intentional shortlist." : "Browse all approved listings and tighten the shortlist with quick filters."}
+            </div>
+          </div>
+          <div className="flex flex-wrap gap-2 text-xs text-foreground/66">
+            <span className="rounded-full border border-border bg-background/50 px-3 py-1.5">{availabilityLabel}</span>
+            <span className="rounded-full border border-border bg-background/50 px-3 py-1.5">Secure checkout</span>
+            <span className="rounded-full border border-border bg-background/50 px-3 py-1.5">Approved listings only</span>
+          </div>
+        </CardContent>
+      </Card>
 
       {listings.length === 0 ? (
         <Card>
@@ -375,9 +438,12 @@ export default async function ListingsPage({
               href={carryQS ? `/listings/${l.id}?${carryQS}` : `/listings/${l.id}`}
               className="group"
             >
-              <div className="rounded-xl border border-border bg-background p-4 shadow-sm shadow-black/5 transition-colors group-hover:bg-muted/50">
+              <div className="relative overflow-hidden rounded-[1.35rem] border border-border bg-background/85 p-4 shadow-sm shadow-black/5 transition-all duration-200 group-hover:-translate-y-0.5 group-hover:bg-muted/50">
+                <div aria-hidden className="pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-300 group-hover:opacity-100">
+                  <div className="absolute -right-20 -top-20 h-48 w-48 rounded-full bg-accent/16 blur-3xl" />
+                </div>
                 {l.imageUrl ? (
-                  <div className="relative mb-3 aspect-[16/9] w-full overflow-hidden rounded-lg border border-border">
+                  <div className="relative mb-3 aspect-[16/9] w-full overflow-hidden rounded-[1rem] border border-border">
                     <Image
                       src={l.imageUrl}
                       alt={l.title}
@@ -386,13 +452,21 @@ export default async function ListingsPage({
                       className="object-cover"
                       priority={false}
                     />
+                    <div className="absolute inset-x-0 top-0 flex items-center justify-between p-3">
+                      <span className="rounded-full bg-slate-950/60 px-2.5 py-1 text-[11px] font-medium text-white backdrop-blur">{l.city}</span>
+                      <span className="rounded-full bg-white/85 px-2.5 py-1 text-[11px] font-semibold text-slate-900">{formatRate(l.dailyRateCents, l.currency)}</span>
+                    </div>
                   </div>
-                ) : null}
-                <div className="text-base font-semibold tracking-tight">{l.title}</div>
+                ) : (
+                  <div className="mb-3 flex aspect-[16/9] w-full items-end rounded-[1rem] border border-border bg-gradient-to-br from-foreground/10 via-background to-background p-4">
+                    <div className="rounded-full border border-border bg-background/75 px-3 py-1 text-xs text-foreground/72">No photo yet</div>
+                  </div>
+                )}
+                <div className="relative text-base font-semibold tracking-tight">{l.title}</div>
                 <div className="mt-1 text-sm text-foreground/60">
                   {l.city}, {l.country}
                 </div>
-                <div className="mt-2 flex flex-wrap gap-1.5 text-[11px] text-foreground/70">
+                <div className="mt-3 flex flex-wrap gap-1.5 text-[11px] text-foreground/70">
                   <span className="rounded-full border border-border bg-background/70 px-2 py-0.5">Approved listing</span>
                   <span className="rounded-full border border-border bg-background/70 px-2 py-0.5">Secure checkout</span>
                   {l.instantBooking ? (
@@ -400,11 +474,20 @@ export default async function ListingsPage({
                   ) : (
                     <span className="rounded-full border border-border bg-background/70 px-2 py-0.5">Host approval</span>
                   )}
+                  <span className="rounded-full border border-border bg-background/70 px-2 py-0.5">
+                    {l.dailyRateCents <= averageDailyRate * 100 || averageDailyRate === 0 ? "Value rate" : "Premium rate"}
+                  </span>
+                </div>
+                <div className="mt-3 grid gap-2 rounded-2xl border border-border bg-background/45 p-3 text-xs text-foreground/64">
+                  <div className="flex items-center justify-between gap-3">
+                    <span>{availabilityLabel}</span>
+                    <span>{l.instantBooking ? "Book immediately" : "Host reviews first"}</span>
+                  </div>
                 </div>
                 <div className="mt-3 flex items-center justify-between">
-                  <div className="text-sm">
-                    {(l.dailyRateCents / 100).toFixed(0)} {l.currency}
-                    <span className="text-foreground/50"> / day</span>
+                  <div className="text-sm font-semibold">
+                    {formatRate(l.dailyRateCents, l.currency)}
+                    <span className="text-foreground/50 font-normal"> / day</span>
                   </div>
                   <div className="text-sm font-medium underline">View</div>
                 </div>
