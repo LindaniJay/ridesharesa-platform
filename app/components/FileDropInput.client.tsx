@@ -26,7 +26,6 @@ function prettyBytes(bytes: number) {
 export default function FileDropInput({ name, label, helper, accept, required = false, onFileSelected }: Props) {
   const [dragOver, setDragOver] = useState(false);
   const [file, setFile] = useState<File | null>(null);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
   const previewType = useMemo<"image" | "pdf" | null>(() => {
     if (!file) return null;
@@ -35,16 +34,16 @@ export default function FileDropInput({ name, label, helper, accept, required = 
     return null;
   }, [file]);
 
-  useEffect(() => {
-    if (!file || !previewType) {
-      setPreviewUrl(null);
-      return;
-    }
-
-    const objectUrl = URL.createObjectURL(file);
-    setPreviewUrl(objectUrl);
-    return () => URL.revokeObjectURL(objectUrl);
+  const previewUrl = useMemo(() => {
+    if (!file || !previewType) return null;
+    return URL.createObjectURL(file);
   }, [file, previewType]);
+
+  useEffect(() => {
+    return () => {
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
+    };
+  }, [previewUrl]);
 
   function applyFile(next: File | null) {
     setFile(next);

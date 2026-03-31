@@ -58,7 +58,6 @@ export default function SignUpPage() {
           password,
           options: {
             data: { name: name || undefined, role },
-            emailRedirectTo: `${window.location.origin}/sign-in`,
           },
         }),
         timeoutPromise,
@@ -70,10 +69,9 @@ export default function SignUpPage() {
         return;
       }
 
-      // If email confirmation is enabled, the session may be null.
       if (!data.session) {
+        setError("This app expects direct sign-up without email confirmation. Disable 'Confirm email' in Supabase Auth settings and try again.");
         setLoading(false);
-        router.push(`/sign-in?checkEmail=1&email=${encodeURIComponent(normalizedEmail)}`);
         return;
       }
 

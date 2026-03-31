@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import { translations } from "@/app/i18n";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/app/components/ui/Card";
@@ -168,12 +169,15 @@ function TopListingsRow({ title, listings }: { title: string; listings: TopListi
               <CardContent className="relative space-y-3 p-0">
                 <div className="h-40 w-full overflow-hidden border-b border-border bg-background/30">
                   {l.imageUrl ? (
-                    <img
-                      src={l.imageUrl}
-                      alt={l.title}
-                      className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
-                      loading="lazy"
-                    />
+                    <div className="relative h-full w-full">
+                      <Image
+                        src={l.imageUrl}
+                        alt={l.title}
+                        fill
+                        sizes="280px"
+                        className="object-cover transition-transform duration-500 group-hover:scale-105"
+                      />
+                    </div>
                   ) : (
                     <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-foreground/10 via-foreground/5 to-transparent text-foreground/70">
                       <Icon name="car" className="h-8 w-8" />
@@ -403,7 +407,7 @@ export default async function Home() {
               rel="noopener noreferrer"
               className="inline-flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-xs font-medium text-foreground shadow-sm hover:bg-muted"
             >
-              <img src="/android-chrome-192.png" alt="Android app" className="h-6 w-6" />
+              <Image src="/android-chrome-192.png" alt="Android app" width={24} height={24} className="h-6 w-6" />
               {labels.book} on Android
             </a>
             <a
@@ -412,7 +416,7 @@ export default async function Home() {
               rel="noopener noreferrer"
               className="inline-flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-xs font-medium text-foreground shadow-sm hover:bg-muted"
             >
-              <img src="/apple-touch-icon.png" alt="iOS app" className="h-6 w-6" />
+              <Image src="/apple-touch-icon.png" alt="iOS app" width={24} height={24} className="h-6 w-6" />
               {labels.book} on iOS
             </a>
           </div>
