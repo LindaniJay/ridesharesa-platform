@@ -7,9 +7,38 @@ import ChatWidget from "@/app/components/ChatWidget.client";
 import PwaInit from "@/app/components/PwaInit.client";
 import BackgroundVideo from "@/app/components/BackgroundVideo.client";
 
+const siteUrl = process.env.NEXT_PUBLIC_SITE_URL?.trim() || "https://ridesharesa.co.za";
+
 export const metadata: Metadata = {
-  title: "RideShare Platform",
-  description: "Peer-to-peer car rental marketplace (Host / Renter / Admin)",
+  metadataBase: new URL(siteUrl),
+  title: {
+    default: "RideShare SA | Rent Cars From Local Hosts",
+    template: "%s | RideShare SA",
+  },
+  description:
+    "Book verified cars from local hosts across South Africa with secure checkout, clear pricing, and fast support.",
+  applicationName: "RideShare SA",
+  alternates: {
+    canonical: "/",
+  },
+  openGraph: {
+    type: "website",
+    url: siteUrl,
+    siteName: "RideShare SA",
+    title: "RideShare SA | Rent Cars From Local Hosts",
+    description:
+      "Book verified cars from local hosts across South Africa with secure checkout, clear pricing, and fast support.",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "RideShare SA | Rent Cars From Local Hosts",
+    description:
+      "Book verified cars from local hosts across South Africa with secure checkout, clear pricing, and fast support.",
+  },
+  robots: {
+    index: true,
+    follow: true,
+  },
   manifest: "/manifest.webmanifest",
   icons: {
     icon: [
