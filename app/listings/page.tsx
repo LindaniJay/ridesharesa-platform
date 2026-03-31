@@ -57,52 +57,71 @@ export default async function ListingsPage({
       !Number.isNaN(endDate!.getTime()) &&
       endDate!.getTime() > startDate!.getTime();
 
-  const listings = await prisma.listing.findMany({
-    where: {
-      status: "ACTIVE",
-      isApproved: true,
-      bookings: {
-        none: hasValidDates
+  let listings: {
+    id: string;
+    title: string;
+    city: string;
+    country: string;
+    latitude: number;
+    longitude: number;
+    dailyRateCents: number;
+    currency: string;
+    imageUrl: string | null;
+    instantBooking: boolean;
+  }[] = [];
+  let fetchError: string | null = null;
+
+  try {
+    listings = await prisma.listing.findMany({
+      where: {
+        status: "ACTIVE",
+        isApproved: true,
+        bookings: {
+          none: hasValidDates
+            ? {
+                status: { in: RESERVED_BOOKING_STATUSES },
+                startDate: { lt: endDate! },
+                endDate: { gt: startDate! },
+              }
+            : {
+                status: { in: RESERVED_BOOKING_STATUSES },
+                startDate: { lte: now },
+                endDate: { gte: now },
+              },
+        },
+        ...(q
           ? {
-              status: { in: RESERVED_BOOKING_STATUSES },
-              startDate: { lt: endDate! },
-              endDate: { gt: startDate! },
+              OR: [
+                { title: { contains: q, mode: "insensitive" } },
+                { city: { contains: q, mode: "insensitive" } },
+                { country: { contains: q, mode: "insensitive" } },
+              ],
             }
-          : {
-              status: { in: RESERVED_BOOKING_STATUSES },
-              startDate: { lte: now },
-              endDate: { gte: now },
-            },
+          : {}),
+        ...(minPrice > 0 ? { dailyRateCents: { gte: Math.round(minPrice * 100) } } : {}),
+        ...(maxPrice > 0 ? { dailyRateCents: { lte: Math.round(maxPrice * 100) } } : {}),
+        ...(instantBooking ? { instantBooking: true } : {}),
+        ...(carType ? { title: { contains: carType, mode: "insensitive" } } : {}),
       },
-      ...(q
-        ? {
-            OR: [
-              { title: { contains: q, mode: "insensitive" } },
-              { city: { contains: q, mode: "insensitive" } },
-              { country: { contains: q, mode: "insensitive" } },
-            ],
-          }
-        : {}),
-      ...(minPrice > 0 ? { dailyRateCents: { gte: Math.round(minPrice * 100) } } : {}),
-      ...(maxPrice > 0 ? { dailyRateCents: { lte: Math.round(maxPrice * 100) } } : {}),
-      ...(instantBooking ? { instantBooking: true } : {}),
-      ...(carType ? { title: { contains: carType, mode: "insensitive" } } : {}),
-    },
-    orderBy,
-    take: 50,
-    select: {
-      id: true,
-      title: true,
-      city: true,
-      country: true,
-      latitude: true,
-      longitude: true,
-      dailyRateCents: true,
-      currency: true,
-      imageUrl: true,
-      instantBooking: true,
-    },
-  });
+      orderBy,
+      take: 50,
+      select: {
+        id: true,
+        title: true,
+        city: true,
+        country: true,
+        latitude: true,
+        longitude: true,
+        dailyRateCents: true,
+        currency: true,
+        imageUrl: true,
+        instantBooking: true,
+      },
+    });
+  } catch (err) {
+    console.error("[listings] DB fetch failed:", err);
+    fetchError = "Unable to load listings right now. Please try again in a moment.";
+  }
 
   const averageDailyRate = listings.length
     ? Math.round(listings.reduce((sum, listing) => sum + listing.dailyRateCents, 0) / listings.length / 100)
@@ -156,6 +175,27 @@ export default async function ListingsPage({
   if (start) carry.set("start", start);
   if (end) carry.set("end", end);
   const carryQS = carry.toString();
+
+  if (fetchError) {
+    return (
+      <main className="space-y-6">
+        <div className="space-y-1">
+          <h1 className="text-2xl font-semibold tracking-tight">Listings</h1>
+        </div>
+        <Card>
+          <CardHeader>
+            <CardTitle>Temporarily unavailable</CardTitle>
+            <CardDescription>{fetchError}</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Link className="underline text-sm" href="/listings">
+              Reload listings
+            </Link>
+          </CardContent>
+        </Card>
+      </main>
+    );
+  }
 
   return (
     <main className="space-y-6">
