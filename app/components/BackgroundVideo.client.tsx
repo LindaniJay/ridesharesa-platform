@@ -1,37 +1,29 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useState } from "react";
 
 export default function BackgroundVideo() {
-  const videoRef = useRef<HTMLVideoElement>(null);
+  const [videoUnavailable, setVideoUnavailable] = useState(false);
 
-  useEffect(() => {
-    const videoEl = videoRef.current;
-    if (!videoEl) return;
-    const stableVideo: HTMLVideoElement = videoEl;
-
-    function freezeFrame() {
-      stableVideo.pause();
-      stableVideo.currentTime = 0;
-    }
-
-    stableVideo.addEventListener("loadeddata", freezeFrame);
-    void stableVideo.play().then(freezeFrame).catch(() => {
-      // Ignore autoplay restrictions; loadeddata handler still freezes when available.
-    });
-
-    return () => {
-      stableVideo.removeEventListener("loadeddata", freezeFrame);
-    };
-  }, []);
+  if (videoUnavailable) {
+    return (
+      <div
+        className="fixed inset-0 z-0 bg-cover bg-center"
+        style={{ backgroundImage: "url('/bg-platform.png')" }}
+        aria-hidden
+      />
+    );
+  }
 
   return (
     <video
-      ref={videoRef}
       className="fixed inset-0 z-0 h-full w-full object-cover"
-      preload="auto"
+      preload="metadata"
+      autoPlay
+      loop
       muted
       playsInline
+      onError={() => setVideoUnavailable(true)}
       aria-hidden
     >
       <source src="/bg-video.mp4" type="video/mp4" />
