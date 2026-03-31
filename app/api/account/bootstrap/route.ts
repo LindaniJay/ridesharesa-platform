@@ -72,7 +72,7 @@ export async function POST(req: Request) {
         reason: "DB_UNREACHABLE",
         message: process.env.NODE_ENV !== "production" ? (e instanceof Error ? e.message : String(e)) : undefined,
       },
-      { status: 503 },
+      { status: process.env.NODE_ENV === "production" ? 503 : 200 },
     );
   }
 
@@ -100,7 +100,7 @@ export async function POST(req: Request) {
           reason: "DB_UNREACHABLE",
           message: process.env.NODE_ENV !== "production" ? (e instanceof Error ? e.message : String(e)) : undefined,
         },
-        { status: 503 },
+        { status: process.env.NODE_ENV === "production" ? 503 : 200 },
       );
     }
 
@@ -126,7 +126,7 @@ export async function POST(req: Request) {
         reason: "DB_UNREACHABLE",
         message: process.env.NODE_ENV !== "production" ? (e instanceof Error ? e.message : String(e)) : undefined,
       },
-      { status: 503 },
+      { status: process.env.NODE_ENV === "production" ? 503 : 200 },
     );
   }
 

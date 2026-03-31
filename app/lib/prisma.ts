@@ -20,9 +20,10 @@ const poolMax = readPositiveInt(
 
 const connectionTimeoutMillis = readPositiveInt(process.env.PG_CONNECT_TIMEOUT_MS, 10_000);
 const idleTimeoutMillis = readPositiveInt(process.env.PG_IDLE_TIMEOUT_MS, 30_000);
+const connectionString = process.env.DATABASE_URL;
 
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
+  connectionString,
   max: poolMax,
   connectionTimeoutMillis,
   idleTimeoutMillis,
@@ -35,6 +36,7 @@ export const prisma = global.prisma ?? new PrismaClient({ adapter });
 if (process.env.NODE_ENV !== "production") {
   if (!global.prismaPoolConfigLogged) {
     console.info("[prisma] pg pool config", {
+      usingPoolerUrl: true,
       max: poolMax,
       connectionTimeoutMillis,
       idleTimeoutMillis,

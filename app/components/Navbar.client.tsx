@@ -7,7 +7,7 @@ import { useEffect, useMemo, useState } from "react";
 import Logo from "@/app/components/Logo";
 import PushEnableButton from "@/app/components/PushEnableButton.client";
 import Button from "@/app/components/ui/Button";
-import { supabaseBrowser } from "@/app/lib/supabase/browser";
+import { clearInvalidRefreshTokenSession, supabaseBrowser } from "@/app/lib/supabase/browser";
 
 type MeResponse =
   | { user: null }
@@ -113,23 +113,15 @@ export default function NavbarClient() {
 
     void load();
 
-    // If the Supabase project/anon key changed, the browser can keep an old refresh token.
-    // That produces noisy 400s in the console. Treat it as a sign-out.
-    (async () => {
-      try {
-        const { error } = await supabase.auth.getSession();
-        const message = (error as { message?: unknown } | null)?.message;
-        if (typeof message === "string" && /invalid\s*refresh\s*token/i.test(message)) {
-          await supabase.auth.signOut();
-          if (!cancelled) {
-            setEmail(null);
-            setRole(null);
-          }
+    void clearInvalidRefreshTokenSession()
+      .catch(() => {
+        // Ignore stale-session cleanup failures.
+      })
+      .then(() => {
+        if (!cancelled) {
+          void load();
         }
-      } catch {
-        // Ignore.
-      }
-    })();
+      });
 
     const { data: sub } = supabase.auth.onAuthStateChange(() => {
       void load();

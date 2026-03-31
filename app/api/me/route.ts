@@ -36,15 +36,12 @@ export async function GET() {
     });
   } catch (e) {
     if (process.env.NODE_ENV !== "production") {
-      return NextResponse.json(
-        {
-          user: null,
-          ok: false,
-          reason: "DB_UNREACHABLE",
-          message: e instanceof Error ? e.message : String(e),
-        },
-        { status: 503 },
-      );
+      return NextResponse.json({
+        user: null,
+        ok: false,
+        reason: "DB_UNREACHABLE",
+        message: e instanceof Error ? e.message : String(e),
+      });
     }
     return NextResponse.json({ user: null }, { status: 503 });
   }
@@ -83,15 +80,12 @@ export async function GET() {
     }
   } catch (e) {
     if (process.env.NODE_ENV !== "production") {
-      return NextResponse.json(
-        {
-          user: null,
-          ok: false,
-          reason: "DB_UNREACHABLE",
-          message: e instanceof Error ? e.message : String(e),
-        },
-        { status: 503 },
-      );
+      return NextResponse.json({
+        user: null,
+        ok: false,
+        reason: "DB_UNREACHABLE",
+        message: e instanceof Error ? e.message : String(e),
+      });
     }
     return NextResponse.json({ user: null }, { status: 503 });
   }

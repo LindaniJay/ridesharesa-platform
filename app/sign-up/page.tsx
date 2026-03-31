@@ -97,9 +97,9 @@ export default function SignUpPage() {
         }
       }
 
-      if (!bootstrapRes.ok) {
-        const json = await bootstrapRes.json().catch(() => ({}));
-        setError(`Setup failed: ${json.message || json.error || "Unknown error"}`);
+      const bootstrapJson = (await bootstrapRes.json().catch(() => ({}))) as { ok?: boolean; error?: string; message?: string };
+      if (!bootstrapRes.ok || bootstrapJson.ok === false) {
+        setError(`Setup failed: ${bootstrapJson.message || bootstrapJson.error || "Unknown error"}`);
         setLoading(false);
         return;
       }
