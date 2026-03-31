@@ -100,8 +100,56 @@ export default async function ListingsPage({
       dailyRateCents: true,
       currency: true,
       imageUrl: true,
+      instantBooking: true,
     },
   });
+
+  const averageDailyRate = listings.length
+    ? Math.round(listings.reduce((sum, listing) => sum + listing.dailyRateCents, 0) / listings.length / 100)
+    : 0;
+  const instantBookingCount = listings.filter((listing) => listing.instantBooking).length;
+
+  const cityCounts = new Map<string, { count: number }>();
+  for (const listing of listings) {
+    const key = listing.city.trim();
+    const current = cityCounts.get(key);
+    cityCounts.set(key, {
+      count: (current?.count ?? 0) + 1,
+    });
+  }
+
+  const featuredCities = [...cityCounts.entries()]
+    .map(([city, value]) => ({ city, count: value.count }))
+    .sort((left, right) => right.count - left.count || left.city.localeCompare(right.city))
+    .slice(0, 4);
+
+  function buildListingsHref(overrides: {
+    q?: string | null;
+    instantBooking?: boolean | null;
+    minPrice?: number | null;
+    maxPrice?: number | null;
+    carType?: string | null;
+  }) {
+    const next = new URLSearchParams();
+
+    const nextQ = overrides.q === undefined ? q : overrides.q ?? "";
+    const nextInstantBooking = overrides.instantBooking === undefined ? instantBooking : Boolean(overrides.instantBooking);
+    const nextMinPrice = overrides.minPrice === undefined ? minPrice : overrides.minPrice ?? 0;
+    const nextMaxPrice = overrides.maxPrice === undefined ? maxPrice : overrides.maxPrice ?? 0;
+    const nextCarType = overrides.carType === undefined ? carType : overrides.carType ?? "";
+
+    if (nextQ) next.set("q", nextQ);
+    if (start) next.set("start", start);
+    if (end) next.set("end", end);
+    if (sort && sort !== "recent") next.set("sort", sort);
+    if (nextMinPrice) next.set("minPrice", String(nextMinPrice));
+    if (nextMaxPrice) next.set("maxPrice", String(nextMaxPrice));
+    if (nextCarType) next.set("carType", nextCarType);
+    if (nextInstantBooking) next.set("instantBooking", "on");
+
+    const query = next.toString();
+    return query ? `/listings?${query}` : "/listings";
+  }
 
   const carry = new URLSearchParams();
   if (start) carry.set("start", start);
@@ -115,7 +163,82 @@ export default async function ListingsPage({
         <p className="text-sm text-foreground/60">Browse approved cars near you.</p>
       </div>
 
-      <Card>
+      <Card className="relative overflow-hidden border-border bg-card/70 backdrop-blur supports-[backdrop-filter]:bg-card/50">
+        <div aria-hidden className="pointer-events-none absolute inset-0">
+          <div className="absolute -left-20 top-0 h-44 w-44 rounded-full bg-accent/16 blur-3xl" />
+          <div className="absolute -right-12 bottom-0 h-40 w-40 rounded-full bg-foreground/8 blur-3xl" />
+        </div>
+        <CardContent className="relative space-y-4 p-5 sm:p-6">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+            <div className="space-y-2">
+              <div className="text-xs font-semibold uppercase tracking-[0.22em] text-accent">Discover faster</div>
+              <div className="max-w-2xl text-xl font-semibold tracking-tight sm:text-2xl">
+                Shortlist the right car before you even open a card.
+              </div>
+              <div className="max-w-2xl text-sm text-foreground/65">
+                Use quick city jumps, instant-booking shortcuts, and live availability to get to the right option faster.
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+              <div className="rounded-2xl border border-border bg-background/55 px-4 py-3">
+                <div className="text-xs uppercase tracking-wide text-foreground/55">Available now</div>
+                <div className="mt-1 text-lg font-semibold">{listings.length}</div>
+              </div>
+              <div className="rounded-2xl border border-border bg-background/55 px-4 py-3">
+                <div className="text-xs uppercase tracking-wide text-foreground/55">Instant book</div>
+                <div className="mt-1 text-lg font-semibold">{instantBookingCount}</div>
+              </div>
+              <div className="rounded-2xl border border-border bg-background/55 px-4 py-3 col-span-2 sm:col-span-1">
+                <div className="text-xs uppercase tracking-wide text-foreground/55">Avg daily rate</div>
+                <div className="mt-1 text-lg font-semibold">{averageDailyRate} ZAR</div>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <Link className="btn-link-secondary h-9 px-3 text-xs" href={buildListingsHref({ instantBooking: true })}>
+              Instant booking only
+            </Link>
+            {(q || instantBooking) ? (
+              <Link className="btn-link-secondary h-9 px-3 text-xs" href="/listings">
+                Reset filters
+              </Link>
+            ) : null}
+            <div className="text-xs text-foreground/55">Quick cities:</div>
+            {featuredCities.map((city) => (
+              <Link
+                key={city.city}
+                href={buildListingsHref({ q: city.city })}
+                className="inline-flex items-center gap-2 rounded-full border border-border bg-background/60 px-3 py-1.5 text-xs text-foreground/75 transition-colors hover:bg-muted"
+              >
+                <span>{city.city}</span>
+                <span className="text-foreground/45">{city.count}</span>
+              </Link>
+            ))}
+          </div>
+
+          <div className="space-y-2">
+            <div className="text-xs font-semibold uppercase tracking-[0.2em] text-foreground/55">Featured collections</div>
+            <div className="flex flex-wrap items-center gap-2">
+              <Link className="btn-link-secondary h-9 px-3 text-xs" href={buildListingsHref({ maxPrice: 700, minPrice: null })}>
+                Budget picks
+              </Link>
+              <Link className="btn-link-secondary h-9 px-3 text-xs" href={buildListingsHref({ carType: "SUV" })}>
+                Family SUVs
+              </Link>
+              <Link className="btn-link-secondary h-9 px-3 text-xs" href={buildListingsHref({ minPrice: 1200, maxPrice: null })}>
+                Premium rides
+              </Link>
+              <Link className="btn-link-secondary h-9 px-3 text-xs" href={buildListingsHref({ carType: "sedan", instantBooking: true })}>
+                Fast business trips
+              </Link>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card id="search-panel">
         <CardHeader>
           <CardTitle>Search</CardTitle>
           <CardDescription>Use a city name to narrow results.</CardDescription>
@@ -175,7 +298,9 @@ export default async function ListingsPage({
         </CardContent>
       </Card>
 
-      <ListingMap listings={listings} />
+      <div id="map-panel">
+        <ListingMap listings={listings} />
+      </div>
 
       {listings.length === 0 ? (
         <Card>
@@ -226,6 +351,15 @@ export default async function ListingsPage({
                 <div className="mt-1 text-sm text-foreground/60">
                   {l.city}, {l.country}
                 </div>
+                <div className="mt-2 flex flex-wrap gap-1.5 text-[11px] text-foreground/70">
+                  <span className="rounded-full border border-border bg-background/70 px-2 py-0.5">Approved listing</span>
+                  <span className="rounded-full border border-border bg-background/70 px-2 py-0.5">Secure checkout</span>
+                  {l.instantBooking ? (
+                    <span className="rounded-full border border-accent/30 bg-accent/10 px-2 py-0.5 text-accent">Instant book</span>
+                  ) : (
+                    <span className="rounded-full border border-border bg-background/70 px-2 py-0.5">Host approval</span>
+                  )}
+                </div>
                 <div className="mt-3 flex items-center justify-between">
                   <div className="text-sm">
                     {(l.dailyRateCents / 100).toFixed(0)} {l.currency}
@@ -238,6 +372,16 @@ export default async function ListingsPage({
           ))}
         </div>
       )}
+
+      <div className="pointer-events-none fixed inset-x-0 bottom-3 z-40 px-3 sm:hidden">
+        <div className="pointer-events-auto mx-auto flex max-w-md items-center justify-between gap-2 rounded-2xl border border-border bg-background/92 px-3 py-2 shadow-[0_10px_25px_-15px_rgba(0,0,0,0.55)] backdrop-blur">
+          <a href="#search-panel" className="btn-link-secondary h-8 px-3 text-xs">Filters</a>
+          <a href="#map-panel" className="btn-link-secondary h-8 px-3 text-xs">Map</a>
+          <div className="rounded-lg border border-border bg-card px-2 py-1 text-xs text-foreground/70">
+            {listings.length} results
+          </div>
+        </div>
+      </div>
     </main>
   );
 }

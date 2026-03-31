@@ -340,7 +340,6 @@ export default async function Home() {
 
   // Multi-language support
   const lang = "en"; // For demonstration, default to English
-  const labels = translations[lang] ?? translations.en;
 
   return (
     <main className="relative">
@@ -397,28 +396,6 @@ export default async function Home() {
             <Link className="text-xs sm:text-sm font-medium text-foreground/70 underline underline-offset-4 hover:text-foreground" href="/how-it-works">
               Booking guide
             </Link>
-          </div>
-
-          {/* Mobile app download prompts */}
-          <div className="mt-3 flex flex-wrap items-center gap-3">
-            <a
-              href="https://play.google.com/store/apps/details?id=com.relayrides.android.relayrides"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-xs font-medium text-foreground shadow-sm hover:bg-muted"
-            >
-              <Image src="/android-chrome-192.png" alt="Android app" width={24} height={24} className="h-6 w-6" />
-              {labels.book} on Android
-            </a>
-            <a
-              href="https://itunes.apple.com/app/relayrides/id555063314?mt=8&ls=1"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-xs font-medium text-foreground shadow-sm hover:bg-muted"
-            >
-              <Image src="/apple-touch-icon.png" alt="iOS app" width={24} height={24} className="h-6 w-6" />
-              {labels.book} on iOS
-            </a>
           </div>
 
           <Card className="relative overflow-hidden border-border bg-card/60 backdrop-blur supports-[backdrop-filter]:bg-card/40">
