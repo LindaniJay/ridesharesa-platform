@@ -23,7 +23,7 @@ test("first() handles edge cases", () => {
   assert.equal(first([]), "");
   assert.equal(first([undefined]), "");
   assert.equal(first([""]), "");
-  assert.equal(first(null as any), "");
+  assert.equal(first(null as unknown), "");
 });
 
 test("price filter range validation", () => {

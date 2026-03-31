@@ -7,7 +7,7 @@ test("city counts aggregation filters out null/empty values", () => {
     { id: "2", city: "Johannesburg", title: "Car 2" },
     { id: "3", city: "Cape Town", title: "Car 3" },
     { id: "4", city: "", title: "Car 4" },
-    { id: "5", city: null as any, title: "Car 5" },
+    { id: "5", city: null as unknown, title: "Car 5" },
   ];
 
   const cityCounts = new Map<string, { count: number }>();
