@@ -111,7 +111,8 @@ export default async function ListingsPage({
 
   const cityCounts = new Map<string, { count: number }>();
   for (const listing of listings) {
-    const key = listing.city.trim();
+    const key = String(listing.city ?? "").trim();
+    if (!key) continue;
     const current = cityCounts.get(key);
     cityCounts.set(key, {
       count: (current?.count ?? 0) + 1,
