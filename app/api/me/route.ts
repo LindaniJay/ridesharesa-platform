@@ -3,6 +3,8 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/app/lib/prisma";
 import { supabaseServer } from "@/app/lib/supabase/server";
 
+const allowDevWithoutDb = process.env.NODE_ENV !== "production" && process.env.ALLOW_DEV_WITHOUT_DB !== "0";
+
 export async function GET() {
   const supabase = await supabaseServer();
   let data: Awaited<ReturnType<(typeof supabase.auth)["getUser"]>>["data"];
@@ -35,6 +37,18 @@ export async function GET() {
       select: { email: true, role: true, status: true },
     });
   } catch (e) {
+    if (allowDevWithoutDb) {
+      return NextResponse.json({
+        user: {
+          email,
+          role: desiredRole ?? "RENTER",
+        },
+        ok: true,
+        degraded: true,
+        reason: "DB_UNREACHABLE",
+        message: e instanceof Error ? e.message : String(e),
+      });
+    }
     if (process.env.NODE_ENV !== "production") {
       return NextResponse.json({
         user: null,
@@ -79,6 +93,18 @@ export async function GET() {
         : existing;
     }
   } catch (e) {
+    if (allowDevWithoutDb) {
+      return NextResponse.json({
+        user: {
+          email,
+          role: desiredRole ?? "RENTER",
+        },
+        ok: true,
+        degraded: true,
+        reason: "DB_UNREACHABLE",
+        message: e instanceof Error ? e.message : String(e),
+      });
+    }
     if (process.env.NODE_ENV !== "production") {
       return NextResponse.json({
         user: null,

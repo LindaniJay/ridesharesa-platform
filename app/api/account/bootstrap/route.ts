@@ -4,6 +4,8 @@ import { z } from "zod";
 import { prisma } from "@/app/lib/prisma";
 import { supabaseServer } from "@/app/lib/supabase/server";
 
+const allowDevWithoutDb = process.env.NODE_ENV !== "production" && process.env.ALLOW_DEV_WITHOUT_DB !== "0";
+
 const BodySchema = z
   .object({
     name: z.string().trim().min(1).max(120).optional(),
@@ -66,6 +68,14 @@ export async function POST(req: Request) {
       select: { id: true, role: true, name: true, surname: true },
     });
   } catch (e) {
+    if (allowDevWithoutDb) {
+      return NextResponse.json({
+        ok: true,
+        degraded: true,
+        reason: "DB_UNREACHABLE",
+        message: e instanceof Error ? e.message : String(e),
+      });
+    }
     return NextResponse.json(
       {
         ok: false,
@@ -94,6 +104,14 @@ export async function POST(req: Request) {
         await prisma.user.update({ where: { email }, data: { role: "HOST" } });
       }
     } catch (e) {
+      if (allowDevWithoutDb) {
+        return NextResponse.json({
+          ok: true,
+          degraded: true,
+          reason: "DB_UNREACHABLE",
+          message: e instanceof Error ? e.message : String(e),
+        });
+      }
       return NextResponse.json(
         {
           ok: false,
@@ -120,6 +138,14 @@ export async function POST(req: Request) {
       },
     });
   } catch (e) {
+    if (allowDevWithoutDb) {
+      return NextResponse.json({
+        ok: true,
+        degraded: true,
+        reason: "DB_UNREACHABLE",
+        message: e instanceof Error ? e.message : String(e),
+      });
+    }
     return NextResponse.json(
       {
         ok: false,
