@@ -7,7 +7,7 @@ import ChatWidget from "@/app/components/ChatWidget.client";
 import PwaInit from "@/app/components/PwaInit.client";
 import BackgroundVideo from "@/app/components/BackgroundVideo.client";
 
-const siteUrl = process.env.NEXT_PUBLIC_SITE_URL?.trim() || "https://ridesharesa.co.za";
+const siteUrl = process.env.NEXT_PUBLIC_SITE_URL?.trim() || "https://www.ridesharesaplatform.co.za";
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
