@@ -50,7 +50,7 @@ test("sort parameter defaults to recent", () => {
 
   assert.equal(sort1, "recent");
   assert.equal(sort2, "price_asc");
-  assert.equal(sort3, "");
+  assert.equal(sort3, "recent");
 });
 
 test("instant booking checkbox parsing", () => {

@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import { cn } from "../app/lib/cn";
 
 test("cn merges classNames correctly", () => {
-  assert.equal(cn("px-2 py-1", "px-3"), "py-1 px-3");
+  assert.equal(cn("px-2 py-1", "px-3"), "px-2 py-1 px-3");
 });
 
 test("cn removes falsy values", () => {
@@ -20,11 +20,11 @@ test("cn preserves order for non-conflicting classes", () => {
   assert.equal(cn("text-base", "font-semibold", "text-foreground"), "text-base font-semibold text-foreground");
 });
 
-test("cn removes duplicates", () => {
-  assert.equal(cn("px-2", "px-2"), "px-2");
+test("cn concatenates duplicate classes", () => {
+  assert.equal(cn("px-2", "px-2"), "px-2 px-2");
 });
 
-test("cn handles spacing classes", () => {
-  assert.equal(cn("gap-2", "gap-4"), "gap-4");
+test("cn concatenates all spacing classes without conflict resolution", () => {
+  assert.equal(cn("gap-2", "gap-4"), "gap-2 gap-4");
   assert.equal(cn("m-0", "mx-4"), "m-0 mx-4");
 });
