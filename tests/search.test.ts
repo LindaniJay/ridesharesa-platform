@@ -21,9 +21,9 @@ test("first() handles edge cases", () => {
   };
 
   assert.equal(first([]), "");
-  assert.equal(first([undefined]), "");
+  assert.equal(first([undefined as unknown as string]), "");
   assert.equal(first([""]), "");
-  assert.equal(first(null as unknown), "");
+  assert.equal(first(null as unknown as string | undefined), "");
 });
 
 test("price filter range validation", () => {
@@ -44,13 +44,12 @@ test("price filter with invalid input", () => {
 });
 
 test("sort parameter defaults to recent", () => {
-  const sort1 = ("recent" || "recent") as string;
-  const sort2 = ("price_asc" || "recent") as string;
-  const sort3 = ("" || "recent") as string;
+  const applyDefault = (val: string | undefined) =>
+    val && val.length > 0 ? val : "recent";
 
-  assert.equal(sort1, "recent");
-  assert.equal(sort2, "price_asc");
-  assert.equal(sort3, "recent");
+  assert.equal(applyDefault("recent"), "recent");
+  assert.equal(applyDefault("price_asc"), "price_asc");
+  assert.equal(applyDefault(""), "recent");
 });
 
 test("instant booking checkbox parsing", () => {
