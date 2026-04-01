@@ -1,0 +1,25 @@
+node_modules
+.next
+out
+
+.git
+.gitignore
+
+Dockerfile*
+docker-compose*.yml
+
+.env
+.env.*
+
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Allow `.certs/corp-*.pem` to be included when needed
+# (for corporate TLS MITM environments). Still ignore private keys.
+*.key
+
+.DS_Store
+
+# Prisma artifacts generated on the host
+prisma/dev.db

@@ -1,0 +1,195 @@
+{
+  "info": {
+    "_postman_id": "7a1d1c29-4c2e-4cf5-9d22-2b4426a62a1c",
+    "name": "RideShare API Smoke",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000"
+    }
+  ],
+  "item": [
+    {
+      "name": "GET /api/me (guest)",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{baseUrl}}/api/me"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('status 200', function () { pm.response.to.have.status(200); });",
+              "const json = pm.response.json();",
+              "pm.test('has user key', function () { pm.expect(json).to.have.property('user'); });",
+              "pm.test('user is null or an object', function () { pm.expect(json.user === null || typeof json.user === 'object').to.eql(true); });",
+              "if (json.user) { pm.test('user has email + role', function () { pm.expect(json.user).to.have.property('email'); pm.expect(json.user).to.have.property('role'); }); }"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "POST /api/chatbot (help)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Accept",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"action\": \"help\",\n  \"lang\": \"en\"\n}"
+        },
+        "url": "{{baseUrl}}/api/chatbot"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('status 200', function () { pm.response.to.have.status(200); });",
+              "const json = pm.response.json();",
+              "pm.test('messages array exists', function () { pm.expect(json).to.have.property('messages'); pm.expect(json.messages).to.be.an('array'); });",
+              "pm.test('first message has text', function () { pm.expect(json.messages[0]).to.have.property('text'); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "POST /api/account/bootstrap (unauthenticated)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Accept",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{}"
+        },
+        "url": "{{baseUrl}}/api/account/bootstrap"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('status 401', function () { pm.response.to.have.status(401); });",
+              "const json = pm.response.json();",
+              "pm.test('has error', function () { pm.expect(json).to.have.property('error'); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "POST /api/push/subscribe (unauthenticated)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Accept",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"endpoint\": \"https://example.invalid/push\",\n  \"keys\": {\n    \"p256dh\": \"dummy\",\n    \"auth\": \"dummy\"\n  }\n}"
+        },
+        "url": "{{baseUrl}}/api/push/subscribe"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('status 401', function () { pm.response.to.have.status(401); });",
+              "const json = pm.response.json();",
+              "pm.test('has error', function () { pm.expect(json).to.have.property('error'); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "GET /api/dev/cookies (not exposed in production)",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{baseUrl}}/api/dev/cookies"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('status is 200 (dev) or 404 (prod)', function () { pm.expect([200, 404]).to.include(pm.response.code); });",
+              "if (pm.response.code === 200) { const json = pm.response.json(); pm.test('has cookieHeaderLength', function () { pm.expect(json).to.have.property('cookieHeaderLength'); }); }"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "GET /api/stripe/webhook (method not allowed)",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{baseUrl}}/api/stripe/webhook"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('status is 404 or 405', function () { pm.expect([404, 405]).to.include(pm.response.code); });"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}
