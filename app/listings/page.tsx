@@ -1,13 +1,10 @@
 import Link from "next/link";
 import Image from "next/image";
-
 import ListingMap from "@/app/components/ListingMap";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/app/components/ui/Card";
 import Input from "@/app/components/ui/Input";
 import Button from "@/app/components/ui/Button";
-import { RESERVED_BOOKING_STATUSES } from "@/app/lib/bookings";
-import { prisma } from "@/app/lib/prisma";
-import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
+import { fetchListingsWithFallback, Listing, formatRate } from "@/app/lib/listings";
 
 export const dynamic = "force-dynamic";
 
@@ -15,233 +12,38 @@ type ListingsPageProps = {
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
 };
 
-type ListingsSearchParams = {
-  q?: string;
-  start?: string;
-  end?: string;
-  sort?: "recent" | "price_asc" | "price_desc" | string;
-};
-
-function isTransientDbError(error: unknown) {
-  const message =
-    typeof error === "object" && error !== null && "message" in error
-      ? String((error as { message?: unknown }).message ?? "")
-      : String(error ?? "");
-
-  return /timeout|etimedout|econnreset|connection terminated|can't reach database server/i.test(message);
-}
-
-async function findListingsWithRetry(args: Parameters<typeof prisma.listing.findMany>[0]) {
-  const attempts = 2;
-
-  for (let attempt = 1; attempt <= attempts; attempt += 1) {
-    try {
-      return await prisma.listing.findMany(args);
-    } catch (error) {
-      if (attempt >= attempts || !isTransientDbError(error)) {
-        throw error;
-      }
-
-      // Small backoff helps absorb transient pool/connect spikes on cold starts.
-      await new Promise((resolve) => setTimeout(resolve, 250 * attempt));
-    }
-  }
-
-  return [];
-}
-
-async function findListingsViaSupabaseFallback(params: {
-  q: string;
-  sort: ListingsSearchParams["sort"];
-  minPrice: number;
-  maxPrice: number;
-  instantBooking: boolean;
-  carType: string;
-}) {
-  let lastError: Error | null = null;
-  const tableCandidates = ["listings", "Listing", "listing"];
-
-  for (const tableName of tableCandidates) {
-    let query = supabaseAdmin()
-      .from(tableName)
-      .select("id,title,city,country,latitude,longitude,dailyRateCents,currency,imageUrl,instantBooking")
-      .eq("status", "ACTIVE")
-      .eq("isApproved", true)
-      .limit(50);
-
-    if (params.q) {
-      const escapedQ = params.q.replace(/[,%]/g, "");
-      query = query.or(`title.ilike.%${escapedQ}%,city.ilike.%${escapedQ}%,country.ilike.%${escapedQ}%`);
-    }
-
-    if (params.minPrice > 0) {
-      query = query.gte("dailyRateCents", Math.round(params.minPrice * 100));
-    }
-
-    if (params.maxPrice > 0) {
-      query = query.lte("dailyRateCents", Math.round(params.maxPrice * 100));
-    }
-
-    if (params.instantBooking) {
-      query = query.eq("instantBooking", true);
-    }
-
-    if (params.carType) {
-      const escapedType = params.carType.replace(/[,%]/g, "");
-      query = query.ilike("title", `%${escapedType}%`);
-    }
-
-    if (params.sort === "price_asc") {
-      query = query.order("dailyRateCents", { ascending: true });
-    } else if (params.sort === "price_desc") {
-      query = query.order("dailyRateCents", { ascending: false });
-    } else {
-      query = query.order("createdAt", { ascending: false });
-    }
-
-    const { data, error } = await query;
-    if (!error) {
-      return (data ?? []) as {
-        id: string;
-        title: string;
-        city: string;
-        country: string;
-        latitude: number;
-        longitude: number;
-        dailyRateCents: number;
-        currency: string;
-        imageUrl: string | null;
-        instantBooking: boolean;
-      }[];
-    }
-
-    lastError = new Error(error.message);
-  }
-
-  throw lastError ?? new Error("Supabase fallback query failed");
-}
-
-function formatRate(dailyRateCents: number, currency: string) {
-  return `${(dailyRateCents / 100).toFixed(0)} ${currency}`;
-}
-
 function first(param: string | string[] | undefined) {
   if (!param) return "";
   return Array.isArray(param) ? String(param[0] ?? "") : String(param);
 }
 
-export default async function ListingsPage({
-  searchParams,
-}: ListingsPageProps) {
+export default async function ListingsPage({ searchParams }: ListingsPageProps) {
   const resolvedSearchParams = (await searchParams) ?? {};
-
   const q = first(resolvedSearchParams?.q).trim();
   const start = first(resolvedSearchParams?.start).trim();
   const end = first(resolvedSearchParams?.end).trim();
-  const sort = (first(resolvedSearchParams?.sort).trim() || "recent") as ListingsSearchParams["sort"];
+  const sort = (first(resolvedSearchParams?.sort).trim() || "recent") as "recent" | "price_asc" | "price_desc";
   const minPrice = Number(first(resolvedSearchParams?.minPrice)) || 0;
   const maxPrice = Number(first(resolvedSearchParams?.maxPrice)) || 0;
   const instantBooking = first(resolvedSearchParams?.instantBooking) === "on";
   const carType = first(resolvedSearchParams?.carType).trim();
   const hasFilters = Boolean(q || start || end || (sort && sort !== "recent") || minPrice || maxPrice || instantBooking || carType);
 
-  const orderBy =
-    sort === "price_asc"
-      ? ({ dailyRateCents: "asc" } as const)
-      : sort === "price_desc"
-        ? ({ dailyRateCents: "desc" } as const)
-        : ({ createdAt: "desc" } as const);
-
-    const now = new Date();
-
-    const startDate = start ? new Date(start) : null;
-    const endDate = end ? new Date(end) : null;
-    const hasValidDates =
-      Boolean(startDate && endDate) &&
-      !Number.isNaN(startDate!.getTime()) &&
-      !Number.isNaN(endDate!.getTime()) &&
-      endDate!.getTime() > startDate!.getTime();
-
-  let listings: {
-    id: string;
-    title: string;
-    city: string;
-    country: string;
-    latitude: number;
-    longitude: number;
-    dailyRateCents: number;
-    currency: string;
-    imageUrl: string | null;
-    instantBooking: boolean;
-  }[] = [];
+  let listings: Listing[] = [];
   let fetchError: string | null = null;
-
   try {
-    listings = await findListingsWithRetry({
-      where: {
-        status: "ACTIVE",
-        isApproved: true,
-        bookings: {
-          none: hasValidDates
-            ? {
-                status: { in: RESERVED_BOOKING_STATUSES },
-                startDate: { lt: endDate! },
-                endDate: { gt: startDate! },
-              }
-            : {
-                status: { in: RESERVED_BOOKING_STATUSES },
-                startDate: { lte: now },
-                endDate: { gte: now },
-              },
-        },
-        ...(q
-          ? {
-              OR: [
-                { title: { contains: q, mode: "insensitive" } },
-                { city: { contains: q, mode: "insensitive" } },
-                { country: { contains: q, mode: "insensitive" } },
-              ],
-            }
-          : {}),
-        ...(minPrice > 0 ? { dailyRateCents: { gte: Math.round(minPrice * 100) } } : {}),
-        ...(maxPrice > 0 ? { dailyRateCents: { lte: Math.round(maxPrice * 100) } } : {}),
-        ...(instantBooking ? { instantBooking: true } : {}),
-        ...(carType ? { title: { contains: carType, mode: "insensitive" } } : {}),
-      },
-      orderBy,
+    listings = await fetchListingsWithFallback({
+      q,
+      minPrice,
+      maxPrice,
+      instantBooking,
+      carType,
+      sort,
       take: 50,
-      select: {
-        id: true,
-        title: true,
-        city: true,
-        country: true,
-        latitude: true,
-        longitude: true,
-        dailyRateCents: true,
-        currency: true,
-        imageUrl: true,
-        instantBooking: true,
-      },
     });
   } catch (err) {
-    if (isTransientDbError(err)) {
-      try {
-        listings = await findListingsViaSupabaseFallback({
-          q,
-          sort,
-          minPrice,
-          maxPrice,
-          instantBooking,
-          carType,
-        });
-      } catch (fallbackError) {
-        console.error("[listings] Supabase fallback failed:", fallbackError);
-        fetchError = "Unable to load listings right now. Please try again in a moment.";
-      }
-    } else {
-      console.error("[listings] DB fetch failed:", err);
-      fetchError = "Unable to load listings right now. Please try again in a moment.";
-    }
+    console.error("[listings] fetch failed:", err);
+    fetchError = "Unable to load listings right now. Please try again in a moment.";
   }
 
   const averageDailyRate = listings.length
@@ -275,25 +77,22 @@ export default async function ListingsPage({
     carType?: string | null;
   }) {
     const next = new URLSearchParams();
-
     const nextQ = overrides.q === undefined ? q : overrides.q ?? "";
-  const nextStart = overrides.start === undefined ? start : overrides.start ?? "";
-  const nextEnd = overrides.end === undefined ? end : overrides.end ?? "";
-  const nextSort = overrides.sort === undefined ? sort : overrides.sort ?? "recent";
+    const nextStart = overrides.start === undefined ? start : overrides.start ?? "";
+    const nextEnd = overrides.end === undefined ? end : overrides.end ?? "";
+    const nextSort = overrides.sort === undefined ? sort : overrides.sort ?? "recent";
     const nextInstantBooking = overrides.instantBooking === undefined ? instantBooking : Boolean(overrides.instantBooking);
     const nextMinPrice = overrides.minPrice === undefined ? minPrice : overrides.minPrice ?? 0;
     const nextMaxPrice = overrides.maxPrice === undefined ? maxPrice : overrides.maxPrice ?? 0;
     const nextCarType = overrides.carType === undefined ? carType : overrides.carType ?? "";
-
     if (nextQ) next.set("q", nextQ);
-  if (nextStart) next.set("start", nextStart);
-  if (nextEnd) next.set("end", nextEnd);
-  if (nextSort && nextSort !== "recent") next.set("sort", nextSort);
+    if (nextStart) next.set("start", nextStart);
+    if (nextEnd) next.set("end", nextEnd);
+    if (nextSort && nextSort !== "recent") next.set("sort", nextSort);
     if (nextMinPrice) next.set("minPrice", String(nextMinPrice));
     if (nextMaxPrice) next.set("maxPrice", String(nextMaxPrice));
     if (nextCarType) next.set("carType", nextCarType);
     if (nextInstantBooking) next.set("instantBooking", "on");
-
     const query = next.toString();
     return query ? `/listings?${query}` : "/listings";
   }
