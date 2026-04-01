@@ -6,7 +6,6 @@ import {
   RESERVED_BOOKING_STATUSES,
   calculateBookingTotalCents,
   generatePaymentReferenceCode,
-  nextBookingStatusForStripeEvent,
 } from "../app/lib/bookings";
 
 test("reserved booking statuses include pending payment holds", () => {
@@ -39,12 +38,4 @@ test("booking totals include chauffeur charges only when enabled", () => {
 test("payment reference codes are six digits", () => {
   const code = generatePaymentReferenceCode();
   assert.match(code, /^\d{6}$/);
-});
-
-test("stripe event mapping keeps booking lifecycle consistent", () => {
-  assert.equal(nextBookingStatusForStripeEvent("checkout.session.completed"), "PENDING_APPROVAL");
-  assert.equal(nextBookingStatusForStripeEvent("checkout.session.async_payment_succeeded"), "PENDING_APPROVAL");
-  assert.equal(nextBookingStatusForStripeEvent("checkout.session.async_payment_failed"), "CANCELLED");
-  assert.equal(nextBookingStatusForStripeEvent("checkout.session.expired"), "CANCELLED");
-  assert.equal(nextBookingStatusForStripeEvent("payment_intent.created"), null);
 });

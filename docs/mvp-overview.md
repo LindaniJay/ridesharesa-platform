@@ -19,7 +19,7 @@ This project is an MVP (Minimum Viable Product) for a ride-sharing platform. It 
 - User registration and authentication (host, renter, admin roles)
 - Listing creation and management for hosts
 - Booking system for renters
-- Payment processing via Stripe
+- EFT payment processing with payment reference codes
 - Profile management
 - Support ticketing system
 - Push notifications
@@ -36,7 +36,7 @@ This project is an MVP (Minimum Viable Product) for a ride-sharing platform. It 
 - **Database:** PostgreSQL (managed via Supabase)
 - **ORM:** Prisma
 - **Authentication & Storage:** Supabase
-- **Payments:** Stripe
+- **Payments:** EFT (manual bank transfer with proof upload)
 - **Email:** Resend
 - **Error Monitoring:** Sentry
 - **Mapping:** Leaflet, React-Leaflet
@@ -82,8 +82,8 @@ This project is an MVP (Minimum Viable Product) for a ride-sharing platform. It 
 ## Setup & Deployment
 
 - Node.js 20+ required
-- Environment variables for Supabase, Stripe, Sentry, etc.
-- Local development uses Supabase for DB and storage, Stripe CLI for webhook forwarding
+- Environment variables for Supabase, Sentry, etc.
+- Local development uses Supabase for DB and storage
 
 ---
 
