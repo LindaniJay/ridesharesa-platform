@@ -17,7 +17,8 @@
     "db:migrate:fallback": "node scripts/migrate-with-fallback.mjs",
     "db:generate": "node scripts/prisma.mjs generate",
     "db:studio": "node scripts/prisma.mjs studio",
-    "db:seed": "tsx prisma/seed.ts"
+    "db:seed": "tsx prisma/seed.ts",
+    "test:api": "npx --yes newman@6.2.1 run postman/api-smoke.postman_collection.json --env-var baseUrl=http://localhost:3000 --reporters cli,junit --reporter-junit-export api-report.xml"
   },
   "dependencies": {
     "@prisma/adapter-pg": "7.3.0",

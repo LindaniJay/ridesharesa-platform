@@ -12,6 +12,8 @@
 
 # testing
 /coverage
+api-report.xml
+e2e-report.xml
 
 # next.js
 /.next/
@@ -43,3 +45,9 @@ yarn-error.log*
 next-env.d.ts
 
 /app/generated/prisma
+
+# python (e2e regression pack)
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv-e2e/

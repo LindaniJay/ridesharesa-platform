@@ -64,6 +64,90 @@ Copy the printed `whsec_...` into `STRIPE_WEBHOOK_SECRET`.
 npm run dev
 ```
 
+## Docker
+
+This app expects the same env vars as local dev (see `.env.example`). For Docker, put them in `.env` (recommended) or pass them via `-e` / your platform's secret manager.
+
+Note: `NEXT_PUBLIC_*` variables are embedded into the browser bundle at **build time** (Next.js behavior). If you change `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY`, re-run with `--build`.
+
+### Build + run (Docker Compose)
+
+```bash
+docker compose up --build
+```
+
+Then open http://localhost:3000
+
+### Build + run (plain Docker)
+
+```bash
+docker build -t rideshare-platform .
+docker run --rm -p 3000:3000 --env-file .env rideshare-platform
+```
+
+### If Docker build fails with `self-signed certificate in certificate chain`
+
+On some corporate networks, Prisma's engine download can fail inside Docker due to TLS inspection.
+
+Generate a CA bundle from Windows and re-build (the Dockerfile auto-detects `.certs/corp-*.pem`):
+
+```powershell
+./scripts/setup-node-extra-ca.ps1 -BundleAll
+docker build -t rideshare-platform .
+```
+
+## Automated regression tests (Python + Gherkin + Selenium)
+
+This repo includes a small BDD regression pack under `e2e/` (feature files + Selenium steps).
+
+### Run locally (Windows / PowerShell)
+
+1) Start the app (choose one):
+
+- `npm run dev`
+- or Docker: `docker compose up --build`
+
+2) Install Python deps and run tests:
+
+```powershell
+python -m venv .venv-e2e
+.\.venv-e2e\Scripts\Activate.ps1
+pip install -r e2e\requirements.txt
+pytest -q e2e --base-url http://localhost:3000
+```
+
+If `pip install` fails with `CERTIFICATE_VERIFY_FAILED` on a corporate network, retry using the bundled CA:
+
+```powershell
+pip install --cert .\.certs\corp-windows-store.pem -r e2e\requirements.txt
+```
+
+### CI
+
+GitHub Actions workflow: `.github/workflows/ci.yml`
+
+## Automated API tests (Postman / Newman)
+
+This repo includes a small API smoke suite you can run via Postman (Collection v2.1) or Newman.
+
+- Postman collection: `postman/api-smoke.postman_collection.json`
+- Local environment: `postman/local.postman_environment.json`
+
+### Run locally
+
+1) Start the app (choose one):
+
+- `npm run dev`
+- or `docker compose up --build`
+
+2) Run the API suite:
+
+```bash
+npm run test:api
+```
+
+This writes a JUnit report to `api-report.xml`.
+
 ## Mobile app (quickest): PWA + Web Push
 
 This repo can be shipped as an **installable PWA** (Add to Home Screen) that works on both Android and iOS.
