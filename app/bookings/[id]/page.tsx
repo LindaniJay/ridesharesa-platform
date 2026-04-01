@@ -14,6 +14,8 @@ import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
 import BookingStatusClient from "@/app/bookings/[id]/BookingStatusClient";
 import BookingActions from "@/app/bookings/[id]/BookingActions.client";
 import BookingChat from "@/app/bookings/[id]/BookingChat.client";
+import PickupWorkflow from "@/app/bookings/[id]/PickupWorkflow.client";
+import ReturnWorkflow from "@/app/bookings/[id]/ReturnWorkflow.client";
 
 type BookingPhotoKind = "host_handover" | "renter_pickup" | "renter_return" | "host_return";
 
@@ -415,22 +417,37 @@ export default async function BookingPage({
           currentEndDateISO={booking.endDate.toISOString()}
           startDateISO={booking.startDate.toISOString()}
           status={booking.status}
-          existingReview={existingRenterReview}
+        />
+      ) : null}
+
+      {/* Pickup workflow — shows when confirmed and before/on start date */}
+      {(lifecycleCurrent === "PICKUP" || lifecycleCurrent === "ACTIVE") && booking.status === "CONFIRMED" ? (
+        <PickupWorkflow
+          bookingId={booking.id}
+          vehicleTitle={booking.listing.title}
+          startDateISO={booking.startDate.toISOString()}
+          viewerRole={isAdmin ? "ADMIN" : isHost ? "HOST" : "RENTER"}
+          hostHandoverPhotos={photosByKind.find((p) => p.kind === "host_handover")?.result?.photos ?? []}
+          renterPickupPhotos={photosByKind.find((p) => p.kind === "renter_pickup")?.result?.photos ?? []}
+        />
+      ) : null}
+
+      {/* Return workflow — shows when booking period ended or cancelled */}
+      {(lifecycleCurrent === "RETURN" || lifecycleCurrent === "REVIEWED" || booking.status === "CANCELLED") && (booking.status === "CONFIRMED" || booking.status === "CANCELLED") ? (
+        <ReturnWorkflow
+          bookingId={booking.id}
+          vehicleTitle={booking.listing.title}
+          endDateISO={booking.endDate.toISOString()}
+          startDateISO={booking.startDate.toISOString()}
+          isCancelled={booking.status === "CANCELLED"}
+          viewerRole={isAdmin ? "ADMIN" : isHost ? "HOST" : "RENTER"}
+          renterReturnPhotos={photosByKind.find((p) => p.kind === "renter_return")?.result?.photos ?? []}
+          hostReturnPhotos={photosByKind.find((p) => p.kind === "host_return")?.result?.photos ?? []}
+          existingReview={isRenter ? existingRenterReview : null}
         />
       ) : null}
 
       <BookingChat bookingId={booking.id} viewerId={viewerId} viewerRole={viewerRole} />
-
-      {isAdmin || isRenter ? (
-        <div className="flex flex-wrap items-center gap-2">
-          <a
-            href={`/api/bookings/${encodeURIComponent(booking.id)}/receipt`}
-            className="btn-link-secondary"
-          >
-            Download receipt (PDF)
-          </a>
-        </div>
-      ) : null}
 
       {isPendingPayment ? (
         <Card>
@@ -598,107 +615,7 @@ export default async function BookingPage({
         </Card>
       ) : null}
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Photo log</CardTitle>
-          <CardDescription>
-            Handover and return photos help prevent disputes. Photos are private and shared only with the renter, host, and admin.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-5">
-          {PHOTO_KINDS.map(({ kind, label, helper }) => {
-            const entry = photosByKind.find((p) => p.kind === kind);
-            const res = entry?.result;
-
-            const canUpload =
-              isAdmin ||
-              ((kind === "host_handover" || kind === "host_return") ? isHost : false) ||
-              ((kind === "renter_pickup" || kind === "renter_return") ? isRenter : false);
-
-            return (
-              <div key={kind} className="space-y-2">
-                <div className="flex flex-wrap items-end justify-between gap-2">
-                  <div>
-                    <div className="text-sm font-medium">{label}</div>
-                    <div className="text-xs text-foreground/60">{helper}</div>
-                  </div>
-                  {canUpload ? (
-                    <form
-                      action={`/api/bookings/${encodeURIComponent(booking.id)}/photos`}
-                      method="post"
-                      encType="multipart/form-data"
-                      className="w-full max-w-sm space-y-2"
-                    >
-                      <input type="hidden" name="kind" value={kind} />
-                      <FileDropInput
-                        name="photo"
-                        label="Upload photo"
-                        helper="JPG/PNG up to 8MB"
-                        accept="image/*"
-                        required
-                      />
-                      <Button type="submit" variant="secondary">
-                        Upload
-                      </Button>
-                    </form>
-                  ) : null}
-                </div>
-
-                {!res ? null : !res.ok ? (
-                  <div className="text-sm text-foreground/60">Could not load photos: {res.error}</div>
-                ) : res.photos.length === 0 ? (
-                  <div className="text-sm text-foreground/60">No photos uploaded yet.</div>
-                ) : (
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    {res.photos.map((p) => (
-                      <a
-                        key={p.name}
-                        href={p.signedUrl}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="group overflow-hidden rounded-xl border border-border bg-card"
-                      >
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
-                          src={p.signedUrl}
-                          alt={`${label} photo`}
-                          className="h-44 w-full object-cover transition-transform group-hover:scale-[1.01]"
-                          loading="lazy"
-                        />
-                        <div className="border-t border-border p-2 text-xs text-foreground/60">
-                          Open (signed URL)
-                        </div>
-                      </a>
-                    ))}
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Next steps</CardTitle>
-          <CardDescription>What to do before pickup and during your booking.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <ul className="list-disc space-y-2 pl-5 text-sm text-black/70 dark:text-white/70">
-            <li>Double-check your dates and booking details.</li>
-            <li>Bring a valid driver’s license and ID.</li>
-            <li>Need help during the booking? Create a support ticket.</li>
-          </ul>
-          <div className="mt-3 flex flex-wrap gap-2">
-            <Link href="/renter#support">
-              <Button variant="secondary">Contact support</Button>
-            </Link>
-            <Link href="/cancellation">
-              <Button variant="secondary">Cancellation policy</Button>
-            </Link>
-          </div>
-        </CardContent>
-      </Card>
+      {/* Photo uploads and next-steps guidance are now handled inside PickupWorkflow and ReturnWorkflow */}
 
       <div className="flex flex-wrap gap-2">
         <Link href={`/listings/${booking.listing.id}`}>
