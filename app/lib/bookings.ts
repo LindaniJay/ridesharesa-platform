@@ -17,15 +17,6 @@ export const RESERVED_BOOKING_STATUSES: BookingStatus[] = [
   "CONFIRMED",
 ];
 
-export const STRIPE_SUCCESS_EVENT_TYPES = new Set<string>([
-  "checkout.session.completed",
-  "checkout.session.async_payment_succeeded",
-]);
-
-export const STRIPE_RELEASE_EVENT_TYPES = new Set<string>([
-  "checkout.session.async_payment_failed",
-  "checkout.session.expired",
-]);
 
 export function daysBetween(start: Date, end: Date) {
   const ms = end.getTime() - start.getTime();
@@ -68,8 +59,3 @@ export function isPaymentReferenceConflict(error: unknown) {
   return targetText.includes("paymentReference");
 }
 
-export function nextBookingStatusForStripeEvent(type: string): BookingStatus | null {
-  if (STRIPE_SUCCESS_EVENT_TYPES.has(type)) return "PENDING_APPROVAL";
-  if (STRIPE_RELEASE_EVENT_TYPES.has(type)) return "CANCELLED";
-  return null;
-}

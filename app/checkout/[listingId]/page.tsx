@@ -162,7 +162,7 @@ export default async function CheckoutPage({
             </div>
             <div className="space-y-1">
               <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">Reserve this car in under 2 minutes</h1>
-              <p className="text-sm text-foreground/60">Confirm your trip dates, choose payment method, and get instant booking status updates.</p>
+              <p className="text-sm text-foreground/60">Confirm your trip dates, review the fare, and book via Instant EFT.</p>
             </div>
 
             <Card className="overflow-hidden border-border bg-background/35 p-0">
@@ -195,7 +195,7 @@ export default async function CheckoutPage({
                   <div className="grid gap-2 text-xs text-foreground/65 sm:grid-cols-3">
                     <div className="rounded-lg border border-border bg-card/70 px-2.5 py-2">Step 1: Dates</div>
                     <div className="rounded-lg border border-border bg-card/70 px-2.5 py-2">Step 2: Price check</div>
-                    <div className="rounded-lg border border-border bg-card/70 px-2.5 py-2">Step 3: Payment</div>
+                    <div className="rounded-lg border border-border bg-card/70 px-2.5 py-2">Step 3: Confirm</div>
                   </div>
                 </div>
               </CardContent>
@@ -205,7 +205,7 @@ export default async function CheckoutPage({
           <Card className="border-border bg-background/30">
             <CardHeader>
               <CardTitle>Booking details</CardTitle>
-              <CardDescription>Pick dates, review total, and complete secure checkout.</CardDescription>
+              <CardDescription>Pick dates, review total, and confirm your EFT booking.</CardDescription>
             </CardHeader>
             <CardContent>
               <CheckoutClient

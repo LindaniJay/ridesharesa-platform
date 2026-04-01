@@ -890,7 +890,7 @@ async function answerMessage(
       messages: [
         {
           text:
-            "Payments can be made by card (Stripe) or Instant EFT (manual). Stripe bookings move to PENDING_APPROVAL after payment and require an admin to approve before they become CONFIRMED. EFT bookings stay PENDING_PAYMENT until an admin confirms payment.",
+            "Payments are made via Instant EFT (bank transfer). After booking you get a unique payment reference. Transfer the amount to our bank account using that reference, upload proof of payment, and submit for admin approval. Once confirmed your booking status moves to CONFIRMED.",
         },
       ],
       quickReplies: [

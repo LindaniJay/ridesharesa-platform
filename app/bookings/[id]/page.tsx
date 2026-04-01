@@ -151,7 +151,6 @@ export default async function BookingPage({
       id: true,
       status: true,
       paymentReference: true,
-      stripeCheckoutSessionId: true,
       days: true,
       totalCents: true,
       currency: true,
@@ -227,9 +226,8 @@ export default async function BookingPage({
   const isPendingPayment = booking.status === "PENDING_PAYMENT";
   const isPendingApproval = booking.status === "PENDING_APPROVAL";
   const isPending = isPendingPayment || isPendingApproval;
-  const isManualPayment = isPendingPayment && !booking.stripeCheckoutSessionId;
 
-  const paymentProofRes = isManualPayment && (isAdmin || isRenter)
+  const paymentProofRes = isPendingPayment && (isAdmin || isRenter)
     ? await listSignedPaymentProofs({ bookingId: booking.id, kind: "payment_proof" })
     : null;
   const hasPaymentProof = Boolean(paymentProofRes?.ok && paymentProofRes.proofs.length > 0);
@@ -263,9 +261,7 @@ export default async function BookingPage({
         ? "This booking has been cancelled."
         : booking.status === "PENDING_APPROVAL"
           ? "Payment was received. An admin must approve this booking before it is confirmed."
-          : isManualPayment
-            ? "Complete payment via Instant EFT so an admin can confirm it."
-            : "Payment is processing. This page will update after Stripe confirms payment.";
+            : "Complete payment via Instant EFT so an admin can confirm it.";
 
   return (
     <main className="mx-auto max-w-5xl space-y-6 pb-8 mobile-tight stagger-children">
@@ -299,7 +295,7 @@ export default async function BookingPage({
                 {booking.days} {booking.days === 1 ? "day" : "days"}
               </span>
             </div>
-            <BookingStatusClient status={booking.status} method={isManualPayment ? "manual" : "stripe"} />
+            <BookingStatusClient status={booking.status} />
           </div>
 
           {booking.listing.imageUrl ? (
@@ -436,7 +432,7 @@ export default async function BookingPage({
         </div>
       ) : null}
 
-      {isManualPayment ? (
+      {isPendingPayment ? (
         <Card>
           <CardHeader>
             <CardTitle>Instant EFT payment</CardTitle>

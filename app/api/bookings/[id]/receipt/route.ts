@@ -38,8 +38,7 @@ export async function GET(_req: Request, context: { params: Promise<{ id: string
       currency: true,
       totalCents: true,
       paidAt: true,
-      stripeCheckoutSessionId: true,
-      stripePaymentIntentId: true,
+      paymentReference: true,
       startDate: true,
       endDate: true,
       days: true,
@@ -69,12 +68,10 @@ export async function GET(_req: Request, context: { params: Promise<{ id: string
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  const paymentMethod = booking.stripeCheckoutSessionId ? "Card (Stripe)" : "Instant EFT (manual)";
-  const paymentReference = booking.stripePaymentIntentId
-    ? booking.stripePaymentIntentId
-    : booking.stripeCheckoutSessionId
-      ? booking.stripeCheckoutSessionId
-      : `RS-${booking.id}`;
+  const paymentMethod = "Instant EFT";
+  const paymentReference = booking.paymentReference
+    ? booking.paymentReference
+    : `RS-${booking.id}`;
 
   const pdf = await PDFDocument.create();
   const page = pdf.addPage([595.28, 841.89]); // A4

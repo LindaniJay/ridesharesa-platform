@@ -32,7 +32,6 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
       id: true,
       renterId: true,
       status: true,
-      stripeCheckoutSessionId: true,
       listing: { select: { hostId: true } },
     },
   });
@@ -54,8 +53,7 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
   }
 
   const isPending = booking.status === "PENDING_PAYMENT";
-  const isManual = isPending && !booking.stripeCheckoutSessionId;
-  if (!isManual) {
+  if (!isPending) {
     return NextResponse.json({ error: "Payment proof is only allowed for pending manual/EFT bookings" }, { status: 400 });
   }
 

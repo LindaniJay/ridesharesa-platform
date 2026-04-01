@@ -229,7 +229,7 @@ export default async function ListingDetailsPage({
                     </span>
                   </div>
                   <div className="mt-2 text-xs text-black/50 dark:text-white/50">
-                    Final amount is confirmed on Stripe at checkout.
+                    Final amount is confirmed at checkout.
                   </div>
                 </div>
 

@@ -17,7 +17,6 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
       id: true,
       renterId: true,
       status: true,
-      stripeCheckoutSessionId: true,
       paymentReference: true,
     },
   });
@@ -28,7 +27,7 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
   if (booking.renterId !== dbUser.id) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
-  if (booking.status !== "PENDING_PAYMENT" || booking.stripeCheckoutSessionId) {
+  if (booking.status !== "PENDING_PAYMENT") {
     return NextResponse.json({ error: "This booking is not eligible for manual proof submission" }, { status: 400 });
   }
 

@@ -602,7 +602,6 @@ export default async function AdminDashboardPage({
         id: true,
         status: true,
         paymentReference: true,
-        stripeCheckoutSessionId: true,
         paidAt: true,
         startDate: true,
         endDate: true,
@@ -624,7 +623,6 @@ export default async function AdminDashboardPage({
     prisma.booking.findMany({
       where: {
         status: { in: ["PENDING_PAYMENT", "PENDING_APPROVAL"] },
-        stripeCheckoutSessionId: null,
       },
       orderBy: { createdAt: "desc" },
       take: 50,
@@ -1036,13 +1034,12 @@ export default async function AdminDashboardPage({
 
     const booking = await prisma.booking.findUnique({
       where: { id: bookingId },
-      select: { id: true, status: true, stripeCheckoutSessionId: true },
+      select: { id: true, status: true },
     });
 
-    // Only allow confirming manual (non-Stripe) pending bookings.
+    // Only allow confirming pending bookings.
     if (!booking) return;
     if (booking.status !== "PENDING_PAYMENT") return;
-    if (booking.stripeCheckoutSessionId) return;
 
     await prisma.booking.update({
       where: { id: bookingId },
@@ -1055,7 +1052,7 @@ export default async function AdminDashboardPage({
       action: "markManualBookingPaid",
       targetId: bookingId,
       targetKind: "booking",
-      before: { status: booking.status, stripeCheckoutSessionId: booking.stripeCheckoutSessionId },
+      before: { status: booking.status },
       after: { status: "CONFIRMED", paidAt: true },
     });
 
@@ -2610,8 +2607,8 @@ export default async function AdminDashboardPage({
                                <div className="mt-1 max-w-[220px] text-xs text-foreground/60">{summarizeRiskFlags(bookingRisk.flags, 1)}</div>
                            </td>
                            <td className="px-3 py-2">
-                             <Badge variant={b.stripeCheckoutSessionId ? "info" : "warning"}>
-                               {b.stripeCheckoutSessionId ? "Stripe" : "EFT"}
+                             <Badge variant="warning">
+                               EFT
                              </Badge>
                            </td>
                            <td className="px-3 py-2">
@@ -2631,7 +2628,7 @@ export default async function AdminDashboardPage({
                                  <input type="hidden" name="bookingId" value={b.id} />
                                  <Button type="submit" variant="secondary">Approve</Button>
                                </form>
-                             ) : !b.stripeCheckoutSessionId && b.status === "PENDING_PAYMENT" ? (
+                             ) : b.status === "PENDING_PAYMENT" ? (
                                <form action={markManualBookingPaid}>
                                  <input type="hidden" name="bookingId" value={b.id} />
                                  <Button type="submit" variant="secondary">Mark paid</Button>

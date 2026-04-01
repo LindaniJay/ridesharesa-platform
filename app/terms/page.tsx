@@ -58,7 +58,7 @@ export default function TermsPage() {
           <CardContent>
             <ul className="list-disc space-y-2 pl-5 text-sm text-black/70 dark:text-white/70">
               <li>Bookings are made for a defined start and end date.</li>
-              <li>Payments are processed by our payment provider (e.g., Stripe).</li>
+              <li>Payments are processed via Instant EFT (bank transfer).</li>
               <li>Fees, taxes, and deposits may apply and are shown during checkout.</li>
             </ul>
             <div className="mt-3 text-sm">

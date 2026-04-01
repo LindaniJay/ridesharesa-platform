@@ -44,14 +44,8 @@ export default function CheckoutClient(props: {
 }) {
   const [startDate, setStartDate] = useState(props.initialStartDate ?? "");
   const [endDate, setEndDate] = useState(props.initialEndDate ?? "");
-  const [paymentMethod, setPaymentMethod] = useState<"card" | "eft">("card");
   const [chauffeurEnabled, setChauffeurEnabled] = useState(Boolean(props.initialChauffeurEnabled));
   const [chauffeurKm, setChauffeurKm] = useState<number>(props.initialChauffeurKm ?? 0);
-  const [checklist, setChecklist] = useState({
-    docsReady: false,
-    handoverTime: false,
-    policyRead: false,
-  });
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -101,9 +95,8 @@ export default function CheckoutClient(props: {
     }
 
     setLoading(true);
-    const endpoint = paymentMethod === "eft" ? "/api/checkout/manual" : "/api/checkout/session";
 
-    const res = await fetch(endpoint, {
+    const res = await fetch("/api/checkout/manual", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
@@ -116,7 +109,7 @@ export default function CheckoutClient(props: {
 
     if (!res || !res.ok) {
       const payload = res ? await res.json().catch(() => null) : null;
-      setError(payload?.error ?? "Could not start checkout.");
+      setError(payload?.error ?? "Could not create booking. Please try again.");
       setLoading(false);
       return;
     }
@@ -124,7 +117,7 @@ export default function CheckoutClient(props: {
     const payload = await res.json().catch(() => null);
     const url = payload?.url as string | undefined;
     if (!url) {
-      setError(paymentMethod === "eft" ? "Could not start EFT checkout." : "Stripe checkout URL was missing.");
+      setError("Could not create booking. Please try again.");
       setLoading(false);
       return;
     }
@@ -132,12 +125,15 @@ export default function CheckoutClient(props: {
     window.location.assign(url);
   }
 
+  const hasDates = Boolean(pricing && pricing.days > 0);
+
   return (
     <form onSubmit={onSubmit} className="space-y-4">
+      {/* Step 1: Dates */}
       <div className="rounded-xl border border-border bg-card/70 p-4">
         <div className="mb-3 flex items-center justify-between gap-2">
           <div className="text-sm font-semibold text-foreground/85">1. Trip dates</div>
-          <div className="text-xs text-foreground/55">Max 30 days per booking</div>
+          <div className="text-xs text-foreground/55">Max 30 days</div>
         </div>
         <div className="grid gap-3 sm:grid-cols-2">
           <label className="block">
@@ -150,7 +146,6 @@ export default function CheckoutClient(props: {
               onChange={(e) => setStartDate(e.target.value)}
             />
           </label>
-
           <label className="block">
             <div className="mb-1 text-sm">End date</div>
             <Input
@@ -165,6 +160,7 @@ export default function CheckoutClient(props: {
         </div>
       </div>
 
+      {/* Step 2: Fare summary */}
       <div className="rounded-xl border border-border bg-card/70 p-4 text-sm">
         <div className="mb-3 flex items-center justify-between gap-2">
           <div className="text-sm font-semibold text-foreground/85">2. Fare summary</div>
@@ -177,13 +173,14 @@ export default function CheckoutClient(props: {
         </div>
         <div className="mt-2 flex items-center justify-between">
           <span className="text-foreground/60">Days</span>
-          <span>{pricing?.days && pricing.days > 0 ? pricing.days : "-"}</span>
+          <span>{hasDates ? pricing!.days : "-"}</span>
         </div>
         <div className="mt-2 flex items-center justify-between">
           <span className="text-foreground/60">Rental total</span>
-          <span>{pricing && pricing.days > 0 ? formatMoney(pricing.baseCents, props.currency) : "-"}</span>
+          <span>{hasDates ? formatMoney(pricing!.baseCents, props.currency) : "-"}</span>
         </div>
 
+        {/* Chauffeur add-on */}
         <div className="mt-3 rounded-lg border border-border bg-background/40 p-3">
           <label className="flex cursor-pointer items-start gap-2">
             <input
@@ -194,154 +191,83 @@ export default function CheckoutClient(props: {
             />
             <span>
               <span className="font-medium">Add chauffeur</span>
-              <div className="text-xs text-foreground/60">Adds 10 {props.currency}/km based on your estimated route distance.</div>
+              <div className="text-xs text-foreground/60">Adds 10 {props.currency}/km based on estimated distance.</div>
             </span>
           </label>
 
-          <div className="mt-2 grid gap-2 sm:grid-cols-2">
-            <label className="block">
-              <div className="mb-1 text-xs text-foreground/60">Estimated distance (km)</div>
-              <Input
-                type="number"
-                min={0}
-                step={1}
-                value={Number.isFinite(chauffeurKm) ? chauffeurKm : 0}
-                onChange={(e) => setChauffeurKm(e.target.value === "" ? 0 : Number(e.target.value))}
-                disabled={!chauffeurEnabled}
-              />
-            </label>
-
-            <div className="rounded-lg border border-border bg-card p-2 text-xs">
-              <div className="flex items-center justify-between">
-                <span className="text-foreground/60">Chauffeur total</span>
-                <span>
-                  {pricing && pricing.days > 0 && chauffeurEnabled
-                    ? formatMoney(pricing.chauffeurCents, props.currency)
-                    : "-"}
-                </span>
+          {chauffeurEnabled ? (
+            <div className="mt-2 grid gap-2 sm:grid-cols-2">
+              <label className="block">
+                <div className="mb-1 text-xs text-foreground/60">Estimated distance (km)</div>
+                <Input
+                  type="number"
+                  min={0}
+                  step={1}
+                  value={Number.isFinite(chauffeurKm) ? chauffeurKm : 0}
+                  onChange={(e) => setChauffeurKm(e.target.value === "" ? 0 : Number(e.target.value))}
+                />
+              </label>
+              <div className="rounded-lg border border-border bg-card p-2 text-xs">
+                <div className="flex items-center justify-between">
+                  <span className="text-foreground/60">Chauffeur total</span>
+                  <span>{hasDates ? formatMoney(pricing!.chauffeurCents, props.currency) : "-"}</span>
+                </div>
               </div>
-              <div className="mt-1 text-foreground/50">Calculated as km x 10.</div>
             </div>
-          </div>
+          ) : null}
         </div>
 
         <div className="mt-3 flex items-center justify-between rounded-lg border border-border bg-background/45 px-3 py-2 font-medium">
           <span>Total</span>
-          <span>{pricing && pricing.days > 0 ? formatMoney(pricing.totalCents, props.currency) : "Select dates"}</span>
+          <span>{hasDates ? formatMoney(pricing!.totalCents, props.currency) : "Select dates"}</span>
         </div>
       </div>
 
-      <div className="space-y-2 rounded-xl border border-border bg-card/70 p-4 text-sm">
-        <div className="text-sm font-semibold text-foreground/85">3. Payment method</div>
-        <label className="flex cursor-pointer items-start gap-2 rounded-lg border border-border bg-background/40 p-2.5">
-          <input
-            type="radio"
-            name="paymentMethod"
-            value="card"
-            checked={paymentMethod === "card"}
-            onChange={() => setPaymentMethod("card")}
-            className="mt-1"
-          />
-          <span>
-            <span className="font-medium">Card (Stripe)</span>
-            <div className="text-xs text-foreground/60">Fast and secure checkout on Stripe.</div>
-          </span>
-        </label>
+      {/* Step 3: Confirm & pay via EFT */}
+      <div className="rounded-xl border border-border bg-card/70 p-4 text-sm">
+        <div className="text-sm font-semibold text-foreground/85">3. Confirm & pay via EFT</div>
+        <p className="mt-1 text-xs text-foreground/60">
+          Your booking will be created immediately. You&apos;ll get a unique payment reference to use for your EFT bank transfer.
+        </p>
 
-        <label className="flex cursor-pointer items-start gap-2 rounded-lg border border-border bg-background/40 p-2.5">
-          <input
-            type="radio"
-            name="paymentMethod"
-            value="eft"
-            checked={paymentMethod === "eft"}
-            onChange={() => setPaymentMethod("eft")}
-            className="mt-1"
-          />
-          <span>
-            <span className="font-medium">Instant EFT (manual)</span>
-            <div className="text-xs text-foreground/60">Create booking first, then pay with your unique reference code.</div>
-          </span>
-        </label>
-
-        {paymentMethod === "eft" ? (
-          <div className="rounded-lg border border-border bg-background/40 p-3 text-xs">
-            <div className="font-medium text-foreground/80">Bank details</div>
-            {props.hasEftDetails ? (
-              <div className="mt-2 grid gap-2 text-foreground/70">
-                <div className="flex items-center justify-between gap-3">
-                  <span className="text-foreground/60">Bank</span>
-                  <span>{props.eftDetails.bankName}</span>
-                </div>
-                <div className="flex items-center justify-between gap-3">
-                  <span className="text-foreground/60">Account name</span>
-                  <span>{props.eftDetails.accountName}</span>
-                </div>
-                <div className="flex items-center justify-between gap-3">
-                  <span className="text-foreground/60">Account number</span>
-                  <span>{props.eftDetails.accountNumber}</span>
-                </div>
-                <div className="flex items-center justify-between gap-3">
-                  <span className="text-foreground/60">Branch code</span>
-                  <span>{props.eftDetails.branchCode}</span>
-                </div>
-                <div className="mt-1 text-foreground/50">You will get a payment reference after creating the booking.</div>
+        {props.hasEftDetails ? (
+          <div className="mt-3 rounded-lg border border-border bg-background/40 p-3 text-xs">
+            <div className="font-medium text-foreground/80">Bank details (for your EFT transfer)</div>
+            <div className="mt-2 grid gap-1.5 text-foreground/70">
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-foreground/60">Bank</span>
+                <span>{props.eftDetails.bankName}</span>
               </div>
-            ) : (
-              <div className="mt-2 text-foreground/60">Bank details are currently unavailable. Please contact support to complete payment.</div>
-            )}
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-foreground/60">Account name</span>
+                <span>{props.eftDetails.accountName}</span>
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-foreground/60">Account number</span>
+                <span>{props.eftDetails.accountNumber}</span>
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-foreground/60">Branch code</span>
+                <span>{props.eftDetails.branchCode}</span>
+              </div>
+            </div>
           </div>
         ) : null}
-      </div>
 
-      <div className="rounded-xl border border-border bg-card/70 p-4 text-sm">
-        <div className="text-sm font-semibold text-foreground/85">4. Checkout checklist</div>
-        <div className="mt-1 text-xs text-foreground/60">Complete these checks before confirming payment.</div>
-        <div className="mt-3 space-y-2">
-          <label className="flex items-start gap-2 rounded-lg border border-border bg-background/40 px-3 py-2">
-            <input
-              type="checkbox"
-              checked={checklist.docsReady}
-              onChange={(e) => setChecklist((prev) => ({ ...prev, docsReady: e.target.checked }))}
-              className="mt-1"
-            />
-            <span className="text-xs text-foreground/80">I have my driver license and ID ready for pickup verification.</span>
-          </label>
-          <label className="flex items-start gap-2 rounded-lg border border-border bg-background/40 px-3 py-2">
-            <input
-              type="checkbox"
-              checked={checklist.handoverTime}
-              onChange={(e) => setChecklist((prev) => ({ ...prev, handoverTime: e.target.checked }))}
-              className="mt-1"
-            />
-            <span className="text-xs text-foreground/80">I confirmed pickup time/location with the host or will confirm right after booking.</span>
-          </label>
-          <label className="flex items-start gap-2 rounded-lg border border-border bg-background/40 px-3 py-2">
-            <input
-              type="checkbox"
-              checked={checklist.policyRead}
-              onChange={(e) => setChecklist((prev) => ({ ...prev, policyRead: e.target.checked }))}
-              className="mt-1"
-            />
-            <span className="text-xs text-foreground/80">I understand cancellation, payment, and return responsibilities for this trip.</span>
-          </label>
-        </div>
+        <ul className="mt-3 list-disc pl-5 text-xs text-foreground/60 space-y-1">
+          <li>I have my driver license and ID ready for pickup verification.</li>
+          <li>I understand cancellation, payment, and return responsibilities.</li>
+        </ul>
       </div>
 
       {error ? <div className="rounded-lg border border-red-500/20 bg-red-500/10 px-3 py-2 text-sm text-red-600">{error}</div> : null}
 
-      <Button
-        className="h-11 w-full text-base"
-        disabled={
-          loading ||
-          !checklist.docsReady ||
-          !checklist.handoverTime ||
-          !checklist.policyRead
-        }
-        type="submit"
-      >
-        {loading ? "Redirecting..." : paymentMethod === "eft" ? "Confirm booking and get EFT reference" : "Continue to secure payment"}
+      <Button className="h-11 w-full text-base" disabled={loading || !hasDates} type="submit">
+        {loading ? "Creating booking..." : "Confirm booking & get EFT reference"}
       </Button>
-      <div className="text-center text-xs text-foreground/55">Your final payable amount is confirmed on the payment page.</div>
+      <div className="text-center text-xs text-foreground/55">
+        After confirmation you&apos;ll see your payment reference and can upload proof of payment.
+      </div>
     </form>
   );
 }
