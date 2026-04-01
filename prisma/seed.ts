@@ -305,6 +305,7 @@ async function main() {
       currency: "ZAR",
       status: "ACTIVE" as const,
       isApproved: true,
+      isDemo: true,
     };
 
     const saved = existing

@@ -368,7 +368,10 @@ export default async function ListingsPage({ searchParams }: ListingsPageProps) 
                       priority={false}
                     />
                     <div className="absolute inset-x-0 top-0 flex items-center justify-between p-3">
-                      <span className="rounded-full bg-slate-950/60 px-2.5 py-1 text-[11px] font-medium text-white backdrop-blur">{l.city}</span>
+                      <div className="flex items-center gap-1.5">
+                        <span className="rounded-full bg-slate-950/60 px-2.5 py-1 text-[11px] font-medium text-white backdrop-blur">{l.city}</span>
+                        {l.isDemo ? <span className="rounded-full bg-amber-400/90 px-2.5 py-1 text-[11px] font-semibold text-slate-900">Demo</span> : null}
+                      </div>
                       <span className="rounded-full bg-white/85 px-2.5 py-1 text-[11px] font-semibold text-slate-900">{formatRate(l.dailyRateCents, l.currency)}</span>
                     </div>
                   </div>

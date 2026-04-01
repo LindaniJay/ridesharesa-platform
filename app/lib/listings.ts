@@ -13,6 +13,7 @@ export interface Listing {
   currency: string;
   imageUrl: string | null;
   instantBooking: boolean;
+  isDemo: boolean;
 }
 
 // Prisma to Listing mapper
@@ -28,6 +29,7 @@ export function mapPrismaListing(l: Record<string, unknown>): Listing {
     currency: String(l.currency),
     imageUrl: l.imageUrl ? String(l.imageUrl) : null,
     instantBooking: Boolean(l.instantBooking),
+    isDemo: Boolean(l.isDemo),
   };
 }
 
@@ -44,6 +46,7 @@ export function mapSupabaseListing(row: Record<string, unknown>): Listing {
     currency: String(row.currency),
     imageUrl: row.imageUrl ? String(row.imageUrl) : null,
     instantBooking: Boolean(row.instantBooking),
+    isDemo: Boolean(row.isDemo),
   };
 }
 
@@ -97,6 +100,7 @@ export async function fetchListingsWithFallback(params: FetchListingsParams): Pr
         currency: true,
         imageUrl: true,
         instantBooking: true,
+        isDemo: true,
       },
     });
     return listings.map(mapPrismaListing);
@@ -116,7 +120,7 @@ export async function fetchListingsWithFallback(params: FetchListingsParams): Pr
 async function fetchListingsViaSupabase(params: FetchListingsParams): Promise<Listing[]> {
   let query = supabaseAdmin()
     .from("Listing")
-    .select("id,title,city,country,latitude,longitude,dailyRateCents,currency,imageUrl,instantBooking")
+    .select("id,title,city,country,latitude,longitude,dailyRateCents,currency,imageUrl,instantBooking,isDemo")
     .eq("status", "ACTIVE")
     .eq("isApproved", true)
     .limit(params.take ?? 50);

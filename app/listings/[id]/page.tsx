@@ -81,6 +81,7 @@ export default async function ListingDetailsPage({
         dailyRateCents: true,
         currency: true,
         imageUrl: true,
+        isDemo: true,
       },
     }),
     prisma.booking.findMany({
@@ -119,7 +120,10 @@ export default async function ListingDetailsPage({
   return (
     <main className="space-y-6">
       <div className="space-y-1">
-        <h1 className="text-2xl font-semibold tracking-tight">{listing.title}</h1>
+        <div className="flex items-center gap-2">
+          <h1 className="text-2xl font-semibold tracking-tight">{listing.title}</h1>
+          {listing.isDemo ? <span className="rounded-full bg-amber-400/90 px-2.5 py-1 text-xs font-semibold text-slate-900">Demo</span> : null}
+        </div>
         <div className="text-sm text-foreground/60">
           {listing.city}, {listing.country}
         </div>
