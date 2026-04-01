@@ -6,6 +6,7 @@ export const dynamic = "force-dynamic";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/app/components/ui/Card";
 import { RESERVED_BOOKING_STATUSES } from "@/app/lib/bookings";
 import { prisma } from "@/app/lib/prisma";
+import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
 import { requireRole } from "@/app/lib/require";
 import CheckoutClient from "@/app/checkout/[listingId]/CheckoutClient";
 
@@ -42,22 +43,42 @@ export default async function CheckoutPage({
   const initialChauffeurKm = firstInt(resolvedSearchParams?.chauffeurKm) ?? 0;
   const initialChauffeurEnabled = first(resolvedSearchParams?.chauffeur).trim() === "1" || initialChauffeurKm > 0;
 
-  const listing = await prisma.listing.findFirst({
-    where: { id: resolvedParams.listingId, status: "ACTIVE", isApproved: true },
-    select: {
-      id: true,
-      title: true,
-      city: true,
-      imageUrl: true,
-      dailyRateCents: true,
-      currency: true,
-    },
-  });
+  const listing = await (async () => {
+    try {
+      return await prisma.listing.findFirst({
+        where: { id: resolvedParams.listingId, status: "ACTIVE", isApproved: true },
+        select: {
+          id: true,
+          title: true,
+          city: true,
+          imageUrl: true,
+          dailyRateCents: true,
+          currency: true,
+        },
+      });
+    } catch {
+      // Prisma failed — try Supabase fallback
+      try {
+        const { data, error } = await supabaseAdmin()
+          .from("Listing")
+          .select("id,title,city,imageUrl,dailyRateCents,currency")
+          .eq("id", resolvedParams.listingId)
+          .eq("status", "ACTIVE")
+          .eq("isApproved", true)
+          .limit(1)
+          .single();
+        if (error || !data) return null;
+        return data as { id: string; title: string; city: string; imageUrl: string | null; dailyRateCents: number; currency: string };
+      } catch {
+        return null;
+      }
+    }
+  })();
 
   if (!listing) redirect("/listings");
 
-  // If dates are present, enforce availability here too (server-side) so the page
-  // doesn't show a checkout form for impossible dates.
+  // If dates are present, check for conflicts. If the check fails (DB error),
+  // let the user proceed — the API will re-check before creating the booking.
   const start = initialStartDate ? new Date(initialStartDate) : null;
   const end = initialEndDate ? new Date(initialEndDate) : null;
   const hasValidDates =
@@ -66,18 +87,26 @@ export default async function CheckoutPage({
     !Number.isNaN(end!.getTime()) &&
     end!.getTime() > start!.getTime();
 
+  let hasConflict = false;
   if (hasValidDates) {
-    const conflict = await prisma.booking.findFirst({
-      where: {
-        listingId: listing.id,
-        status: { in: RESERVED_BOOKING_STATUSES },
-        startDate: { lt: end! },
-        endDate: { gt: start! },
-      },
-      select: { id: true },
-    });
+    try {
+      const conflict = await prisma.booking.findFirst({
+        where: {
+          listingId: listing.id,
+          status: { in: RESERVED_BOOKING_STATUSES },
+          startDate: { lt: end! },
+          endDate: { gt: start! },
+        },
+        select: { id: true },
+      });
+      hasConflict = Boolean(conflict);
+    } catch {
+      // DB check failed — allow checkout, the API endpoint will re-validate
+      hasConflict = false;
+    }
+  }
 
-    if (conflict) {
+  if (hasConflict) {
       return (
         <main className="mx-auto max-w-xl space-y-4">
           <div className="text-sm text-foreground/60">
@@ -114,7 +143,6 @@ export default async function CheckoutPage({
           </Card>
         </main>
       );
-    }
   }
 
   const listingId = listing.id;

@@ -61,84 +61,92 @@ async function createManualBooking(params: {
 }
 
 export async function POST(req: Request) {
-  const { dbUser } = await requireRole("RENTER");
-  const renterId = dbUser.id;
+  try {
+    const { dbUser } = await requireRole("RENTER");
+    const renterId = dbUser.id;
 
-  const body = await req.json().catch(() => null);
-  const parsed = BodySchema.safeParse(body);
-  if (!parsed.success) {
-    return NextResponse.json({ error: "Invalid request" }, { status: 400 });
-  }
+    const body = await req.json().catch(() => null);
+    const parsed = BodySchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json({ error: "Invalid request" }, { status: 400 });
+    }
 
-  const { listingId, startDate: startRaw, endDate: endRaw } = parsed.data;
+    const { listingId, startDate: startRaw, endDate: endRaw } = parsed.data;
 
-  const listing = await prisma.listing.findFirst({
-    where: { id: listingId, status: "ACTIVE", isApproved: true },
-    select: { id: true, dailyRateCents: true, currency: true },
-  });
+    const listing = await prisma.listing.findFirst({
+      where: { id: listingId, status: "ACTIVE", isApproved: true },
+      select: { id: true, dailyRateCents: true, currency: true },
+    });
 
-  if (!listing) {
-    return NextResponse.json({ error: "Listing not found" }, { status: 404 });
-  }
+    if (!listing) {
+      return NextResponse.json({ error: "Listing not found or no longer available. Please go back and try again." }, { status: 404 });
+    }
 
-  const start = new Date(startRaw);
-  const end = new Date(endRaw);
-  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
-    return NextResponse.json({ error: "Invalid dates" }, { status: 400 });
-  }
+    const start = new Date(startRaw);
+    const end = new Date(endRaw);
+    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+      return NextResponse.json({ error: "Invalid dates" }, { status: 400 });
+    }
 
-  const days = daysBetween(start, end);
-  if (days <= 0 || days > 30) {
-    return NextResponse.json({ error: "Invalid date range" }, { status: 400 });
-  }
+    const days = daysBetween(start, end);
+    if (days <= 0 || days > 30) {
+      return NextResponse.json({ error: "Invalid date range" }, { status: 400 });
+    }
 
-  const conflict = await prisma.booking.findFirst({
-    where: {
+    const conflict = await prisma.booking.findFirst({
+      where: {
+        listingId: listing.id,
+        status: { in: RESERVED_BOOKING_STATUSES },
+        startDate: { lt: end },
+        endDate: { gt: start },
+      },
+      select: { id: true },
+    });
+
+    if (conflict) {
+      return NextResponse.json({ error: "This vehicle is not available for the selected dates. Please choose different dates." }, { status: 409 });
+    }
+
+    const chauffeurEnabled = parsed.data.chauffeur?.enabled === true;
+    const chauffeurKm = chauffeurEnabled ? parsed.data.chauffeur?.kilometers ?? 0 : 0;
+    if (chauffeurEnabled && chauffeurKm <= 0) {
+      return NextResponse.json({ error: "Invalid chauffeur kilometers" }, { status: 400 });
+    }
+
+    const { totalCents } = calculateBookingTotalCents({
+      days,
+      dailyRateCents: listing.dailyRateCents,
+      chauffeurEnabled,
+      chauffeurKm,
+    });
+
+    const booking = await createManualBooking({
       listingId: listing.id,
-      status: { in: RESERVED_BOOKING_STATUSES },
-      startDate: { lt: end },
-      endDate: { gt: start },
-    },
-    select: { id: true },
-  });
+      renterId,
+      startDate: start,
+      endDate: end,
+      days,
+      totalCents,
+      currency: listing.currency,
+    });
 
-  if (conflict) {
-    return NextResponse.json({ error: "This vehicle is not available for the selected dates." }, { status: 409 });
+    const breakdownParams = new URLSearchParams();
+    if (chauffeurEnabled && chauffeurKm > 0) {
+      breakdownParams.set("chauffeurKm", String(chauffeurKm));
+      breakdownParams.set("chauffeurRate", "10");
+    }
+    const breakdownQuery = breakdownParams.toString();
+    const breakdownSuffix = breakdownQuery ? `?${breakdownQuery}` : "";
+
+    return NextResponse.json({
+      bookingId: booking.id,
+      url: `/bookings/${booking.id}${breakdownSuffix}`,
+    });
+  } catch (err: unknown) {
+    console.error("[checkout/manual] unexpected error:", err);
+    return NextResponse.json(
+      { error: "Something went wrong. Please try again in a moment." },
+      { status: 500 },
+    );
   }
-
-  const chauffeurEnabled = parsed.data.chauffeur?.enabled === true;
-  const chauffeurKm = chauffeurEnabled ? parsed.data.chauffeur?.kilometers ?? 0 : 0;
-  if (chauffeurEnabled && chauffeurKm <= 0) {
-    return NextResponse.json({ error: "Invalid chauffeur kilometers" }, { status: 400 });
-  }
-
-  const { totalCents } = calculateBookingTotalCents({
-    days,
-    dailyRateCents: listing.dailyRateCents,
-    chauffeurEnabled,
-    chauffeurKm,
-  });
-
-  const booking = await createManualBooking({
-    listingId: listing.id,
-    renterId,
-    startDate: start,
-    endDate: end,
-    days,
-    totalCents,
-    currency: listing.currency,
-  });
-
-  const breakdownParams = new URLSearchParams();
-  if (chauffeurEnabled && chauffeurKm > 0) {
-    breakdownParams.set("chauffeurKm", String(chauffeurKm));
-    breakdownParams.set("chauffeurRate", "10");
-  }
-  const breakdownQuery = breakdownParams.toString();
-  const breakdownSuffix = breakdownQuery ? `?${breakdownQuery}` : "";
-
-  return NextResponse.json({
-    bookingId: booking.id,
-    url: `/bookings/${booking.id}${breakdownSuffix}`,
-  });
 }
