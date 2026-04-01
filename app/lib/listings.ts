@@ -31,7 +31,7 @@ export function mapPrismaListing(l: Record<string, unknown>): Listing {
   };
 }
 
-// Supabase to Listing mapper
+// Supabase to Listing mapper (columns are camelCase — Prisma default without @@map)
 export function mapSupabaseListing(row: Record<string, unknown>): Listing {
   return {
     id: String(row.id),
@@ -40,10 +40,10 @@ export function mapSupabaseListing(row: Record<string, unknown>): Listing {
     country: String(row.country),
     latitude: Number(row.latitude),
     longitude: Number(row.longitude),
-    dailyRateCents: Number(row.daily_rate_cents),
+    dailyRateCents: Number(row.dailyRateCents),
     currency: String(row.currency),
-    imageUrl: row.image_url ? String(row.image_url) : null,
-    instantBooking: Boolean(row.instant_booking),
+    imageUrl: row.imageUrl ? String(row.imageUrl) : null,
+    instantBooking: Boolean(row.instantBooking),
   };
 }
 
@@ -100,47 +100,53 @@ export async function fetchListingsWithFallback(params: FetchListingsParams): Pr
       },
     });
     return listings.map(mapPrismaListing);
-  } catch (err) {
-    // Fallback to Supabase if transient error
-    const message = err instanceof Error ? err.message : String(err ?? "");
-    if (!/timeout|etimedout|econnreset|connection terminated|can't reach database server/i.test(message)) {
-      throw err;
+  } catch (prismaErr) {
+    // Always fall back to Supabase on any Prisma failure
+    console.warn("[listings] Prisma failed, trying Supabase fallback:", prismaErr instanceof Error ? prismaErr.message : prismaErr);
+    try {
+      return await fetchListingsViaSupabase(params);
+    } catch (fallbackErr) {
+      console.error("[listings] Supabase fallback also failed:", fallbackErr instanceof Error ? fallbackErr.message : fallbackErr);
+      throw fallbackErr;
     }
-    // Supabase fallback
-    let query = supabaseAdmin()
-      .from("Listing")
-      .select("id,title,city,country,latitude,longitude,daily_rate_cents,currency,image_url,instant_booking")
-      .eq("status", "ACTIVE")
-      .eq("is_approved", true)
-      .limit(params.take ?? 50);
-    if (params.q) {
-      const escapedQ = params.q.replace(/[,%]/g, "");
-      query = query.or(`title.ilike.%${escapedQ}%,city.ilike.%${escapedQ}%,country.ilike.%${escapedQ}%`);
-    }
-    if (params.minPrice) {
-      query = query.gte("daily_rate_cents", Math.round(params.minPrice * 100));
-    }
-    if (params.maxPrice) {
-      query = query.lte("daily_rate_cents", Math.round(params.maxPrice * 100));
-    }
-    if (params.instantBooking) {
-      query = query.eq("instant_booking", true);
-    }
-    if (params.carType) {
-      const escapedType = params.carType.replace(/[,%]/g, "");
-      query = query.ilike("title", `%${escapedType}%`);
-    }
-    if (params.sort === "price_asc") {
-      query = query.order("daily_rate_cents", { ascending: true });
-    } else if (params.sort === "price_desc") {
-      query = query.order("daily_rate_cents", { ascending: false });
-    } else {
-      query = query.order("created_at", { ascending: false });
-    }
-    const { data, error } = await query;
-    if (error) throw new Error(error.message);
-    return (data ?? []).map(mapSupabaseListing);
   }
+}
+
+// Standalone Supabase listing query (used as fallback)
+async function fetchListingsViaSupabase(params: FetchListingsParams): Promise<Listing[]> {
+  let query = supabaseAdmin()
+    .from("Listing")
+    .select("id,title,city,country,latitude,longitude,dailyRateCents,currency,imageUrl,instantBooking")
+    .eq("status", "ACTIVE")
+    .eq("isApproved", true)
+    .limit(params.take ?? 50);
+  if (params.q) {
+    const escapedQ = params.q.replace(/[,%]/g, "");
+    query = query.or(`title.ilike.%${escapedQ}%,city.ilike.%${escapedQ}%,country.ilike.%${escapedQ}%`);
+  }
+  if (params.minPrice) {
+    query = query.gte("dailyRateCents", Math.round(params.minPrice * 100));
+  }
+  if (params.maxPrice) {
+    query = query.lte("dailyRateCents", Math.round(params.maxPrice * 100));
+  }
+  if (params.instantBooking) {
+    query = query.eq("instantBooking", true);
+  }
+  if (params.carType) {
+    const escapedType = params.carType.replace(/[,%]/g, "");
+    query = query.ilike("title", `%${escapedType}%`);
+  }
+  if (params.sort === "price_asc") {
+    query = query.order("dailyRateCents", { ascending: true });
+  } else if (params.sort === "price_desc") {
+    query = query.order("dailyRateCents", { ascending: false });
+  } else {
+    query = query.order("createdAt", { ascending: false });
+  }
+  const { data, error } = await query;
+  if (error) throw new Error(error.message);
+  return (data ?? []).map(mapSupabaseListing);
 }
 
 // Utility for formatting rates
