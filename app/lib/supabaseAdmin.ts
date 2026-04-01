@@ -1,23 +1,16 @@
 import { createClient } from "@supabase/supabase-js";
 
 function requireEnv(name: string) {
-  const value = process.env[name]?.trim();
+  // Strip ALL whitespace (newlines, spaces, tabs) — Vercel sometimes injects
+  // line-breaks inside long env values when pasted via the dashboard.
+  const value = process.env[name]?.replace(/\s+/g, "");
   if (!value) throw new Error(`Missing env var: ${name}`);
   return value;
 }
 
 export function supabaseAdmin() {
-  const url = (process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || requireEnv("SUPABASE_URL")).trim();
+  const url = (process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || requireEnv("SUPABASE_URL")).replace(/\s+/g, "");
   const serviceRoleKey = requireEnv("SUPABASE_SERVICE_ROLE_KEY");
-
-  // Validate key is a well-formed JWT (3 dot-separated base64 segments)
-  const parts = serviceRoleKey.split(".");
-  if (parts.length !== 3 || parts.some((p) => p.length === 0)) {
-    throw new Error(
-      `SUPABASE_SERVICE_ROLE_KEY is not a valid JWT (got ${parts.length} segment(s), length ${serviceRoleKey.length}). ` +
-        "Check for truncation or extra whitespace in your environment variables.",
-    );
-  }
 
   return createClient(url, serviceRoleKey, {
     auth: { persistSession: false, autoRefreshToken: false },
